@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script
+      src="https://kit.fontawesome.com/64d58efce2.js"
+      crossorigin="anonymous"
+    ></script>
+    <link rel="stylesheet" href="/static/css/login_style.css" />
+    <title>Welcome!</title>
+  </head>
+  <body>
+    <div class="container">
+      <div class="forms-container">
+        <div class="signin-signup">
+          <form action="#" class="sign-in-form" autocomplete="off">
+            <!--input copy/cut/paste prohibited-->
+            <h2 class="title">Sign in</h2>
+            <div class="input-field">
+              <i class="fas fa-user"></i>
+              <input type="text" id="userid_input" placeholder="UserID" pattern="[a-zA-Z0-9]{4,10}" oncut="return false" oncopy="return false" onpaste="return false" required/>
+            </div>
+            <div class="input-field">
+              <i class="fas fa-lock"></i>
+              <input type="password" id="password_input" placeholder="Password" oncut="return false" oncopy="return false" onpaste="return false" required/>
+            </div>
+            <a class="forgotpwtxt" id="forgot_pw_link">Forgot password?</a>
+            <div class="employee_login_selection" style="margin-top:5px;">
+              <label for="employee_login_check" style="color:white;">I am :</label>
+              <select name="employee_login_check" class="employee_login_check">
+                <option value="customer">a Customer</option>
+                <option value="tier1">Tier 1 Employee</option>
+                <option value="tier2">Tier 2 Employee</option>
+                <option value="admin">Administrator</option>
+              </select>
+            </div>
+            <input type="text" id="honey_input" placeholder="UserID" value='' style="display:none"/>
+            <input type="submit" value="Login" class="btn solid" />
+          </form>
+          <form action="#" class="forgot-pw-form">
+            <h2 class="title">Authenticate</h2>
+            <div class="employee_login_selection" style="margin-top:5px;">
+              <label for="employee_login_check" style="color:white;margin-left:20px;">I am :</label>
+              <select name="employee_login_check" class="auth_usertype_check">
+                <option value="Customer">a Customer</option>
+                <option value="Employee">Tier 1 Employee</option>
+                <option value="Employee">Tier 2 Employee</option>
+                <option value="Employee">Administrator</option>
+              </select>
+            </div>
+            <div class="input-field">
+              <i class="fas fa-user"></i>
+              <input type="text" placeholder="Enter User ID" id="forgotpw_userid" pattern="[a-zA-Z0-9]{4,10}" oncut="return false" oncopy="return false" onpaste="return false" required/>
+            </div>
+            <!-- <span class="squestions">What was your childhood nickname?</span>
+            <div class="input-field">
+              <div></div>
+              <input type="text" placeholder="Security Answer" id="forgotpw_sec1" oncut="return false" oncopy="return false" onpaste="return false" required/>
+            </div>
+            <span class="squestions">Who was your childhood hero?</span>
+            <div class="input-field">
+              <div></div>
+              <input type="text" placeholder="Security Answer" id="forgotpw_sec2" oncut="return false" oncopy="return false" onpaste="return false" required/>
+            </div> -->
+            <input type="submit" id="otpsend" value="Send OTP" class="btn solid" />
+            <span id="otptimer">60</span>
+            <div class="input-field">
+              <i class="fas fa-keyboard" id="virtual_keyboard"></i>
+              <input type="text" placeholder="Enter OTP" id="otp_verify_input" pattern="\d*" maxlength="10" oninput="validity.valid||(value='');" oncut="return false" oncopy="return false" onpaste="return false"/>
+            </div>
+            <div id="keyboard" style="display: none">
+              <div class="row r1">
+                <span class="key i num" id="key_1">1</span>
+                <span class="key i num" id="key_2">2</span>
+                <span class="key i num" id="key_3">3</span>
+              </div>
+              <div class="row r2">
+                <span class="key i num" id="key_4">4</span>
+                <span class="key i num" id="key_5">5</span>
+                <span class="key i num" id="key_6">6</span>
+              </div>
+              <div class="row r3">
+                <span class="key i num" id="key_7">7</span>
+                <span class="key i num" id="key_8">8</span>
+                <span class="key i num" id="key_9">9</span>
+              </div>
+              <div class="row r4">
+                <span class="key i num" id="key_backs"><i class="fas fa-backspace"></i></span>
+                <span class="key i num" id="key_0">0</span>
+                <span class="key i num" id="key_ac">AC</i></span>
+              </div>
+            </div>
+            <input type="button" id="otp_verify_btn" value="Verify" class="btn solid" />
+          </form>
+          <form action="#" class="reset-pw-form">
+            <h2 class="title">Reset Password</h2>
+            <div class="input-field">
+              <i class="fas fa-lock"></i>
+              <input type="password" id="reset_pw_1" placeholder="Enter New Password" pattern="(?=.*\d)(?=.*[a-z])(?=.*[A-Z]).{8,16}" oncut="return false" oncopy="return false" onpaste="return false" required/>
+              <div class="tooltip pwtt">
+                <i class="fas fa-question-circle"></i>
+                <span class="tooltiptext pwttt">Length must be between 8-16 characters and Must contain at least : 1 UPPERCASE letter, 1 lowercase letter, 1 number.</span>
+              </div>
+            </div>
+            <div class="input-field">
+              <i class="fas fa-lock"></i>
+              <input type="password" id="reset_pw_2" placeholder="Confirm New Password" pattern="(?=.*\d)(?=.*[a-z])(?=.*[A-Z]).{8,16}" oncut="return false" oncopy="return false" onpaste="return false" required/>
+            </div>
+            <input type="submit" id="reset_pw_btn" value="Reset" class="btn solid" />
+            <svg id="checkmark" visibility="hidden" class="checkmark" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 52 52">
+              <circle id="checkmark_circle" cx="26" cy="26" r="25" fill="none"/>
+              <path id="checkmark_check" fill="none" d="M14.1 27.2l7.1 7.2 16.7-16.8"/>
+            </svg>
+          </form>
+          <form class="sign-up-form" id="sign_up_form_1">
+            <h2 class="title">Customer Sign up</h2>
+            <div class="input-field">
+              <i class="fas fa-user"></i>
+              <input type="text" placeholder="UserID" id="register_userid" pattern="[a-zA-Z0-9]{4,10}" oncut="return false" oncopy="return false" onpaste="return false" required/>
+              <div class="tooltip useridtt">
+                <i class="fas fa-question-circle"></i>
+                <span class="tooltiptext useridttt">Length : 4-10 characters. Only accepts letters and numbers.</span>
+              </div>
+            </div>
+            <div class="input-field">
+              <i class="fas fa-envelope"></i>
+              <input type="email" placeholder="Email" id="register_email" pattern="[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$" oncut="return false" oncopy="return false" onpaste="return false" required/>
+            </div>
+            <div class="input-field">
+              <i class="fas fa-lock"></i>
+              <input type="password" placeholder="Password" id="register_password" pattern="(?=.*\d)(?=.*[a-z])(?=.*[A-Z]).{8,16}" oncut="return false" oncopy="return false" onpaste="return false" required/>
+              <div class="tooltip pwtt">
+                <i class="fas fa-question-circle"></i>
+                <span class="tooltiptext pwttt">Length must be between 8-16 characters and Must contain at least : 1 UPPERCASE letter, 1 lowercase letter, 1 number.</span>
+              </div>
+            </div>
+            <div class="input-field">
+              <i class="fas fa-lock"></i>
+              <input type="password" placeholder="Confirm Password" id="register_confirm_password" pattern="(?=.*\d)(?=.*[a-z])(?=.*[A-Z]).{8,16}" oncut="return false" oncopy="return false" onpaste="return false" required/>
+            </div>
+            <div style="max-width: 350px;width: 100%;margin: 10px 0;height: 55px;">
+              <input type="checkbox" id="agree_checkbox">
+              <span style="color:white"> I have read and agree to all </span>
+              <a class="forgotpwtxt" id="tnc_link" href="/static/docs/Terms-and-Conditions.pdf" target="_blank">Terms and Conditions</a>
+            </div>
+            <input type="submit" class="btn" value="Next >" id="next_btn_1"/>
+          </form>
+          <form class="user-details-form" id="sign_up_form_2">
+            <h2 class="title">Personal Details</h2>
+            <div class="input-field">
+              <i class="fas fa-user"></i>
+              <input type="text" placeholder="First Name" id="register_fname" pattern="[a-zA-Z]+" oncut="return false" oncopy="return false" onpaste="return false" required/>
+              <div class="tooltip namett">
+                <i class="fas fa-question-circle"></i>
+                <span class="tooltiptext namettt">Name cannot contain numbers or special characters.</span>
+              </div>
+            </div>
+            <div class="input-field">
+              <i class="fas fa-user"></i>
+              <input type="text" placeholder="Middle Name" id="register_mname" pattern="[a-zA-Z]*" oncut="return false" oncopy="return false" onpaste="return false" />
+            </div>
+            <div class="input-field">
+              <i class="fas fa-user"></i>
+              <input type="text" placeholder="Last Name" id="register_lname" pattern="[a-zA-Z]+" oncut="return false" oncopy="return false" onpaste="return false" required/>
+            </div>
+            <div class="input-field">
+              <i class="fas fa-phone-alt"></i>
+              <input type="text" placeholder="Contact No." id="register_phone" pattern="[0-9]{10}" oncut="return false" oncopy="return false" onpaste="return false" required/>
+              <div class="tooltip phonett">
+                <i class="fas fa-question-circle"></i>
+                <span class="tooltiptext phonettt">Contact no. can be 10 digits only. We support only US phone numbers.</span>
+              </div>
+            </div>
+            <div class="input-field">
+              <i class="fas fa-calendar-alt"></i>
+              <input type="text" placeholder="DOB (MM/DD/YYYY)" id="register_dob" oncut="return false" oncopy="return false" onpaste="return false" required/>
+            </div>
+            <div class="input-field">
+              <i class="fas fa-id-card"></i>
+              <input type="text" placeholder="SSN (9 digits only)" id="register_ssn" pattern="[0-9]{9}" oncut="return false" oncopy="return false" onpaste="return false" required/>
+            </div>
+            <div class="button-group">
+              <input type="button" class="btn" value="< Previous" id="prev_btn_1"/>
+              <input type="submit" class="btn" value="Next >" id="next_btn_2" />
+            </div>
+          </form>
+          <form class="address-info-form" id="sign_up_form_3">
+            <h2 class="title">Address</h2>
+            <div class="input-field">
+              <i class="fas fa-map-marker-alt"></i>
+              <input type="text" placeholder="Address Line 1" id="register_address1" oncut="return false" oncopy="return false" onpaste="return false" required/>
+            </div>
+            <div class="input-field">
+              <div></div>
+              <input type="text" placeholder="Address Line 2" id="register_address2" oncut="return false" oncopy="return false" onpaste="return false" />
+            </div>
+            <div class="button-group">
+              <input class="split-input" type="text" placeholder="State" id="register_state" oncut="return false" oncopy="return false" onpaste="return false" required/>
+              <input class="split-input" type="text" placeholder="ZIP" id="register_zip" oncut="return false" oncopy="return false" onpaste="return false" required/>
+            </div>
+            <div class="button-group">
+              <input type="button" class="btn" value="< Previous" id="prev_btn_2"/>
+              <input type="submit" class="btn" value="Finish" id="sign_up_finish" />
+            </div>
+          </form>
+          <!-- <form class="security-questions-form" id="sign_up_form_4">
+            <h2 class="title">Security Questions</h2>
+            <span class="squestions">What was your childhood nickname?</span>
+            <div class="input-field">
+              <i class="fas fa-key"></i>
+              <input type="text" placeholder="Security Answer" id="register_sec1" oncut="return false" oncopy="return false" onpaste="return false" required/>
+            </div>
+            <span class="squestions">Who was your childhood hero?</span>
+            <div class="input-field">
+              <i class="fas fa-key"></i>
+              <input type="text" placeholder="Security Answer" id="register_sec2" oncut="return false" oncopy="return false" onpaste="return false" required/>
+            </div>
+            <div class="button-group">
+              <input type="button" class="btn" value="< Previous" id="prev_btn_3"/>
+              <input type="submit" class="btn" value="Finish" id="sign_up_finish" />
+            </div>
+          </form> -->
+        </div>
+      </div>
+
+      <div class="panels-container">
+        <div class="panel left-panel">
+          <div class="content">
+            <h3>SunDevil Bank</h3>
+            <p>
+              New here? Sign up and Get Started with our secure online banking solutions.<br><br>
+              <b>DISCLAIMER: THIS IS NOT A REAL BANK! DO NOT USE ANY REAL INFORMATION IN SIGN-UP FORM. THIS IS FOR A STUDENT PROJECT FOR CSE545 AT ASU. IF YOU ARE NOT A STUDENT IN THE CLASS GRADING OUR PROJECT, PLEASE DO NOT USE THIS WEBSITE.</b>
+            </p>
+            <button class="btn transparent" id="sign-up-btn">
+              Sign up
+            </button>
+          </div>
+          <img src="/static/img/login.svg" class="image" alt="" />
+        </div>
+        <div class="panel right-panel">
+          <div class="content">
+            <h3>One of us ?</h3>
+            <p>
+              Sign in to your existing account to access all our secure banking features.
+            </p>
+            <button class="btn transparent" id="sign-in-btn">
+              Sign in
+            </button>
+          </div>
+          <img src="/static/img/register.svg" class="image" alt="" />
+        </div>
+      </div>
+    </div>
+
+    <script src="/static/js/login.js"></script>
+  </body>
+</html>
