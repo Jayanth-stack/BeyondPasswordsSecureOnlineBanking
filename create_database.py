@@ -5,6 +5,7 @@ from utility.encrypt import encrypt
 from datetime import datetime
 
 
+
 def getdate():
     now = datetime.now()
     return now.strftime("%d/%m/%Y %H:%M:%S")
@@ -14,6 +15,7 @@ db = mysql.connector.connect(
     host="localhost",
     user="root",
     password="root",
+    port="3306",
     database="bankingapplication"
 )
 

@@ -4,11 +4,13 @@ from customer import Customers
 from utility.encrypt import encrypt
 from datetime import datetime
 import mysql.connector
+import pymysql
 
 db = mysql.connector.connect(
     host="localhost",
     user="root",
     password="root",
+    port="3306",
     database="bankingapplication"
 )
 
@@ -643,5 +645,5 @@ class Employee:
 
 # emp.get_employee_tier('1')
 emp = Employee()
-# print(emp.create_employee('anilkh', "khadwal",  "", "ROHIT",  "6205709721", "ani1asq@gmail.com", "password","ssn1sa214", getdate(), 1))
-# create_employee(self, emp_id, last_name, middle_name, first_name, contact_no, email_id,  password, dob, ssn, tier, active=1,  address="")
+print(emp.create_employee('anilkh', "khadwal",  "", "ROHIT",  "6205709721", "ani1asq@gmail.com", "password","ssn1sa214", getdate(), 1))
+#create_employee(self, emp_id, last_name, middle_name, first_name, contact_no, email_id,  password, dob, ssn, tier, active=1,  address="")
