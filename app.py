@@ -1,8 +1,11 @@
 import logging
 
-from flask import Flask, session, jsonify, request, send_from_directory, redirect, url_for, escape
+from flask import Flask, session, jsonify, request, send_from_directory, redirect, url_for
 from flask_cors import CORS, cross_origin
-from customer import Customer
+import json
+from customer import customer, Customers
+from markupsafe import escape
+from employee import Employee
 import json
 
 from werkzeug.utils import secure_filename
