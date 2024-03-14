@@ -5,11 +5,11 @@ from datetime import datetime
 import mysql.connector
 
 db = mysql.connector.connect(
-    host="127.0.0.1",
+    host="localhost",
     port="3306",
     user="root",
     password="root",
-    database="bankingSystem"
+    database="bankingapplication"
 )
 
 cursor = db.cursor()
