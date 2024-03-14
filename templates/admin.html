@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<head>
+    <title>Admin Dashboard</title>
+
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css">
+    <link rel="stylesheet" href="/static/css/admin_style.css" />
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/js/bootstrap.min.js"></script>
+</head>
+
+
+<nav class="navbar navbar-custom">
+
+    <div class="container-fluid">
+        <div class="navbar-header">
+
+
+            <button type="button" class="navbar-toggle"
+                    data-toggle="collapse" data-target="#myNavbar">
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+            </button>
+
+
+            <a class="navbar-brand" id="home_logo" style="color: yellow">
+                Konoha Bank- Admin</a>
+
+        </div>
+        <div class="collapse navbar-collapse" id="myNavbar">
+            <ul class="nav navbar-nav navbar-right">
+                <li><a id="account_details_btn"><span class="glyphicon glyphicon-user"
+                                                      style="color: white"></span> Account Details</a></li>
+                <li><a id="logout_btn"><span class="glyphicon glyphicon-log-out"
+                                             style="color: white"></span> Logout</a></li>
+            </ul>
+        </div>
+    </div>
+</nav>
+
+<div class="loader-wrapper">
+    <span class="loader"><span class="loader-inner"></span></span>
+</div>
+
+
+<div class="container-fluid">
+
+    <div class="row">
+        <div class="col-sm-3">
+
+            <button type="button" class="btn btn-primary btn-block"
+                    id="empl_accs_btn">
+        <span class="glyphicon glyphicon-list-alt gi-3x"
+              style="color: white" aria-hidden="true">
+        </span>
+                <br />
+                View Employee Accounts
+            </button>
+
+            <button type="button" class="btn btn-primary btn-block"
+                    id="create_accs_btn">
+        <span class="glyphicon glyphicon-plus-sign gi-3x"
+              style="color: white" aria-hidden="true">
+        </span>
+                <br />
+                Create Employee Account
+            </button>
+
+            <button type="button" class="btn btn-primary btn-block"
+                    id="modify_accs_btn">
+        <span class="glyphicon glyphicon-edit gi-3x"
+              style="color: white" aria-hidden="true">
+        </span>
+                <br />
+                Modify Employee Account
+            </button>
+
+            <button type="button" class="btn btn-primary btn-block"
+                    id="empl_requests_btn">
+        <span class="glyphicon glyphicon-transfer gi-3x"
+              style="color: white" aria-hidden="true">
+        </span>
+                <br />
+                Employee Requests
+            </button>
+
+            <button type="button" class="btn btn-primary btn-block"
+                    id="app_dec_requests_btn">
+        <span class="glyphicon glyphicon-ok-circle gi-3x"
+              style="color: white" aria-hidden="true">
+        </span>
+                <span class="glyphicon glyphicon-remove-circle gi-3x"
+                      style="color: white" aria-hidden="true">
+        </span>
+                <br />
+                Approve/Decline Requests
+            </button>
+
+            <button type="button" class="btn btn-primary btn-block"
+                    id="sys_log_btn">
+        <span class="glyphicon glyphicon-file gi-3x"
+              style="color: white" aria-hidden="true">
+        </span>
+                <br />
+                System Log
+            </button>
+
+        </div>
+
+        <div id="empl_accs_pane">
+            <div class="empl_accs_content">
+                <h4 class="header_text" style="color:white;">Search by Employee ID</h4>
+                <hr class="header_divider" />
+                <label class="custom_label"><b>Employee ID : </b></label> <input type="text" id="employee_id_input" placeholder="Enter ID"/><br>
+                <button type="button" id="employee_id_input_btn" class="btn btn-primary" style="width:50%;margin-bottom:10px;margin-top:20px;">Search</button><br>
+                <button type="button" id="employee_id_clear_btn" class="btn btn-primary" style="width:50%;margin-bottom:10px;margin-top:10px;">Clear Employee data</button>
+                <br><br><br>
+                <div class="cust_details_card" id="cust_details_card" style="display:none; margin-bottom: 10px">
+                    <h4 class="header_text">Employee Details</h4>
+                    <hr class="header_divider" />
+                    <h5 class="cust_details_text">Employee ID :</h5> <p id="employee_id">XXX</p> <br/>
+                    <h5 class="cust_details_text">Last Name :</h5> <p id="last_name">XXX</p> <br/>
+                    <h5 class="cust_details_text">Middle Name :</h5> <p id="middle_name">XXX</p> <br/>
+                    <h5 class="cust_details_text">First Name :</h5> <p id="first_name">XXX</p> <br/>
+                    <h5 class="cust_details_text">Date of Birth :</h5> <p id="dob">XXX</p> <br/>
+                    <h5 class="cust_details_text">Contact Number :</h5> <p id="contact_no">XXX</p> <br/>
+                    <h5 class="cust_details_text">Email Address :</h5> <p id="email_id">XXX</p> <br/>
+                    <h5 class="cust_details_text">SSN :</h5> <p id="ssn">XXX</p> <br/>
+                    <h5 class="cust_details_text">Address :</h5> <p id="address">XXX</p> <br/>
+                    <h5 class="cust_details_text">Employee Tier :</h5> <p id="tier">XXX</p> <br/>
+                    <h5 class="cust_details_text">Account Created :</h5> <p id="account_created">XXX</p> <br/>
+                </div>
+            </div>
+        </div>
+
+        <div id="account_details_pane" style="display:none;">
+            <label class="details_lbl" for="first_name">First name:</label>
+            <input type="text" id="account_first_name" name="first_name"><br><br>
+            <label class="details_lbl" for="middle_name">Middle name:</label>
+            <input type="text" id="account_middle_name" name="middle_name"><br><br>
+            <label class="details_lbl" for="last_name">Last name:</label>
+            <input type="text" id="account_last_name" name="last_name"><br><br>
+            <label class="details_lbl" for="email_id">Email Address:</label>
+            <input type="email" id="account_email_id" name="email_id"><br><br>
+            <label class="details_lbl" for="contact_no">Contact Number:</label>
+            <input type="text" id="account_contact_no" name="contact_no"><br><br>
+            <label class="details_lbl" for="dob">Date of Birth:</label>
+            <input type="text" id="account_dob" name="dob"><br><br>
+            <label class="details_lbl" for="ssn">SSN:</label>
+            <input type="text" id="account_ssn" name="ssn"><br><br>
+            <label class="details_lbl" for="address">Address:</label>
+            <textarea id="account_address" name="address" rows="4" cols="50"></textarea><br><br>
+            <button type="button" id="update_info_btn" class="btn btn-primary" style="width:50%;margin-bottom:10px;margin-top:10px;">Update</button><br><br>
+            <button type="button" id="change_pw_btn" data-toggle="modal" data-target="#changePWModal" class="btn btn-primary" style="width:50%;margin-bottom:10px;margin-top:10px;">Change Password</button>
+        </div>
+
+        <!-- changePWModal -->
+        <div class="modal fade" id="changePWModal" tabindex="-1" role="dialog" aria-labelledby="exampleModalCenterTitle" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered" role="document">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h4 class="account_type_text" style="display:inline-block">Change Password</h4>
+                        <button type="button" class="close" id="changePW_close" data-dismiss="modal" aria-label="Close">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
+                    <div class="modal-body">
+                        <span style="color:red;">*Length must be between 8-16 characters and Must contain at least : 1 UPPERCASE letter, 1 lowercase letter, 1 number.*</span><br><br>
+                        <input type="password" id="changePW_oldPW" placeholder="Enter old password" pattern="(?=.*\d)(?=.*[a-z])(?=.*[A-Z]).{8,16}" oncut="return false" oncopy="return false" onpaste="return false"/><br><br>
+                        <input type="password" id="changePW_newPW" placeholder="Enter new password" pattern="(?=.*\d)(?=.*[a-z])(?=.*[A-Z]).{8,16}" oncut="return false" oncopy="return false" onpaste="return false"/><br><br>
+                        <input type="password" id="changePW_confirmPW" placeholder="Re-enter new password" pattern="(?=.*\d)(?=.*[a-z])(?=.*[A-Z]).{8,16}" oncut="return false" oncopy="return false" onpaste="return false"/><br>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                        <button type="button" id="changePW_btn" class="btn btn-primary">Submit</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="empl_requests_pane" style="display:none;">
+            <table class="table table-hover table-bordered table-color" id="emp_reqs_tbl">
+                <col style="width:25%">
+                <col style="width:25%">
+                <col style="width:50%">
+                <thead>
+                <tr>
+                    <th> Request ID </th>
+                    <th> Employee ID </th>
+                    <th> Requested Change </th>
+                </tr>
+                </thead>
+                <tbody>
+                </tbody>
+            </table>
+        </div>
+
+        <div id="app_dec_requests_pane" style="display:none;">
+            <div class="app_dec_requests_content">
+                <div class="cust_details_card">
+                    <h4 class="header_text">Approve or Decline Employee Requests</h4>
+                    <hr class="header_divider" />
+                    <select id="employee_req_id" style="height:30px;">
+                        <option value="select">Select Request No.</option>
+                    </select><br>
+                    <!-- <label class="custom_label"><b>Request ID:</b></label> <input type="text" id="employee_req_id" placeholder="Enter ID" pattern="[0-9]{10}"/><br> -->
+                    <button type="button" id="approve_req_btn" class="btn btn-primary" style="width:50%;margin-bottom:10px;margin-top:10px;">Approve</button><br>
+                    <button type="button" id="deny_req_btn" class="btn btn-primary" style="width:50%;margin-bottom:10px;margin-top:10px;">Decline</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="create_accs_pane" style="display:none;">
+            <div class="create_accs_content">
+                <div class="cust_details_card" style="margin-bottom: 10px;">
+                    <h4 class="header_text">Create New Employee</h4>
+                    <hr class="header_divider" />
+                    <form action='#' id="create_employee_form">
+                        <label class="custom_label" for="create_userid"
+                        >User ID:</label
+                        >
+                        <input
+                                type="text"
+                                id="create_userid"
+                                name="create_userid"
+                                required
+                        /><br /><br />
+                        <label class="custom_label" for="create_password"
+                        >Password:</label
+                        >
+                        <input
+                                type="password"
+                                id="create_password"
+                                name="create_password"
+                                required
+                        /><br /><br />
+                        <label class="custom_label" for="create_first_name"
+                        >First name:</label
+                        >
+                        <input
+                                type="text"
+                                id="create_first_name"
+                                name="create_first_name"
+                                required
+                        /><br /><br />
+                        <label class="custom_label" for="create_middle_name"
+                        >Middle name:</label
+                        >
+                        <input
+                                type="text"
+                                id="create_middle_name"
+                                name="create_middle_name"
+                        /><br /><br />
+                        <label class="custom_label" for="create_last_name"
+                        >Last name:</label
+                        >
+                        <input
+                                type="text"
+                                id="create_last_name"
+                                name="create_last_name"
+                                required
+                        /><br /><br />
+                        <label class="custom_label" for="create_email_id"
+                        >Email Address:</label
+                        >
+                        <input
+                                type="email"
+                                id="create_email_id"
+                                name="create_email_id"
+                                required
+                        /><br /><br />
+                        <label class="custom_label" for="create_contact_no"
+                        >Contact Number:</label
+                        >
+                        <input
+                                type="text"
+                                id="create_contact_no"
+                                name="create_contact_no"
+                                required
+                        /><br /><br />
+                        <label class="custom_label" for="create_dob"
+                        >Date of Birth:</label
+                        >
+                        <input
+                                type="text"
+                                id="create_dob"
+                                name="create_dob"
+                                placeholder="MM/DD/YYYY"
+                                required
+                        /><br /><br />
+                        <label class="custom_label" for="create_ssn">SSN:</label>
+                        <input
+                                type="text"
+                                id="create_ssn"
+                                name="create_ssn"
+                                required
+                        /><br /><br />
+                        <label class="custom_label" for="create_address"
+                        >Address:</label
+                        >
+                        <textarea
+                                id="create_address"
+                                name="create_address"
+                                rows="4"
+                                cols="50"
+                                required
+                        ></textarea
+                        ><br /><br />
+                        <label class="custom_label" for="create_tier">Account Tier:</label>
+                        <input type="text" id="create_tier" name="create_tier" placeholder="1-3" pattern="[1-3]{1}" required><br><br>
+                        <button
+                                type="submit"
+                                id="create_employee_btn"
+                                class="btn btn-primary"
+                                style="width: 50%; margin-bottom: 10px; margin-top: 10px"
+                        >
+                            Create Employee
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div id="modify_accs_pane" style="display:none;">
+            <div class="modify_accs_content">
+                <div class="cust_details_card">
+                    <h4 class="header_text">Modify Employee Data</h4>
+                    <hr class="header_divider" />
+                    <form action='#' id="modify_employee_form">
+                        <label class="custom_label" for="modify_userid"
+                        >Employee ID :</label
+                        >
+                        <input
+                                type="text"
+                                id="modify_userid"
+                                name="modify_userid"
+                                required
+                        /><br /><br />
+                        <button
+                                type="submit"
+                                id="modify_employee_account_get_btn"
+                                class="btn btn-primary"
+                                style="width: 50%; margin-bottom: 10px; margin-left: 10px"
+                        >
+                            Get Data
+                        </button><br /><br />
+                        <label class="custom_label" for="modify_first_name">First name:</label>
+                        <input
+                                type="text"
+                                id="modify_first_name"
+                                name="modify_first_name"
+                                required
+                        /><br /><br />
+                        <label class="custom_label" for="modify_middle_name">Middle name:</label>
+                        <input
+                                type="text"
+                                id="modify_middle_name"
+                                name="modify_middle_name"
+                        /><br /><br />
+                        <label class="custom_label" for="modify_last_name"
+                        >Last name:</label
+                        >
+                        <input
+                                type="text"
+                                id="modify_last_name"
+                                name="modify_last_name"
+                                required
+                        /><br /><br />
+                        <label class="custom_label" for="modify_email_id"
+                        >Email Address:</label
+                        >
+                        <input
+                                type="email"
+                                id="modify_email_id"
+                                name="modify_email_id"
+                                required
+                        /><br /><br />
+                        <label class="custom_label" for="modify_contact_no"
+                        >Contact Number:</label
+                        >
+                        <input
+                                type="text"
+                                id="modify_contact_no"
+                                name="modify_contact_no"
+                                required
+                        /><br /><br />
+                        <label class="custom_label" for="modify_dob"
+                        >Date of Birth:</label
+                        >
+                        <input
+                                type="text"
+                                id="modify_dob"
+                                name="modify_dob"
+                                placeholder="MM/DD/YYYY"
+                                required
+                        /><br /><br />
+                        <label class="custom_label" for="modify_ssn">SSN:</label>
+                        <input
+                                type="text"
+                                id="modify_ssn"
+                                name="modify_ssn"
+                                required
+                        /><br /><br />
+                        <label class="custom_label" for="modify_address"
+                        >Address:</label
+                        >
+                        <textarea
+                                id="modify_address"
+                                name="modify_address"
+                                rows="4"
+                                cols="50"
+                                required
+                        ></textarea
+                        ><br /><br />
+                        <label class="custom_label" for="modify_tier">Account Tier:</label>
+                        <input type="text" id="modify_tier" name="modify_tier" placeholder="1-3" pattern="[1-3]{1}" required><br><br>
+                        <button
+                                type="submit"
+                                id="modify_employee_account_btn"
+                                class="btn btn-primary"
+                                style="width: 50%; margin-bottom: 10px; margin-top: 10px"
+                        >
+                            Modify Employee
+                        </button>
+                    </form>
+                </div>
+                <br /><br /><br />
+                <div class="cust_details_card">
+                    <h4 class="header_text">Delete Employee</h4>
+                    <hr class="header_divider" />
+                    <label class="custom_label" for="delete_employee_id"
+                    >Employee ID:</label
+                    >
+                    <input
+                            type="text"
+                            id="delete_employee_id"
+                            name="delete_employee_id"
+                    /><br /><br />
+                    <button
+                            type="button"
+                            id="delete_employee_id_btn"
+                            class="btn btn-primary"
+                            style="width: 50%; margin-bottom: 10px; margin-top: 10px"
+                    >
+                        Delete Employee
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div id="sys_log_pane" style="display:none;">
+            <div class="sys_log_content">
+                <h4 class="header_text" style="color:white;">System Log</h4>
+                <hr class="header_divider" />
+                <button
+                        type="button"
+                        id="sys_logs_btn"
+                        class="btn btn-primary"
+                        style="width: 50%; margin-bottom: 10px; margin-top: 10px"
+                >
+                    Get System Logs
+                </button>
+            </div>
+        </div>
+
+
+    </div>
+</div>
+<script src ="/static/main_js/admin.js"></script>
+</body>
+</html>

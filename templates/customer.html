@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>Customer Home</title>
+
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <link rel="stylesheet"
+  href="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css">
+  <script
+  src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"
+  ></script>
+  <script
+  src="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/js/bootstrap.min.js"
+  ></script>
+  <link rel="stylesheet" href="https://ajax.googleapis.com/ajax/libs/jqueryui/1.12.1/themes/smoothness/jquery-ui.css">
+  <script src="https://ajax.googleapis.com/ajax/libs/jqueryui/1.12.1/jquery-ui.min.js"></script>
+  <script src="//cdnjs.cloudflare.com/ajax/libs/timepicker/1.3.5/jquery.timepicker.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/1.5.3/jspdf.min.js"></script>
+  <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/timepicker/1.3.5/jquery.timepicker.min.css">
+  <link rel="stylesheet" href="/static/css/customer_style.css" />
+
+	<script src="https://d355qjo8cm788m.cloudfront.net/lex-web-ui-loader.min.js"></script>
+	<script>
+		var loaderOpts = {
+			baseUrl: 'https://d355qjo8cm788m.cloudfront.net/',
+			shouldLoadMinDeps: true
+		};
+	var loader = new ChatBotUiLoader.IframeLoader(loaderOpts);
+	loader.load()
+	.catch(function (error) { console.error(error); });
+	</script>
+
+</head>
+
+<body style="background-color: sienna">
+
+  <nav class="navbar navbar-custom">
+
+    <div class="container-fluid">
+      <div class="navbar-header">
+
+
+        <button type="button" class="navbar-toggle"
+        data-toggle="collapse" data-target="#myNavbar">
+          <span class="icon-bar"></span>
+          <span class="icon-bar"></span>
+          <span class="icon-bar"></span>
+        </button>
+
+
+        <a class="navbar-brand" id="home_logo" style="color: yellow">
+        SunDevil Bank</a>
+
+      </div>
+      <div class="collapse navbar-collapse" id="myNavbar">
+        <ul class="nav navbar-nav navbar-right">
+          <li><a id="account_details_btn"><span class="glyphicon glyphicon-user"
+          style="color: white"></span> Account Details</a></li>
+          <li><a id="logout_btn"><span class="glyphicon glyphicon-log-out"
+          style="color: white"></span> Logout</a></li>
+        </ul>
+      </div>
+    </div>
+  </nav>
+
+  <div class="loader-wrapper">
+    <span class="loader"><span class="loader-inner"></span></span>
+  </div>
+
+  <div class="container-fluid">
+
+    <div class="row">
+      <div class="col-sm-3">
+
+        <button type="button" class="btn btn-primary btn-block"
+        id="my_accounts_menu">
+        <span class="glyphicon glyphicon-list-alt gi-3x"
+        style="color: white" aria-hidden="true">
+        </span>
+        <br />
+        My Accounts
+        </button>
+
+        <button type="button" class="btn btn-primary btn-block"
+        id="pending_transaction_requests_menu">
+        <span class="glyphicon glyphicon-transfer gi-3x"
+        style="color: white" aria-hidden="true">
+        </span>
+        <br />
+        Pending Transaction Requests
+        </button>
+
+        <button type="button" class="btn btn-primary btn-block"
+        id="service_requests_menu">
+        <span class="glyphicon glyphicon-edit gi-3x"
+        style="color: white" aria-hidden="true">
+        </span>
+        <br />
+        Service Requests
+        </button>
+
+      </div>
+
+      <div class="col-sm-9">
+        <h5 id="wlcm_msg">Welcome <span id="user_name">USER!</span></h5>
+      	<div id="my_accs_pane" class="my_accs_float">
+					<div class="account_cards" id="sa_card">
+            <div class="account_cards_content">
+              <h4 class="account_type_text">Savings Account</h4>
+              <hr class="header_divider" />
+              <div class="ac_details">
+                <h5 class="ac_details_text">A/C No :</h5>
+                <p id="sa_no">NA</p>
+                <br/>
+                <h5 class="ac_details_text">Available Balance :</h5>
+                <p id="sa_balance">NA</p>
+                <br/>
+              </div>
+              <button type="button" data-toggle="modal" data-target="#saDepositModal" class="btn btn-primary" style="width:80%;margin-bottom:10px;margin-top:10px;">Deposit Fund</button>
+              <button type="button" data-toggle="modal" data-target="#saTransferModal" class="btn btn-primary" style="width:80%;margin-bottom:10px;">Transfer Fund</button>
+              <button type="button" id="view_sa_xacts_btn" data-toggle="modal" data-target="#saTransactionsModal" class="btn btn-primary" style="width:80%;margin-bottom:10px;">View Transactions</button>
+            </div>
+          </div>
+          <div class="account_cards" id="ca_card">
+            <div class="account_cards_content">
+              <h4 class="account_type_text">Checking Account</h4>
+              <hr class="header_divider" />
+              <div class="ac_details">
+                <h5 class="ac_details_text">A/C No :</h5>
+                <p id="ca_no">NA</p>
+                <br/>
+                <h5 class="ac_details_text">Available Balance :</h5>
+                <p id="ca_balance">NA</p>
+                <br/>
+              </div>
+              <button type="button" data-toggle="modal" data-target="#caDepositModal" class="btn btn-primary" style="width:80%;margin-bottom:10px;margin-top:10px;">Deposit Fund</button>
+              <button type="button" data-toggle="modal" data-target="#caTransferModal" class="btn btn-primary" style="width:80%;margin-bottom:10px;">Transfer Fund</button>
+              <button type="button" id="view_ca_xacts_btn" data-toggle="modal" data-target="#caTransactionsModal" class="btn btn-primary" style="width:80%;margin-bottom:10px;">View Transactions</button>
+            </div>
+          </div>
+          <div class="account_cards" id="cc_card">
+            <div class="account_cards_content">
+              <h4 class="account_type_text">Credit Card</h4>
+              <hr class="header_divider" />
+              <div class="ac_details">
+                <h5 class="ac_details_text">Card No :</h5>
+                <p id="cc_no">NA</p>
+                <br/>
+                <h5 class="ac_details_text">Credit Balance :</h5>
+                <p id="cc_balance">NA</p>
+                <br/>
+                <h5 class="ac_details_text" style="color: red;">Credit Limit :</h5>
+                <p style="color: red;">$5000</p>
+                <br/>
+              </div>
+              <button type="button" data-toggle="modal" data-target="#ccTransferModal" class="btn btn-primary" style="width:80%;margin-bottom:10px;margin-top:10px;">Initiate Transaction</button>
+              <button type="button" id="view_cc_xacts_btn" data-toggle="modal" data-target="#ccTransactionsModal" class="btn btn-primary" style="width:80%;margin-bottom:10px;">View Transactions</button>
+            </div>
+          </div>
+        </div>
+        <div id="service_requests_pane" class="my_accs_float" style="display:none;">
+					<button type="button" data-toggle="modal" data-target="#schedAppModal" class="btn btn-primary btn-block" style="margin-top:10px;margin-bottom:10px;">Schedule Appointment</button>
+          <button type="button" id="viewAppoint_btn" data-toggle="modal" data-target="#viewAppointModal" class="btn btn-primary btn-block" style="margin-top:10px;margin-bottom:10px;">View Appointments</button>
+          <button type="button" data-toggle="modal" data-target="#orderCheckModal" class="btn btn-primary btn-block" style="margin-top:10px;margin-bottom:10px;">Order Cashier Cheque</button>
+          <button type="button" data-toggle="modal" data-target="#depCheckModal" class="btn btn-primary btn-block" style="margin-top:10px;margin-bottom:10px;">Deposit Cashier Cheque</button>
+          <button type="button" id="viewCheck_btn" data-toggle="modal" data-target="#viewCheckModal" class="btn btn-primary btn-block" style="margin-top:10px;margin-bottom:10px;">View All Cashier Cheques</button>
+          <button type="button" data-toggle="modal" data-target="#newAccModal" class="btn btn-primary btn-block" style="margin-top:10px;margin-bottom:10px;">Open New Account</button>
+        </div>
+        <div id="no_accounts_pane" style="display:none;">
+          <p style="color:white;">You don't have any accounts with us.</p><br>
+          <p style="color:white;">Request to open a new account from the Service Requests menu on the left.</p><br>
+          <p style="color:yellow;">You'll get a $250 Bonus when you open a new account with us.</p>
+        </div>
+        <div id="pending_transaction_requests_pane" style="display:none;">
+					<table class="table table-hover table-bordered table-color fixed-header" id="pending_requests_tbl">
+	          <col style="width:25%">
+	          <col style="width:25%">
+            <col style="width:25%">
+            <col style="width:25%">
+						<thead>
+							<tr>
+                <th> Transaction No. </th>
+								<th> From Account No. </th>
+                <th> To Account No. </th>
+								<th> Amount ($) </th>
+							</tr>
+						</thead>
+						<tbody>
+              <tr>
+                <td>NA</td>
+                <td>NA</td>
+                <td>NA</td>
+                <td>NA</td>
+              </tr>
+						</tbody>
+					</table>
+          <hr>
+          <hr>
+          <select id="xact_id_acc_den" style="height:30px;margin-right:5px;">
+            <option value="select">Select Transaction No.</option>
+          </select>
+          <!-- <input type="text" id="xact_id_acc_den" placeholder="Enter Transaction No." style="height:30px;margin-right:5px;"> -->
+          <button type="button" id="pending_req_accept" class="btn btn-primary" style="width:100px;color:white;background-color:green;margin-right:5px;">Accept</button>
+          <button type="button" id="pending_req_deny" class="btn btn-primary" style="width:100px;color:white;background-color:red;margin-left:5px;">Deny</button>
+        </div>
+        <div id="account_details_pane" style="display:none;">
+					<label class="details_lbl" for="first_name">First name:</label>
+          <input type="text" id="first_name" name="first_name" disabled><br><br>
+          <label class="details_lbl" for="middle_name">Middle name:</label>
+          <input type="text" id="middle_name" name="middle_name" disabled><br><br>
+          <label class="details_lbl" for="last_name">Last name:</label>
+          <input type="text" id="last_name" name="last_name" disabled><br><br>
+          <label class="details_lbl" for="email_id">Email Address:</label>
+          <input type="email" id="email_id" name="email_id"><br><br>
+          <label class="details_lbl" for="contact_no">Contact Number:</label>
+          <input type="text" id="contact_no" name="contact_no" pattern="\d*" maxlength="10" oninput="validity.valid||(value='');"><br><br>
+          <label class="details_lbl" for="dob">Date of Birth:</label>
+          <input type="text" id="dob" name="dob" disabled><br><br>
+          <label class="details_lbl" for="ssn">SSN:</label>
+          <input type="text" id="ssn" name="ssn" disabled><br><br>
+          <label class="details_lbl" for="address">Address:</label>
+          <textarea id="address" name="address" rows="4" cols="50"></textarea><br><br>
+          <button type="button" id="update_info_btn" class="btn btn-primary" style="width:50%;margin-bottom:10px;margin-top:10px;">Update Info</button><br><br>
+          <button type="button" id="change_pw_btn" data-toggle="modal" data-target="#changePWModal" class="btn btn-primary" style="width:50%;margin-bottom:10px;margin-top:10px;">Change Password</button>
+        </div>
+
+        <!-- changePWModal -->
+        <div class="modal fade" id="changePWModal" tabindex="-1" role="dialog" aria-labelledby="exampleModalCenterTitle" aria-hidden="true">
+          <div class="modal-dialog modal-dialog-centered" role="document">
+            <div class="modal-content">
+              <div class="modal-header">
+                <h4 class="account_type_text" style="display:inline-block">Change Password</h5>
+                <button type="button" class="close" id="changePW_close" data-dismiss="modal" aria-label="Close">
+                  <span aria-hidden="true">&times;</span>
+                </button>
+              </div>
+              <div class="modal-body">
+                <span style="color:red;">*Length must be between 8-16 characters and Must contain at least : 1 UPPERCASE letter, 1 lowercase letter, 1 number.*</span><br><br>
+                <input type="password" id="changePW_oldPW" placeholder="Enter old password" pattern="(?=.*\d)(?=.*[a-z])(?=.*[A-Z]).{8,16}" oncut="return false" oncopy="return false" onpaste="return false"/><br><br>
+                <input type="password" id="changePW_newPW" placeholder="Enter new password" pattern="(?=.*\d)(?=.*[a-z])(?=.*[A-Z]).{8,16}" oncut="return false" oncopy="return false" onpaste="return false"/><br><br>
+                <input type="password" id="changePW_confirmPW" placeholder="Re-enter new password" pattern="(?=.*\d)(?=.*[a-z])(?=.*[A-Z]).{8,16}" oncut="return false" oncopy="return false" onpaste="return false"/><br>
+              </div>
+              <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                <button type="button" id="changePW_btn" class="btn btn-primary">Submit</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- otpModal -->
+        <div class="modal fade" id="otpModal" tabindex="-1" role="dialog" aria-labelledby="exampleModalCenterTitle" aria-hidden="true">
+          <div class="modal-dialog modal-dialog-centered" role="document">
+            <div class="modal-content">
+              <div class="modal-header">
+                <h4 class="account_type_text" style="display:inline-block">OTP Authentication</h5>
+                <button type="button" class="close" id="otpModal_close" data-dismiss="modal" aria-label="Close">
+                  <span aria-hidden="true">&times;</span>
+                </button>
+              </div>
+              <div class="modal-body">
+                <span style="color:red;">*An OTP has been sent to your registered mobile phone no.*</span><br><br>
+                <span style="color:red;">*DO NOT REFRESH THE PAGE OR CLOSE THE OTP WINDOW!!!*</span><br><br>
+                <input type="text" id="otpModal_input" placeholder="Enter OTP" oncut="return false" oncopy="return false" onpaste="return false" style="margin-left:5%;"/><br><br>
+                <div id="keyboard">
+                  <div class="otprow r1">
+                    <span class="key i num" id="key_1">1</span>
+                    <span class="key i num" id="key_2">2</span>
+                    <span class="key i num" id="key_3">3</span>
+                  </div>
+                  <div class="otprow r2">
+                    <span class="key i num" id="key_4">4</span>
+                    <span class="key i num" id="key_5">5</span>
+                    <span class="key i num" id="key_6">6</span>
+                  </div>
+                  <div class="otprow r3">
+                    <span class="key i num" id="key_7">7</span>
+                    <span class="key i num" id="key_8">8</span>
+                    <span class="key i num" id="key_9">9</span>
+                  </div>
+                  <div class="otprow r4">
+                    <span class="key i num" id="key_backs">⌫</span>
+                    <span class="key i num" id="key_0">0</span>
+                    <span class="key i num" id="key_ac">AC</i></span>
+                  </div>
+                </div>
+              </div>
+              <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                <button type="button" id="otpModal_btn" class="btn btn-primary">Submit</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- saDepositModal -->
+        <div class="modal fade" id="saDepositModal" tabindex="-1" role="dialog" aria-labelledby="exampleModalCenterTitle" aria-hidden="true">
+          <div class="modal-dialog modal-dialog-centered" role="document">
+            <div class="modal-content">
+              <div class="modal-header">
+                <h4 class="account_type_text" style="display:inline-block">Deposit Fund</h4>
+                <button type="button" class="close" id="saDeposit_close" data-dismiss="modal" aria-label="Close">
+                  <span aria-hidden="true">&times;</span>
+                </button>
+              </div>
+              <div class="modal-body">
+                <b>$</b> <input type="text" id="saDeposit_amt" placeholder="Enter Amount" pattern="\d*" maxlength="6" oninput="validity.valid||(value='');"/>
+              </div>
+              <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                <button type="button" id="saDeposit_btn" class="btn btn-primary">Submit</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <!-- caDepositModal -->
+        <div class="modal fade" id="caDepositModal" tabindex="-1" role="dialog" aria-labelledby="exampleModalCenterTitle" aria-hidden="true">
+          <div class="modal-dialog modal-dialog-centered" role="document">
+            <div class="modal-content">
+              <div class="modal-header">
+                <h4 class="account_type_text" style="display:inline-block">Deposit Fund</h5>
+                <button type="button" class="close" id="caDeposit_close" data-dismiss="modal" aria-label="Close">
+                  <span aria-hidden="true">&times;</span>
+                </button>
+              </div>
+              <div class="modal-body">
+                <b>$</b> <input type="text" id="caDeposit_amt" placeholder="Enter Amount" pattern="\d*" maxlength="6" oninput="validity.valid||(value='');"/>
+              </div>
+              <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                <button type="button" id="caDeposit_btn" class="btn btn-primary">Submit</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <!-- saTransferModal -->
+        <div class="modal fade" id="saTransferModal" tabindex="-1" role="dialog" aria-labelledby="exampleModalCenterTitle" aria-hidden="true">
+          <div class="modal-dialog modal-dialog-centered" role="document">
+            <div class="modal-content">
+              <div class="modal-header">
+                <h4 class="account_type_text" style="display:inline-block">Transfer Fund</h5>
+                <button type="button" class="close" id="saTransfer_close" data-dismiss="modal" aria-label="Close">
+                  <span aria-hidden="true">&times;</span>
+                </button>
+              </div>
+              <div class="modal-body">
+                <b>&nbsp;&nbsp;&nbsp;</b><input type="radio" id="sa_send_radio" name="satransfer" value="sa_send_radio" checked>
+                <label for="sa_send_radio">Send Money</label>
+                <b>&nbsp;&nbsp;&nbsp;</b><input type="radio" id="sa_request_radio" name="satransfer" value="sa_request_radio">
+                <label for="sa_request_radio">Request Money</label><br/><br/>
+                <b>&nbsp;&nbsp;&nbsp;</b><input type="text" id= "sa_transfer_acno_input" placeholder="To Account No." pattern="\d*" maxlength="10" oninput="validity.valid||(value='');"/><br/><br/>
+                <b>$</b> <input type="text" id="saTransfer_amt" placeholder="Enter Amount" pattern="\d*" maxlength="6" oninput="validity.valid||(value='');"/>
+              </div>
+              <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                <button type="button" id="saTransfer_btn" class="btn btn-primary">Submit</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <!-- caTransferModal -->
+        <div class="modal fade" id="caTransferModal" tabindex="-1" role="dialog" aria-labelledby="exampleModalCenterTitle" aria-hidden="true">
+          <div class="modal-dialog modal-dialog-centered" role="document">
+            <div class="modal-content">
+              <div class="modal-header">
+                <h4 class="account_type_text" style="display:inline-block">Transfer Fund</h5>
+                <button type="button" class="close" id="caTransfer_close" data-dismiss="modal" aria-label="Close">
+                  <span aria-hidden="true">&times;</span>
+                </button>
+              </div>
+              <div class="modal-body">
+                <b>&nbsp;&nbsp;&nbsp;</b><input type="radio" id="ca_send_radio" name="catransfer" value="sa_send_radio" checked>
+                <label for="ca_send_radio">Send Money</label>
+                <b>&nbsp;&nbsp;&nbsp;</b><input type="radio" id="ca_request_radio" name="catransfer" value="sa_request_radio">
+                <label for="ca_request_radio">Request Money</label><br/><br/>
+                <b>&nbsp;&nbsp;&nbsp;</b><input type="text" id= "ca_transfer_acno_input" placeholder="To Account No." pattern="\d*" maxlength="10" oninput="validity.valid||(value='');"/><br/><br/>
+                <b>$</b> <input type="text" id="caTransfer_amt" placeholder="Enter Amount" pattern="\d*" maxlength="6" oninput="validity.valid||(value='');"/>
+              </div>
+              <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                <button type="button" id="caTransfer_btn" class="btn btn-primary">Submit</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <!-- ccTransferModal -->
+        <div class="modal fade" id="ccTransferModal" tabindex="-1" role="dialog" aria-labelledby="exampleModalCenterTitle" aria-hidden="true">
+          <div class="modal-dialog modal-dialog-centered" role="document">
+            <div class="modal-content">
+              <div class="modal-header">
+                <h4 class="account_type_text" style="display:inline-block">Payment</h5>
+                <button type="button" class="close" id="ccTransfer_close" data-dismiss="modal" aria-label="Close">
+                  <span aria-hidden="true">&times;</span>
+                </button>
+              </div>
+              <div class="modal-body">
+                <b>&nbsp;&nbsp;&nbsp;</b><input type="text" id="cc_transfer_acno_input" placeholder="Recipient Account No." pattern="\d*" maxlength="10" oninput="validity.valid||(value='');"/><br/><br/>
+                <b>$</b> <input type="text" id="ccTransfer_amt" placeholder="Payment Amount" pattern="\d*" maxlength="6" oninput="validity.valid||(value='');"/>
+              </div>
+              <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                <button type="button" id="ccTransfer_btn" class="btn btn-primary">Submit</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal fade" id="schedAppModal" tabindex="-1" role="dialog" aria-labelledby="exampleModalCenterTitle" aria-hidden="true">
+          <div class="modal-dialog modal-dialog-centered" role="document">
+            <div class="modal-content">
+              <div class="modal-header">
+                <h4 class="account_type_text" style="display:inline-block">Schedule Appointment</h5>
+                <button type="button" class="close" id="schedApp_close" data-dismiss="modal" aria-label="Close">
+                  <span aria-hidden="true">&times;</span>
+                </button>
+              </div>
+              <div class="modal-body">
+                <label for="schDate">Date: </label>
+                <input name="schDate" class="date-picker-start" data-provide="datepicker"><br/><br/>
+                <label for="schTime">Time: </label>
+                <input name="schTime" class="time-picker-start" data-provide="timepicker">
+              </div>
+              <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                <button type="button" id="schedApp_btn" class="btn btn-primary">Submit</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal fade" id="newAccModal" tabindex="-1" role="dialog" aria-labelledby="exampleModalCenterTitle" aria-hidden="true">
+          <div class="modal-dialog modal-dialog-centered" role="document">
+            <div class="modal-content">
+              <div class="modal-header">
+                <h4 class="account_type_text" style="display:inline-block">Open a new Account</h4>
+                <button type="button" class="close" id="newAcc_close" data-dismiss="modal" aria-label="Close">
+                  <span aria-hidden="true">&times;</span>
+                </button>
+              </div>
+              <div class="modal-body">
+                <span style="color:red;">You'll get a $250 Bonus when you open a new account with us.</span><br><br>
+                <label for="account_selection">Select Account Type:</label>
+                <select name="account_selection" id="account_selection">
+                  <option value="savings">Savings Account</option>
+                  <option value="checkin">Checking Account</option>
+                  <option value="credit">Credit Card</option>
+                </select>
+              </div>
+              <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                <button type="button" id="newAcc_btn" class="btn btn-primary">Submit</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal fade" id="orderCheckModal" tabindex="-1" role="dialog" aria-labelledby="exampleModalCenterTitle" aria-hidden="true">
+          <div class="modal-dialog modal-dialog-centered" role="document">
+            <div class="modal-content">
+              <div class="modal-header">
+                <h4 class="account_type_text" style="display:inline-block">Order Cashier Cheque</h4>
+                <button type="button" class="close" id="orderCheck_close" data-dismiss="modal" aria-label="Close">
+                  <span aria-hidden="true">&times;</span>
+                </button>
+              </div>
+              <div class="modal-body">
+                <b>&nbsp;&nbsp;&nbsp;</b><input type="text" id="orderCheck_toAccount" placeholder="Recipient Account No." pattern="\d*" maxlength="10" oninput="validity.valid||(value='');"/><br/><br/>
+                <b>$</b> <input type="text" id="orderCheck_amt" placeholder="Payment Amount" pattern="\d*" maxlength="6" oninput="validity.valid||(value='');"/><br/><br/>
+                <b>&nbsp;&nbsp;</b>
+                <select id="orderCheck_fromAccount">
+                  <option value="select">Select your Account</option>
+                </select>
+                <!-- <input type="text" id="orderCheck_fromAccount" placeholder="Enter Your account No." pattern="[0-9]{10}"/> -->
+              </div>
+              <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                <button type="button" id="orderCheck_btn" class="btn btn-primary">Submit</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal fade" id="depCheckModal" tabindex="-1" role="dialog" aria-labelledby="exampleModalCenterTitle" aria-hidden="true">
+          <div class="modal-dialog modal-dialog-centered" role="document">
+            <div class="modal-content">
+              <div class="modal-header">
+                <h4 class="account_type_text" style="display:inline-block">Deposit Cashier Cheque</h4>
+                <button type="button" class="close" id="depCheck_close" data-dismiss="modal" aria-label="Close">
+                  <span aria-hidden="true">&times;</span>
+                </button>
+              </div>
+              <div class="modal-body">
+                <input type="text" id="depCheck_no" placeholder="Cashier Cheque ID" pattern="\d*" maxlength="10" oninput="validity.valid||(value='');"/><br/><br/>
+              </div>
+              <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                <button type="button" id="depCheck_btn" class="btn btn-primary">Submit</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal fade" id="viewAppointModal" tabindex="-1" role="dialog" aria-labelledby="exampleModalCenterTitle" aria-hidden="true">
+          <div class="modal-dialog modal-dialog-centered" role="document">
+            <div class="modal-content">
+              <div class="modal-header">
+                <h4 class="account_type_text" style="display:inline-block">Your scheduled Appointments</h4>
+                <button type="button" class="close" id="viewAppoint_close" data-dismiss="modal" aria-label="Close">
+                  <span aria-hidden="true">&times;</span>
+                </button>
+              </div>
+              <div class="modal-body">
+                <div class="scrollable_div" id="view_appoint_tbl">
+                  None
+                </div>
+              </div>
+              <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal fade" id="viewCheckModal" tabindex="-1" role="dialog" aria-labelledby="exampleModalCenterTitle" aria-hidden="true">
+          <div class="modal-dialog modal-dialog-centered" role="document">
+            <div class="modal-content">
+              <div class="modal-header">
+                <h4> class="account_type_text" style="display:inline-block">Your Cashier cheques</h4>
+                <button type="button" class="close" id="viewCheck_close" data-dismiss="modal" aria-label="Close">
+                  <span aria-hidden="true">&times;</span>
+                </button>
+              </div>
+              <div class="modal-body">
+                <div class="scrollable_div" id="view_check_tbl">
+                  None
+                </div>
+              </div>
+              <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal fade" id="saTransactionsModal" tabindex="-1" role="dialog" aria-labelledby="exampleModalCenterTitle" aria-hidden="true">
+          <div class="modal-dialog modal-dialog-centered" role="document">
+            <div class="modal-content">
+              <div class="modal-header">
+                <h4 class="account_type_text" style="display:inline-block">Savings Account Transactions</h4>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                  <span aria-hidden="true">&times;</span>
+                </button>
+              </div>
+              <div class="modal-body">
+                <div class="scrollable_div" id="sa_trans_tbl">
+                  None
+                </div>
+              </div>
+              <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                <button type="button" id="saXact_dwnld_btn" class="btn btn-primary">Download</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal fade" id="caTransactionsModal" tabindex="-1" role="dialog" aria-labelledby="exampleModalCenterTitle" aria-hidden="true">
+          <div class="modal-dialog modal-dialog-centered" role="document">
+            <div class="modal-content">
+              <div class="modal-header">
+                <h4 class="account_type_text" style="display:inline-block">Checking Account Transactions</h4>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                  <span aria-hidden="true">&times;</span>
+                </button>
+              </div>
+              <div class="modal-body">
+                <div class="scrollable_div" id="ca_trans_tbl">
+                  None
+                </div>
+              </div>
+              <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                <button type="button" id="caXact_dwnld_btn" class="btn btn-primary">Download</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal fade" id="ccTransactionsModal" tabindex="-1" role="dialog" aria-labelledby="exampleModalCenterTitle" aria-hidden="true">
+          <div class="modal-dialog modal-dialog-centered" role="document">
+            <div class="modal-content">
+              <div class="modal-header">
+                <h4 class="account_type_text" style="display:inline-block">Credit card Transactions</h4>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                  <span aria-hidden="true">&times;</span>
+                </button>
+              </div>
+              <div class="modal-body">
+                <div class="scrollable_div" id="cc_trans_tbl">
+                  None
+                </div>
+              </div>
+              <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                <button type="button" id="ccXact_dwnld_btn" class="btn btn-primary">Download</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+
+      </div>
+
+    </div>
+
+  </div>
+
+<script src = "static/main_js/customer.js"></script>
+</body>
+</html>
