@@ -3,6 +3,7 @@ from customer import Customers
 from employee import Employee
 from utility.encrypt import encrypt
 from datetime import datetime
+import pymysql
 
 
 def getdate():
@@ -10,7 +11,7 @@ def getdate():
     return now.strftime("%d/%m/%Y %H:%M:%S")
 
 
-db = mysql.connector.connect(
+db = pymysql.connections.Connection(
     host="localhost",
     user="root",
     password="root",
