@@ -1,3 +1,10 @@
 23-03-2024 17:25:18 - werkzeug - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
  * Running on http://127.0.0.1:5000
 23-03-2024 17:25:18 - werkzeug - INFO - [33mPress CTRL+C to quit[0m
+23-03-2024 17:29:05 - werkzeug - INFO - 127.0.0.1 - - [23/Mar/2024 17:29:05] "GET /tier1 HTTP/1.1" 200 -
+23-03-2024 17:29:06 - werkzeug - INFO - 127.0.0.1 - - [23/Mar/2024 17:29:06] "[33mGET /static/css/tier1_style.css HTTP/1.1[0m" 404 -
+23-03-2024 17:29:06 - werkzeug - INFO - 127.0.0.1 - - [23/Mar/2024 17:29:06] "[36mGET /static/main_js/tier1.js HTTP/1.1[0m" 304 -
+23-03-2024 17:29:13 - werkzeug - INFO - 127.0.0.1 - - [23/Mar/2024 17:29:13] "GET /tier2 HTTP/1.1" 200 -
+23-03-2024 17:29:13 - werkzeug - INFO - 127.0.0.1 - - [23/Mar/2024 17:29:13] "[33mGET /static/css/tier2_style.css HTTP/1.1[0m" 404 -
+23-03-2024 17:29:13 - werkzeug - INFO - 127.0.0.1 - - [23/Mar/2024 17:29:13] "GET /static/main_js/tier2.js HTTP/1.1" 200 -
+23-03-2024 17:29:39 - werkzeug - INFO - 127.0.0.1 - - [23/Mar/2024 17:29:39] "GET /tier2 HTTP/1.1" 200 -
