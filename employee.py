@@ -4,8 +4,9 @@ from customer import Customers
 from utility.encrypt import encrypt
 from datetime import datetime
 import mysql.connector
+import pymysql
 
-db = mysql.connector.connect(
+db = pymysql.connections.Connection(
     host="localhost",
     user="root",
     password="root",

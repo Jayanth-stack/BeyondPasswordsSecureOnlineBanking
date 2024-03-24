@@ -3,10 +3,10 @@ from time import time
 from utility.encrypt import encrypt
 from datetime import datetime
 import mysql.connector
+import pymysql
 
-db = mysql.connector.connect(
+db = pymysql.connections.Connection(
     host="localhost",
-    port="3306",
     user="root",
     password="root",
     database="bankingapplication"
