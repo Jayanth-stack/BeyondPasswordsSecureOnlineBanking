@@ -1,5 +1,4 @@
 import logging
-
 from flask import Flask, session, jsonify, request, send_from_directory, redirect, url_for
 from flask_cors import CORS, cross_origin
 import json
