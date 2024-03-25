@@ -12,7 +12,7 @@ def getdate():
     return now.strftime("%d/%m/%Y %H:%M:%S")
 
 
-db = pymysql.connections.Connection(
+db = mysql.connector.connect(
     host="localhost",
     user="root",
     password="root",

@@ -5,9 +5,10 @@ from datetime import datetime
 import mysql.connector
 import pymysql
 
-db = pymysql.connections.Connection(
+db = mysql.connector.connect(
     host="localhost",
     user="root",
+    port ="3306",
     password="root",
     database="bankingapplication"
 )
