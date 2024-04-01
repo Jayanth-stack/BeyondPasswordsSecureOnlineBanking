@@ -9,7 +9,7 @@ document.addEventListener("contextmenu", function(e){
   e.preventDefault();
 })
 
-const homeURL = 'https://www.cse545group6.online/';
+const homeURL = 'http://127.0.0.1:5000';
 
 // var data = {
 //   "Accounts" : {
@@ -931,13 +931,13 @@ $(document).ready(function() {
     if(date.getHours() >= 17) {
       date.setDate(date.getDate()+1);
       date.setHours(10);
-      date.setMinutes(00);
+      date.setMinutes(0o0);
     }
     else if(date.getHours() >= 9) {
       date.setDate(date.getHours()+2);
     }
     else {
-      date.setMinutes(00);
+      date.setMinutes(0o0);
     }
     $('.date-picker-start').datepicker({
         format: 'dd.mm.yyyy',
