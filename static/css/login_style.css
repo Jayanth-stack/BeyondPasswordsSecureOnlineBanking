@@ -1,0 +1,250 @@
+/* Basic Reset */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: 'Roboto', sans-serif;
+}
+
+body, html {
+    height: 100%;
+    overflow: hidden;
+}
+
+/* Container and Forms Setup */
+.container {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    background: #f6f5f7;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
+}
+
+.forms-container {
+    position: absolute;
+    top: 50px;
+    width: 70%;
+    max-width: 800px;
+    transition: all 0.2s ease-in-out;
+}
+
+.sign-in-form, .forgot-pw-form, .reset-pw-form, .sign-up-form, .user-details-form, .address-info-form {
+    background-color: #ffffff;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    padding: 20px 50px;
+    height: 90%;
+    text-align: center;
+    border-radius: 10px;
+}
+
+.form-active {
+    display: flex !important;
+}
+
+/* Input Fields */
+.input-field {
+    max-width: 380px;
+    width: 100%;
+    background-color: #f0f0f0;
+    margin: 10px 0;
+    height: 55px;
+    border-radius: 55px;
+    display: grid;
+    grid-template-columns: 15% 85%;
+    padding: 0 0.4rem;
+    position: relative;
+}
+
+.input-field i {
+    text-align: center;
+    line-height: 55px;
+    color: #acacac;
+    transition: 0.5s;
+    font-size: 1.1rem;
+}
+
+.input-field input {
+    background: none;
+    outline: none;
+    border: none;
+    line-height: 1;
+    font-weight: 600;
+    font-size: 1.1rem;
+    color: #333;
+}
+
+.input-field input::placeholder {
+    color: #aaa;
+    font-weight: 500;
+}
+
+.btn {
+    width: 150px;
+    background-color: #5f95f0;
+    border: none;
+    outline: none;
+    height: 49px;
+    border-radius: 49px;
+    color: #fff;
+    text-transform: uppercase;
+    font-weight: 600;
+    margin: 10px 0;
+    cursor: pointer;
+    transition: 0.5s;
+}
+
+.btn:hover {
+    background-color: #4d84e2;
+}
+
+.forgotpwtxt, .forgotpwtxt a {
+    text-decoration: none;
+    color: #5f95f0;
+    font-size: 0.9rem;
+    transition: 0.3s;
+}
+
+.forgotpwtxt:hover {
+    color: #4d84e2;
+}
+
+/* Panels */
+.panels-container {
+    position: absolute;
+    height: 100%;
+    width: 100%;
+    top: 0;
+    left: 100%;
+    display: flex;
+}
+
+.panel {
+    background: #5f95f0;
+    color: #ffffff;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    text-align: left;
+    padding: 3rem 17% 2rem 12%;
+    width: 50%;
+    transition: 0.9s 0.6s ease-in-out;
+}
+
+.left-panel {
+    pointer-events: all;
+    padding: 3rem 12% 2rem 17%;
+}
+
+.right-panel {
+    pointer-events: none;
+}
+
+.panel .content {
+    color: #fff;
+    transition: transform 0.9s 0.6s ease-in-out;
+}
+
+.panel h3 {
+    font-weight: 600;
+    line-height: 1;
+    font-size: 1.5rem;
+}
+
+.panel p {
+    font-size: 0.95rem;
+    padding: 0.7rem 0;
+}
+
+.btn.transparent {
+    margin: 0;
+    background: none;
+    border: 2px solid #fff;
+    width: 130px;
+    height: 41px;
+    font-weight: 600;
+    font-size: 0.8rem;
+}
+
+.image {
+    transition: transform 0.9s 0.6s ease-in-out;
+    position: absolute;
+    top: 50%;
+    right: 15%;
+    transform: translate(0, -50%);
+    width: 100%;
+    transition: 2s;
+}
+
+/* Media Queries for Responsive Design */
+@media screen and (max-width: 870px) {
+    .container {
+        flex-direction: column;
+        justify-content: flex-start;
+    }
+
+    .panels-container, .forms-container {
+        width: 100%;
+        top: 0;
+        left: 0;
+    }
+
+    .panel {
+        flex-direction: row;
+        justify-content: space-around;
+        align-items: center;
+        padding: 2rem 8%;
+        grid-template-columns: auto auto;
+        /* For older versions of browsers that don't support gap property */
+        width: 200%;
+        transition: 0.9s 0.6s ease-in-out;
+    }
+
+    .panel .content, .image {
+        transform: translateY(-50%);
+        transition: transform 0.9s ease-in-out;
+    }
+
+    .left-panel {
+        grid-area: 1 / 1 / 2 / 2;
+    }
+
+    .right-panel {
+        grid-area: 1 / 2 / 2 / 3;
+    }
+}
+
+@media screen and (max-width: 570px) {
+    .forms-container {
+        width: 90%;
+    }
+
+    .form-container .input-field {
+        margin-left: 0;
+    }
+
+    .panel .content, .image {
+        padding: 0.5rem 1rem;
+        transform: translateX(0);
+    }
+
+    .panel h3 {
+        font-size: 1.2rem;
+    }
+
+    .panel p {
+        font-size: 0.7rem;
+    }
+
+    .btn.transparent {
+        width: 110px;
+        height: 35px;
+        font-size: 0.7rem;
+    }
+}

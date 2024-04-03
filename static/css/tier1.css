@@ -1,0 +1,139 @@
+body {
+    font-family: 'Segoe UI', Arial, sans-serif;
+    background-color: #f4f3ef;
+    color: #333;
+    margin: 0;
+    padding: 0;
+    font-size: 14px;
+}
+
+.navbar-custom {
+    background-color: #004d99; /* Dark blue background */
+    border: none;
+    border-radius: 0;
+}
+
+.navbar-custom .navbar-brand {
+    color: #ffcc00; /* Konoha Bank yellow */
+}
+
+.navbar-custom .navbar-nav li a {
+    color: #fff; /* White text */
+}
+
+.btn-primary {
+    background-color: #007bff;
+    border: none;
+}
+
+.btn-primary:hover,
+.btn-primary:focus {
+    background-color: #0056b3;
+}
+
+.table {
+    margin-top: 20px;
+    box-shadow: 0 0 5px rgba(0,0,0,0.1);
+}
+
+.table th {
+    background-color: #007bff;
+    color: #ffffff;
+}
+
+.table th,
+.table td {
+    padding: 10px;
+    text-align: center;
+    border-bottom: 1px solid #ddd;
+}
+
+.loader-wrapper {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(255,255,255,0.9);
+    z-index: 1000;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.loader {
+    border: 5px solid #f3f3f3; /* Light grey */
+    border-top: 5px solid #3498db; /* Blue */
+    border-radius: 50%;
+    width: 50px;
+    height: 50px;
+    animation: spin 2s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.cust_details_card, .app_dec_transactions_content, .cashier_cheques_content {
+    background-color: #ffffff;
+    padding: 20px;
+    margin-bottom: 20px;
+    border-radius: 5px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.header_text {
+    color: #333;
+    margin-bottom: 15px;
+}
+
+.custom_label, .details_lbl {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: bold;
+}
+
+input[type="text"],
+input[type="email"],
+input[type="password"],
+textarea,
+select {
+    width: 100%;
+    padding: 10px;
+    margin-bottom: 15px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+}
+
+.modal-content {
+    background-color: #f4f3ef;
+}
+
+.modal-header, .modal-footer {
+    border-bottom: none;
+    border-top: none;
+}
+
+#cust_accounts_tbl, #pending_transactions_tbl, #cust_reqs_tbl {
+    display: none; /* Initially hide tables */
+}
+
+/* Custom styles for buttons and inputs for better UX */
+input[type="submit"],
+button {
+    cursor: pointer;
+}
+
+/* Improve visibility on small screens */
+@media screen and (max-width: 768px) {
+    .btn-block {
+        display: block;
+        width: 100%;
+        text-align: center;
+    }
+
+    .cust_details_card, .app_dec_transactions_content, .cashier_cheques_content {
+        margin: 10px 0;
+    }
+}
