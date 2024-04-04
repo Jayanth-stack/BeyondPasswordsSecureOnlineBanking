@@ -2,7 +2,7 @@ import logging
 from flask import Flask, session, jsonify, request, send_from_directory, redirect, url_for
 from flask_cors import CORS, cross_origin
 import json
-from customer import customer, Customers
+from customer import  Customers
 from markupsafe import escape
 from employee import Employee
 import json
