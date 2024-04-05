@@ -1,14 +1,16 @@
 import logging
-
 from flask import Flask, session, jsonify, request, send_from_directory, redirect, url_for
 from flask_cors import CORS, cross_origin
 import json
-from customer import customer, Customers
+from customer import  Customers
 from markupsafe import escape
 from employee import Employee
 import json
 
 from werkzeug.utils import secure_filename
+
+from otp import OtpInterface
+
 logging.basicConfig(level=logging.INFO, filename='SystemLogs/bank.log', filemode='w', format='%(asctime)-15s - %(name)s - %(levelname)s - %(message)s', datefmt='%d-%m-%Y %H:%M:%S')
 otpSet = {}
 

@@ -3,7 +3,8 @@ from customer import Customers
 from employee import Employee
 from utility.encrypt import encrypt
 from datetime import datetime
-import pymysql
+
+
 
 
 def getdate():
@@ -11,10 +12,11 @@ def getdate():
     return now.strftime("%d/%m/%Y %H:%M:%S")
 
 
-db = pymysql.connections.Connection(
+db = mysql.connector.connect(
     host="localhost",
     user="root",
     password="root",
+    port="3306",
     database="bankingapplication"
 )
 
@@ -129,7 +131,7 @@ cursor.execute("""
         email_id VARCHAR(255) NOT NULL,
         address VARCHAR(255) NOT NULL,
         password VARCHAR(255) NOT NULL,
-        ssn VARCHAR(12) NOT NULL,
+        ssn VARCHAR(255) NOT NULL,
         active BOOLEAN NOT NULL,
         tier INT NOT NULL,
         PRIMARY KEY(emp_id),
@@ -158,7 +160,7 @@ cursor.execute("""
         email_id VARCHAR(255) NOT NULL,
         address VARCHAR(255) NOT NULL,
         password VARCHAR(255) NOT NULL,
-        ssn VARCHAR(12) NOT NULL,
+        ssn VARCHAR(255) NOT NULL,
         active BOOLEAN NOT NULL,
         login_history TEXT NOT NULL,
         PRIMARY KEY(customer_id),

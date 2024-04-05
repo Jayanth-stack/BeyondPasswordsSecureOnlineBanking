@@ -9,7 +9,7 @@ document.addEventListener("contextmenu", function(e){
   e.preventDefault();
 })
 
-const homeURL = 'https://www.cse545group6.online/';
+const homeURL = 'http://127.0.0.1:5000';
 
 var userid, usertype, firstname, midname, lastname, email, contact, dob, ssn, address;
 

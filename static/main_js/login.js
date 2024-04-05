@@ -16,7 +16,7 @@ window.onload = function() {
   localStorage.removeItem('loggedStatus');
 }
 
-const homeURL = 'https://www.cse545group6.online/';
+const homeURL = 'http://127.0.0.1:5000';
 
 var auth_user_type, forgotpw_userid_data;
 const sign_in_btn = document.querySelector("#sign-in-btn");

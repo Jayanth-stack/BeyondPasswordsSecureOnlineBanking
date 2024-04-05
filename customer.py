@@ -1,13 +1,15 @@
 from time import time
 # from employee import Employee
-from utility.encrypt import encrypt
+from utility.encrypt import encrypt, encrypt_ssn
 from datetime import datetime
 import mysql.connector
+
 import pymysql
 
-db = pymysql.connections.Connection(
+db = mysql.connector.connect(
     host="localhost",
     user="root",
+    port ="3306",
     password="root",
     database="bankingapplication"
 )
@@ -45,7 +47,7 @@ class Customers:
                 INSERT INTO Customers(customer_id, last_name, middle_name, first_name, dob, contact_no, email_id, address, password, ssn, active, login_history)
                 VALUES('%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', %d, '%s');""" % (
         customer_id, last_name, middle_name,
-        first_name, dob, contact_no, email_id, address, encrypt(password), ssn, active, login_history)
+        first_name, dob, contact_no, email_id, address, encrypt(password), encrypt_ssn(ssn), active, login_history)
         cursor.execute(query)
         try:
             db.commit()
@@ -735,19 +737,17 @@ class Customers:
             return 'Try Again Later'
 
 
-customer = Customers()
-# customer.create_customer_id('anilkh', "khadwal",  "", "ROHIT",  "8894141486", "anil@gmail.com", "password", "ssn", 1)
+#customer = Customers()
+#customer.create_customer_id('anilkh', "khadwal",  "", "ROHIT",  "8894141486", "anil@gmail.com", "password", "ssn", 1)
 
-# customer.open_account('savings', 'anilkh',last_name="khadwal", middle_name="", first_name="ROHIT", dob=getdate(), contact_no="8894141786", email_id="anil.khadwal@gmail.com", address="abc", password="samsung", ssn="123756901", active=True )
-# customer.update_account_info('rohitkh',last_name="khadwal", middle_name="", first_name="ROHIT", dob=getdate(), contact_no="8894141786", email_id="anil.khadwal@gmail.com", address="abc", password="samsung", ssn="123756901", active=True)
-# customer.fund_transfers(1, 2, 5000)
-# customer.get_statement(1)
-# customer.open_another_account('savings')
-# customer.printcustomer()
-# customer.debit_request(1, 50)
-# customer.credit_request(1, 50)
-# customer.check_account('rohitkh', 'samsung')
-# customer.check_user_id('rohitkh', 'samsung')
-# customer.get_all_account('rohitkh')
-# customer.get_customer_details('rohitkh')
-# print(customer.credit_request(1, 1000))
+#customer.open_account('savings', 'anilkh',last_name="khadwal", middle_name="", first_name="ROHIT", dob=getdate(), contact_no="8894141786", email_id="anil.khadwal@gmail.com", address="abc", password="samsung", ssn="123756901", active=True )
+#customer.update_account_info('rohitkh',last_name="khadwal", middle_name="", first_name="ROHIT", dob=getdate(), contact_no="8894141786", email_id="anil.khadwal@gmail.com", address="abc", password="samsung", ssn="123756901", active=True)
+#customer.fund_transfers(1, 2, 5000)
+#customer.get_statement(1)
+#customer.open_another_account('savings')
+#customer.printcustomer(), customer.debit_request(1, 50)
+#customer.credit_request(1, 50), customer.check_account('rohitkh', 'samsung')
+#customer.check_user_id('rohitkh', 'samsung')
+#customer.get_all_account('rohitkh')
+#customer.get_customer_details('rohitkh')
+#print(customer.credit_request(1, 1000))

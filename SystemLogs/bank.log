@@ -1,23 +1,10 @@
-14-03-2024 00:14:49 - werkzeug - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+23-03-2024 17:25:18 - werkzeug - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
  * Running on http://127.0.0.1:5000
-14-03-2024 00:14:49 - werkzeug - INFO - [33mPress CTRL+C to quit[0m
-14-03-2024 00:15:07 - werkzeug - INFO - 127.0.0.1 - - [14/Mar/2024 00:15:07] "GET / HTTP/1.1" 200 -
-14-03-2024 00:15:07 - werkzeug - INFO - 127.0.0.1 - - [14/Mar/2024 00:15:07] "[36mGET /static/css/login_style.css HTTP/1.1[0m" 304 -
-14-03-2024 00:15:07 - werkzeug - INFO - 127.0.0.1 - - [14/Mar/2024 00:15:07] "[36mGET /static/main_js/login.js HTTP/1.1[0m" 304 -
-14-03-2024 00:15:07 - werkzeug - INFO - 127.0.0.1 - - [14/Mar/2024 00:15:07] "[33mGET /static/img/register.svg HTTP/1.1[0m" 404 -
-14-03-2024 00:15:07 - werkzeug - INFO - 127.0.0.1 - - [14/Mar/2024 00:15:07] "[33mGET /static/img/login.svg HTTP/1.1[0m" 404 -
-14-03-2024 00:15:27 - werkzeug - INFO - 127.0.0.1 - - [14/Mar/2024 00:15:27] "GET /customer_dash HTTP/1.1" 200 -
-14-03-2024 00:15:28 - werkzeug - INFO - 127.0.0.1 - - [14/Mar/2024 00:15:28] "[33mGET /static/css/customer_style.css HTTP/1.1[0m" 404 -
-14-03-2024 00:15:28 - werkzeug - INFO - 127.0.0.1 - - [14/Mar/2024 00:15:28] "GET /static/main_js/customer.js HTTP/1.1" 200 -
-14-03-2024 00:15:28 - werkzeug - INFO - 127.0.0.1 - - [14/Mar/2024 00:15:28] "[33mGET /static/css/customer_style.css HTTP/1.1[0m" 404 -
-14-03-2024 00:15:45 - werkzeug - INFO - 127.0.0.1 - - [14/Mar/2024 00:15:45] "GET /admin HTTP/1.1" 200 -
-14-03-2024 00:15:45 - werkzeug - INFO - 127.0.0.1 - - [14/Mar/2024 00:15:45] "[33mGET /static/css/admin_style.css HTTP/1.1[0m" 404 -
-14-03-2024 00:15:45 - werkzeug - INFO - 127.0.0.1 - - [14/Mar/2024 00:15:45] "GET /static/main_js/admin.js HTTP/1.1" 200 -
-14-03-2024 00:15:56 - werkzeug - INFO - 127.0.0.1 - - [14/Mar/2024 00:15:56] "GET /tier1 HTTP/1.1" 200 -
-14-03-2024 00:15:56 - werkzeug - INFO - 127.0.0.1 - - [14/Mar/2024 00:15:56] "[33mGET /static/css/tier1_style.css HTTP/1.1[0m" 404 -
-14-03-2024 00:15:56 - werkzeug - INFO - 127.0.0.1 - - [14/Mar/2024 00:15:56] "GET /static/main_js/tier1.js HTTP/1.1" 200 -
-14-03-2024 00:16:04 - werkzeug - INFO - 127.0.0.1 - - [14/Mar/2024 00:16:04] "[36mGET / HTTP/1.1[0m" 304 -
-14-03-2024 00:16:04 - werkzeug - INFO - 127.0.0.1 - - [14/Mar/2024 00:16:04] "[36mGET /static/css/login_style.css HTTP/1.1[0m" 304 -
-14-03-2024 00:16:04 - werkzeug - INFO - 127.0.0.1 - - [14/Mar/2024 00:16:04] "[33mGET /static/img/register.svg HTTP/1.1[0m" 404 -
-14-03-2024 00:16:04 - werkzeug - INFO - 127.0.0.1 - - [14/Mar/2024 00:16:04] "[33mGET /static/img/login.svg HTTP/1.1[0m" 404 -
-14-03-2024 00:16:04 - werkzeug - INFO - 127.0.0.1 - - [14/Mar/2024 00:16:04] "[36mGET /static/main_js/login.js HTTP/1.1[0m" 304 -
+23-03-2024 17:25:18 - werkzeug - INFO - [33mPress CTRL+C to quit[0m
+23-03-2024 17:29:05 - werkzeug - INFO - 127.0.0.1 - - [23/Mar/2024 17:29:05] "GET /tier1 HTTP/1.1" 200 -
+23-03-2024 17:29:06 - werkzeug - INFO - 127.0.0.1 - - [23/Mar/2024 17:29:06] "[33mGET /static/css/tier1_style.css HTTP/1.1[0m" 404 -
+23-03-2024 17:29:06 - werkzeug - INFO - 127.0.0.1 - - [23/Mar/2024 17:29:06] "[36mGET /static/main_js/tier1.js HTTP/1.1[0m" 304 -
+23-03-2024 17:29:13 - werkzeug - INFO - 127.0.0.1 - - [23/Mar/2024 17:29:13] "GET /tier2 HTTP/1.1" 200 -
+23-03-2024 17:29:13 - werkzeug - INFO - 127.0.0.1 - - [23/Mar/2024 17:29:13] "[33mGET /static/css/tier2_style.css HTTP/1.1[0m" 404 -
+23-03-2024 17:29:13 - werkzeug - INFO - 127.0.0.1 - - [23/Mar/2024 17:29:13] "GET /static/main_js/tier2.js HTTP/1.1" 200 -
+23-03-2024 17:29:39 - werkzeug - INFO - 127.0.0.1 - - [23/Mar/2024 17:29:39] "GET /tier2 HTTP/1.1" 200 -

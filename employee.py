@@ -1,15 +1,16 @@
 from time import time
 from customer import Customers
 
-from utility.encrypt import encrypt
+from utility.encrypt import encrypt, encrypt_ssn
 from datetime import datetime
 import mysql.connector
 import pymysql
 
-db = pymysql.connections.Connection(
+db = mysql.connector.connect(
     host="localhost",
     user="root",
     password="root",
+    port="3306",
     database="bankingapplication"
 )
 
@@ -46,7 +47,7 @@ class Employee:
                 INSERT INTO Employees(emp_id, last_name, middle_name, first_name, dob, contact_no, email_id, address, password, ssn, active, tier)
                 VALUES('%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', %d, %d);""" % (
         emp_id, last_name, middle_name,
-        first_name, dob, contact_no, email_id, address, encrypt(password), ssn, int(active), int(tier))
+        first_name, dob, contact_no, email_id, address, encrypt(password), encrypt_ssn(ssn), int(active), int(tier))
         cursor.execute(query)
         try:
             db.commit()
@@ -643,6 +644,7 @@ class Employee:
 
 
 # emp.get_employee_tier('1')
+
 emp = Employee()
-# print(emp.create_employee('anilkh', "khadwal",  "", "ROHIT",  "6205709721", "ani1asq@gmail.com", "password","ssn1sa214", getdate(), 1))
-# create_employee(self, emp_id, last_name, middle_name, first_name, contact_no, email_id,  password, dob, ssn, tier, active=1,  address="")
+#print(emp.create_employee('anilkh', "khadwal",  "", "ROHIT",  "6205709721", "ani1asq@gmail.com", "password","ssn1sa214", getdate(), 1))
+#create_employee(self, emp_id, last_name, middle_name, first_name, contact_no, email_id,  password, dob, ssn, tier, active=1,  address="")

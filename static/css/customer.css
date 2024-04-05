@@ -1,0 +1,174 @@
+:root {
+  --primary-color: #007bff;
+  --secondary-color: #6c757d;
+  --background-color: #f8f9fa;
+  --text-color: #212529;
+  --link-color: #007bff;
+  --warning-color: #ffc107;
+  --error-color: #dc3545;
+  --success-color: #28a745;
+  --light-color: #f4f4f4;
+  --dark-color: #343a40;
+}
+
+body {
+  background-color: var(--background-color);
+  color: var(--text-color);
+  font-family: 'Segoe UI', Arial, sans-serif;
+  margin: 0;
+  padding: 0;
+}
+
+.navbar-custom {
+  background-color: var(--primary-color);
+}
+
+.navbar-custom .navbar-brand {
+  color: var(--warning-color);
+}
+
+.navbar-custom .navbar-nav li a {
+  color: var(--light-color);
+}
+
+.btn-primary {
+  background-color: var(--primary-color);
+  border-color: var(--primary-color);
+}
+
+.btn-primary:hover {
+  /*noinspection CssInvalidFunction*/
+  background-color: darken(var(--primary-color), 5%);
+  /*noinspection CssInvalidFunction*/
+  border-color: darken(var(--primary-color), 5%);
+}
+
+.loader-wrapper {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  width: 100vw;
+  position: fixed;
+  top: 0;
+  left: 0;
+  background-color: rgba(255, 255, 255, 0.8);
+  z-index: 1050;
+}
+
+.account_cards {
+  background-color: var(--light-color);
+  border: 1px solid var(--secondary-color);
+  border-radius: 0.25rem;
+  padding: 20px;
+  margin-bottom: 15px;
+}
+
+.modal-content {
+  color: var(--text-color);
+}
+
+.table {
+  width: 100%;
+  margin-bottom: 1rem;
+  background-color: transparent;
+}
+
+@media (min-width: 576px) {
+  .modal-dialog {
+    max-width: 500px;
+    margin: 1.75rem auto;
+  }
+}
+
+@media (max-width: 768px) {
+  .navbar-custom .navbar-nav {
+    text-align: center;
+  }
+
+  .btn-block {
+    display: block;
+    width: 100%;
+  }
+}
+
+@media (max-width: 992px) {
+  .account_cards {
+    padding: 15px;
+  }
+
+  .modal-dialog {
+    margin: 0.5rem;
+  }
+}
+
+.scrollable_div {
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+/* Virtual Keyboard Styles */
+#keyboard .otprow {
+  display: flex;
+  justify-content: space-around;
+  margin: 5px 0;
+}
+
+.key {
+  padding: 10px;
+  background-color: var(--light-color);
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.key:hover {
+  background-color: var(--secondary-color);
+  color: var(--light-color);
+}
+
+/* Adjustments for smaller screens */
+@media screen and (max-width: 600px) {
+  .container-fluid, .modal-dialog {
+    padding: 0 5px;
+  }
+
+  .modal-body {
+    padding: 1rem;
+  }
+
+  .btn, .input-field {
+    font-size: 14px;
+  }
+}
+
+/* Custom styles for alert messages */
+.alert {
+  padding: 0.75rem 1.25rem;
+  margin-bottom: 1rem;
+  border: 1px solid transparent;
+  border-radius: 0.25rem;
+}
+
+.alert-warning {
+  color: var(--warning-color);
+  /*noinspection CssInvalidFunction*/
+  background-color: lighten(var(--warning-color), 55%);
+  /*noinspection CssInvalidFunction*/
+  border-color: lighten(var(--warning-color), 55%);
+}
+
+.alert-danger {
+  color: var(--error-color);
+  /*noinspection CssInvalidFunction*/
+  background-color: lighten(var(--error-color), 55%);
+  /*noinspection CssInvalidFunction*/
+  border-color: lighten(var(--error-color), 55%);
+}
+
+.alert-success {
+  color: var(--success-color);
+  /*noinspection CssInvalidFunction*/
+  background-color: lighten(var(--success-color), 55%);
+  /*noinspection CssInvalidFunction*/
+  border-color: lighten(var(--success-color), 55%);
+}

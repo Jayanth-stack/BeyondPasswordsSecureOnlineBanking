@@ -1,0 +1,124 @@
+/* General Reset */
+body, h1, h2, h3, h4, h5, h6, p, label, input, textarea, button, select, a {
+    margin: 0;
+    padding: 0;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+/* Navbar Customization */
+.navbar-custom {
+    background-color: #004d99; /* Dark blue background */
+    border: none;
+    border-radius: 0;
+}
+
+.navbar-custom .navbar-brand {
+    color: #ffcc00; /* Konoha Bank yellow */
+}
+
+.navbar-custom .navbar-nav li a {
+    color: #fff; /* White text */
+}
+
+.navbar-custom .navbar-toggle {
+    border-color: #ffcc00; /* Konoha Bank yellow for toggle icon */
+}
+
+.navbar-custom .icon-bar {
+    background-color: #fff; /* White toggle icon */
+}
+
+/* Loader Styles */
+.loader-wrapper {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+}
+
+.loader {
+    border: 5px solid #f3f3f3; /* Light grey */
+    border-top: 5px solid #3498db; /* Blue */
+    border-radius: 50%;
+    width: 50px;
+    height: 50px;
+    animation: spin 2s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Container and Row Customization */
+.container-fluid {
+    padding: 20px;
+}
+
+.row {
+    margin-top: 20px;
+}
+
+/* Button Customization */
+.btn-primary {
+    background-color: #004d99; /* Dark blue background */
+    border: none;
+    margin-top: 10px;
+}
+
+.btn-primary:hover {
+    background-color: #003366; /* Darker blue on hover */
+}
+
+/* Forms and Inputs Customization */
+input[type=text], input[type=email], input[type=password], textarea, select {
+    width: 100%;
+    padding: 12px 20px;
+    margin: 8px 0;
+    display: inline-block;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    box-sizing: border-box;
+}
+
+/* Modal Customization */
+.modal-content {
+    background-color: #f4f4f4; /* Light grey background */
+}
+
+/* Table Customization */
+.table {
+    background-color: #ffffff; /* White background */
+    border-collapse: collapse;
+    width: 100%;
+}
+
+.table th, .table td {
+    text-align: left;
+    padding: 8px;
+}
+
+.table th {
+    background-color: #004d99; /* Dark blue background */
+    color: white;
+}
+
+.table-hover tbody tr:hover {
+    background-color: #f2f2f2; /* Light grey on hover */
+}
+
+/* Custom Card Styles */
+.cust_details_card {
+    background-color: #f4f4f4; /* Light grey background */
+    border-radius: 5px;
+    padding: 20px;
+    margin-top: 20px;
+}
+
+.header_text, .custom_label {
+    color: #333; /* Dark text for better readability */
+}
+
+.header_divider {
+    border-top: 2px solid #004d99; /* Dark blue divider */
+}
