@@ -1,4 +1,5 @@
 //prevent browser back
+
 history.pushState(null, null, document.URL);
 window.addEventListener('popstate', function () {
     history.pushState(null, null, document.URL);
@@ -16,7 +17,7 @@ window.onload = function() {
   localStorage.removeItem('loggedStatus');
 }
 
-const homeURL = 'http://127.0.0.1:5000';
+const homeURL = 'http://127.0.0.1:5000/';
 
 var auth_user_type, forgotpw_userid_data;
 const sign_in_btn = document.querySelector("#sign-in-btn");
@@ -417,7 +418,6 @@ sign_in_form.addEventListener('submit', function(e) {
       password : password_data,
       usertype : usertype_data
     };
-
     fetch(homeURL+'login', {
       method : 'post',
       body : JSON.stringify(loginData),
@@ -437,3 +437,7 @@ sign_in_form.addEventListener('submit', function(e) {
     });
   }
 });
+
+
+
+

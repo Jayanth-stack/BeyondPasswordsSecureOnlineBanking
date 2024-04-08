@@ -9,7 +9,7 @@ document.addEventListener("contextmenu", function(e){
   e.preventDefault();
 })
 
-const homeURL = 'http://127.0.0.1:5000';
+const homeURL = 'http://127.0.0.1:5000/';
 
 var userid, usertype, firstname, midname, lastname, email, contact, dob, ssn, address;
 
@@ -20,7 +20,7 @@ function getUser() {
   console.log("userid retrieved from local storage ="+ userid);
 
   const loadUserData = {
-    employee_id : userid,
+    employee_id : '4',
     usertype : 'admin'
   };
 
@@ -109,7 +109,7 @@ function fillPendingReqTbl(data){
   }
 }
 
-function logout() {
+function logout(){
   console.log("logout called");
 
   //userid = localStorage.getItem('user');

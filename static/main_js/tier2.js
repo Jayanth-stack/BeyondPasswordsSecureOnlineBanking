@@ -9,7 +9,7 @@ document.addEventListener("contextmenu", function(e){
   e.preventDefault();
 })
 
-const homeURL = 'http://127.0.0.1:5000';
+const homeURL = 'http://127.0.0.1:5000/';
 
 var userid, usertype, firstname, midname, lastname, email, contact, dob, ssn, address;
 
@@ -371,19 +371,21 @@ function deny_request(userid, xactno) {
 
 function register_customer() {
   console.log("register_customer called");
+  a = $('#create_userid').val().toString();
+  console.log("i'm, " , a);
 
   const register_customerData = {
-    empid : userid,
-    userid : $('#create_userid').val(),
-    password : $('#create_password').val(),
-    email : $('#create_email_id').val(),
-    firstname : $('#create_first_name').val(),
-    midname : $('#create_middle_name').val(),
-    lastname : $('#create_last_name').val(),
-    phone : $('#create_contact_no').val(),
-    dob : $('#create_dob').val(),
-    ssn : $('#create_ssn').val(),
-    address : $('#create_address').val()
+    'userid' : $('#create_userid').val().toString(),
+    'empid' : $('#create_userid').val().toString(),
+    'password' : $('#create_password').val().toString(),
+    'email' : $('#create_email_id').val().toString(),
+    'firstname' : $('#create_first_name').val().toString(),
+    'midname' : $('#create_middle_name').val().toString(),
+    'lastname' : $('#create_last_name').val().toString(),
+    'phone' : $('#create_contact_no').val().toString(),
+    'dob' : $('#create_dob').val().toString(),
+    'ssn' : $('#create_ssn').val().toString(),
+    'address' : $('#create_address').val().toString()
   };
 
   fetch(homeURL+'registerCustomer', {

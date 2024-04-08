@@ -1,8 +1,10 @@
 import logging
+
+from flask_bcrypt import Bcrypt
 from flask import Flask, session, jsonify, request, send_from_directory, redirect, url_for
 from flask_cors import CORS, cross_origin
 import json
-from customer import  Customers
+from customer import Customers
 from markupsafe import escape
 from employee import Employee
 import json
@@ -11,35 +13,43 @@ from werkzeug.utils import secure_filename
 
 from otp import OtpInterface
 
-logging.basicConfig(level=logging.INFO, filename='SystemLogs/bank.log', filemode='w', format='%(asctime)-15s - %(name)s - %(levelname)s - %(message)s', datefmt='%d-%m-%Y %H:%M:%S')
+logging.basicConfig(level=logging.INFO, filename='SystemLogs/bank.log', filemode='w',
+                    format='%(asctime)-15s - %(name)s - %(levelname)s - %(message)s', datefmt='%d-%m-%Y %H:%M:%S')
 otpSet = {}
 
 app = Flask(__name__)
 
+CORS(app)
+Bcrypt(app)
 
 
-@app.route('/', methods =['GET'])
+@app.route('/', methods=['GET'])
 def get_login_page_ui():  # put application's code here
     return send_from_directory('templates', 'Login.html')
 
-@app.route('/customer_dash', methods =['GET'])
+
+@app.route('/customer_dash', methods=['GET'])
 def get_customer_dash_ui():
     return send_from_directory('templates', 'customer.html')
 
-@app.route('/admin', methods =['GET'])
+
+@app.route('/admin', methods=['GET'])
 def get_admin_dashboard_ui():
     return send_from_directory('templates', 'admin.html')
 
-@app.route('/tier1', methods =['GET'])
+
+@app.route('/tier1', methods=['GET'])
 def get_tier1_dashboard_ui():
     return send_from_directory('templates', 'tier1.html')
-@app.route('/tier2', methods =['GET'])
+
+
+@app.route('/tier2', methods=['GET'])
 def get_tier2_dashboard_ui():
     return send_from_directory('templates', 'tier2.html')
 
 
 ###############                   HANDLE FOR NEW REGISTER CUSTOMER             ###############
-@app.route('/registerCustomer', methods=['POST'])
+@app.route('/registerCustomer', methods=['POST', 'GET'])
 @cross_origin()
 def registerCustomer():
     values = request.get_json()
@@ -98,7 +108,7 @@ def registerCustomer():
     if temp == 1:
         session[values['userid']] = values['userid']
         print('Redirecting to Customer dashboard')
-        return redirect(url_for('get_customer_dashboard_ui', _external=True, _scheme='https'))
+        return redirect(url_for('get_customer_dashboard_ui', _external=True, _scheme='http'))
 
     response = {
         'message': 'Something Went wrong, Please try again later'
@@ -107,45 +117,35 @@ def registerCustomer():
 
 
 ###############                   HANDLE FOR NEW REGISTER EMPLOYEE             ###############
-@app.route('/registerEmployee', methods=['POST'])
+@app.route('/registerEmployee', methods=['POST', 'GET'])
+@cross_origin()
 def registerEmployee():
     values = request.get_json()
     logging.debug('Data @registerEmployee' + str(values))
-    # print('Data @registerCustomer', values)
+
     if not values:
-        response = {
-            'message': 'No data Found'
-        }
-        return jsonify(response), 400
+        return jsonify({'message': 'No data Found'}), 400
+
     required = ['userid', 'password', 'email', 'firstname', 'midname', 'lastname', 'phone', 'dob', 'ssn', 'address',
                 'tier']
     if not all(key in values for key in required):
-        response = {
-            'message': 'Some data missing'
-        }
-        return jsonify(response), 400
-    emp = Employee()
-    # if emp.check_user_id(values['userid']):
-    #         response = {
-    #             'message' : 'AccountID exists'
-    #         }
-    #         return jsonify(response), 400
-    # if emp.check_existing_contact(values['phone']):
-    #         response = {
-    #             'message' : 'Contact already registered'
-    #         }
-    #         return jsonify(response), 400
-    # if emp.check_existing_email(values['email']):
-    #     response = {
-    #         'message' : 'Email already registered'
-    #     }
-    #     return jsonify(response), 400
-    # if emp.check_existing_email(values['ssn']):
-    #     response = {
-    #         'message' : 'SSN already registered'
-    #     }
-    #     return jsonify(response), 400
+        return jsonify({'message': 'Some data missing'}), 400
 
+    emp = Employee()
+    if emp.check_user_id(values['userid']):
+        return jsonify({'message': 'AccountID exists'}), 400
+
+    if emp.check_existing_contact(values['phone']):
+        return jsonify({'message': 'Contact already registered'}), 400
+
+    if emp.check_existing_email(values['email']):
+        return jsonify({'message': 'Email already registered'}), 400
+
+    # Assuming you meant to check if the SSN is already registered with a different method, not check_existing_email
+    if emp.check_existing_ssn(values['ssn']):  # Replace 'check_existing_email' with the correct method for checking SSN
+        return jsonify({'message': 'SSN already registered'}), 400
+
+    # If none of the above conditions are met, proceed to create the employee.
     response = {
         'message': emp.create_employee(values['userid'], values['lastname'], values['midname'],
                                        values['firstname'], values['phone'], values['email'], values['password'],
@@ -155,7 +155,7 @@ def registerEmployee():
 
 
 ###############                   HANDLE FOR LOGIN (EMP + CUST)             ###############
-@app.route('/login', methods=['POST'])
+@app.route('/login', methods=['POST', 'GET'])
 @cross_origin()
 def login():
     values = request.get_json()
@@ -180,8 +180,8 @@ def login():
             c.update_login_history(values['userid'])
             logging.info("Customer " + values['userid'] + " logged in")
             print('Redirecting to Customer dashboard')
-            return redirect(url_for('get_customer_dashboard_ui', _external=True, _scheme='https'))
-            # return redirect(url_for('get_customer_dashboard_ui', userid=values['userid']))
+            return redirect(url_for('get_customer_dashboard_ui', _external=True, _scheme='http'))
+            return redirect(url_for('get_customer_dashboard_ui', userid=values['userid']))
         else:
             response = {
                 'message': 'UserID/Password doesn\'t Exists'
@@ -194,9 +194,9 @@ def login():
             emp_tier = emp.get_employee_tier(values['userid'])
             logging.info("Employee " + values['userid'] + " logged in")
             if emp_tier == 3:
-                return redirect(url_for('get_admin_dashboard_ui', _external=True, _scheme='https'))
+                return redirect(url_for('get_admin_dashboard_ui', _external=True, _scheme='http'))
             else:
-                return redirect(url_for('get_tier' + str(emp_tier) + '_dashboard_ui', _external=True, _scheme='https'))
+                return redirect(url_for('get_tier' + str(emp_tier) + '_dashboard_ui', _external=True, _scheme='http'))
         else:
             response = {
                 'message': 'invalid username/password'
@@ -205,7 +205,7 @@ def login():
 
 
 ###############                 HANDLE FOR FILL CUSTOMER DASH               ###############
-@app.route('/loadCustomer', methods=['POST'])
+@app.route('/loadCustomer', methods=['POST', 'GET'])
 @cross_origin()
 def get_customer_data():
     values = request.get_json()
@@ -225,7 +225,7 @@ def get_customer_data():
         return jsonify(response), 400
 
     if values['usertype'] != 'customer':
-        return redirect(url_for('get_login_page_ui', _external=True, _scheme='https'))
+        return redirect(url_for('get_login_page_ui', _external=True, _scheme='http'))
 
     if values['customer_id'] in session:
         c = Customers()
@@ -237,11 +237,12 @@ def get_customer_data():
         return jsonify(response), 200
     else:
         print('Not logged In')
-        return redirect(url_for('get_login_page_ui', _external=True, _scheme='https'))
+        return redirect(url_for('get_login_page_ui', _external=True, _scheme='http'))
 
 
 ###############                 HANDLE FOR FILL EMPLOYEE DASH               ###############
-@app.route('/loadEmployee', methods=['POST'])
+@app.route('/loadEmployee', methods=['GET', 'POST'])
+@cross_origin()
 def get_employee_data():
     values = request.get_json()
     logging.debug('Data @loadEmployee' + str(values))
@@ -260,11 +261,11 @@ def get_employee_data():
         return jsonify(response), 400
 
     if values['usertype'] == 'customer':
-        return redirect(url_for('get_login_page_ui', _external=True, _scheme='https'))
+        return redirect(url_for('get_login_page_ui', _external=True, _scheme='http'))
 
     if values['employee_id'] is None or values['usertype'] is None:
         # print('Heyyy')
-        return redirect(url_for('get_login_page_ui', _external=True, _scheme='https'))
+        return redirect(url_for('get_login_page_ui', _external=True, _scheme='http'))
 
     e = Employee()
     emp_tier = e.get_employee_tier(values['employee_id'])
@@ -272,7 +273,7 @@ def get_employee_data():
             (values['usertype'] == 'admin' and emp_tier != 3) or
             (values['usertype'] == 'tier2' and emp_tier != 2)):
         # print('Heyyy')
-        return redirect(url_for('get_login_page_ui', _external=True, _scheme='https'))
+        return redirect(url_for('get_login_page_ui', _external=True, _scheme='http'))
 
     if values['employee_id'] in session:
         # e = Employee()
@@ -284,11 +285,12 @@ def get_employee_data():
         return jsonify(response), 200
     else:
         print('Not logged In')
-        return redirect(url_for('get_login_page_ui', _external=True, _scheme='https'))
+        return redirect(url_for('get_login_page_ui', _external=True, _scheme='http'))
 
 
 ###############                 HANDLE to OPEN NEW ACCOUNT              ###############
-@app.route('/openNewAccount', methods=['POST'])
+@app.route('/openNewAccount', methods=['POST', 'GET'])
+@cross_origin()
 def open_new_account():
     values = request.get_json()
     logging.debug('Data @openNewAccount' + str(values))
@@ -314,11 +316,12 @@ def open_new_account():
         return jsonify(response), 200
     else:
         print('Not logged In')
-        return redirect(url_for('get_login_page_ui', _external=True, _scheme='https'))
+        return redirect(url_for('get_login_page_ui', _external=True, _scheme='http'))
 
 
 ###############                HANDLE FOR FUND TRASNFER            ###############
-@app.route('/fundTransfer', methods=['POST'])
+@app.route('/fundTransfer', methods=['POST', 'GET'])
+@cross_origin()
 def fund_transfers():
     values = request.get_json()
     logging.debug('Data @fundTransfer' + str(values))
@@ -353,11 +356,12 @@ def fund_transfers():
         return jsonify(response), 200
     else:
         print('Not logged In')
-        return redirect(url_for('get_login_page_ui', _external=True, _scheme='https'))
+        return redirect(url_for('get_login_page_ui', _external=True, _scheme='http'))
 
 
 ###############                HANDLE TO REQUEST FUNDS           ###############
-@app.route('/requestFunds', methods=['POST'])
+@app.route('/requestFunds', methods=['POST', 'GET'])
+@cross_origin()
 def request_funds():
     values = request.get_json()
     logging.debug('Data @requestFunds' + str(values))
@@ -389,11 +393,12 @@ def request_funds():
 
     else:
         print('Not logged In')
-        return redirect(url_for('get_login_page_ui', _external=True, _scheme='https'))
+        return redirect(url_for('get_login_page_ui', _external=True, _scheme='http'))
 
 
 ###############                HANDLE TO DEPOSIT MONEY            ###############
-@app.route('/depositAmount', methods=['POST'])
+@app.route('/depositAmount', methods=['POST', 'GET'])
+@cross_origin()
 def deposit_fund():
     values = request.get_json()
     logging.debug('Data @depositAmount' + str(values))
@@ -424,11 +429,12 @@ def deposit_fund():
         return jsonify(response), 200
     else:
         print('Not logged In')
-        return redirect(url_for('get_login_page_ui', _external=True, _scheme='https'))
+        return redirect(url_for('get_login_page_ui', _external=True, _scheme='http'))
 
 
 ###############                HANDLE TO WITHDRAW MONEY            ###############
-@app.route('/withdrawAmount', methods=['POST'])
+@app.route('/withdrawAmount', methods=['POST', 'GET'])
+@cross_origin()
 def withdraw_fund():
     values = request.get_json()
     logging.debug('Data @withdrawAmount' + str(values))
@@ -461,11 +467,12 @@ def withdraw_fund():
         return jsonify(response), 200
     else:
         print('Not logged In')
-        return redirect(url_for('get_login_page_ui', _external=True, _scheme='https'))
+        return redirect(url_for('get_login_page_ui', _external=True, _scheme='http'))
 
 
 ###############            HANDLE TO APPROVE FUND'S REQUEST By CUSTOMER          ###############
-@app.route('/approveRequest', methods=['POST'])
+@app.route('/approveRequest', methods=['POST', 'GET'])
+@cross_origin()
 def approve_request():
     values = request.get_json()
     logging.debug('Data @approveRequest' + str(values))
@@ -514,11 +521,12 @@ def approve_request():
         return jsonify(response), 200
     else:
         print('Not logged In')
-        return redirect(url_for('get_login_page_ui', _external=True, _scheme='https', ))
+        return redirect(url_for('get_login_page_ui', _external=True, _scheme='http', ))
 
 
 ###############            HANDLE TO APPROVE FUND'S REQUEST By EMPLOYEE (not Tier1)         ###############
-@app.route('/approveRequestEmp', methods=['POST'])
+@app.route('/approveRequestEmp', methods=['POST', 'GET'])
+@cross_origin()
 def approve_request_employee():
     values = request.get_json()
     logging.debug('Data @approveRequestEmp' + str(values))
@@ -562,11 +570,12 @@ def approve_request_employee():
         return jsonify(response), 200
     else:
         print('Not logged In')
-        return redirect(url_for('get_login_page_ui', _external=True, _scheme='https'))
+        return redirect(url_for('get_login_page_ui', _external=True, _scheme='http'))
 
 
 ###############                HANDLE TO deny FUND TRANSFER REQUEST           ###############
-@app.route('/denyRequest', methods=['POST'])
+@app.route('/denyRequest', methods=['POST', 'GET'])
+@cross_origin()
 def deny_request():
     values = request.get_json()
     logging.debug('Data @denyRequest' + str(values))
@@ -592,11 +601,12 @@ def deny_request():
         return jsonify(response), 200
     else:
         print('Not logged In')
-        return redirect(url_for('get_login_page_ui', _external=True, _scheme='https'))
+        return redirect(url_for('get_login_page_ui', _external=True, _scheme='http'))
 
 
 ###############                HANDLE TO GET TRANSACTION HISTORY            ###############
-@app.route('/getTransactionHistory', methods=['POST'])
+@app.route('/getTransactionHistory', methods=['POST', 'GET'])
+@cross_origin()
 def get_transaction_history():
     values = request.get_json()
     logging.debug('Data @getTransactionHistory' + str(values))
@@ -622,11 +632,12 @@ def get_transaction_history():
         return jsonify(response), 200
     else:
         print('Not logged In')
-        return redirect(url_for('get_login_page_ui', _external=True, _scheme='https'))
+        return redirect(url_for('get_login_page_ui', _external=True, _scheme='http'))
 
 
 ###############              HANDLE FOR GET CHEQUE (BY CUSTOMER/BANK)             ###############
-@app.route('/getCashierCheque', methods=['POST'])
+@app.route('/getCashierCheque', methods=['POST', 'GET'])
+@cross_origin()
 def make_cashier_cheque():
     values = request.get_json()
     logging.debug('Data @getCashierCheque' + str(values))
@@ -660,11 +671,12 @@ def make_cashier_cheque():
         return jsonify(response), 200
     else:
         print('Not logged In')
-        return redirect(url_for('get_login_page_ui', _external=True, _scheme='https'))
+        return redirect(url_for('get_login_page_ui', _external=True, _scheme='http'))
 
 
 ###############            HANDLE FOR DEPOSIT CHEQUE (BY CUSTOMER/BANK)          ###############
-@app.route('/depositCheck', methods=['POST'])
+@app.route('/depositCheck', methods=['POST', 'GET'])
+@cross_origin()
 def deposit_cheuqe():
     values = request.get_json()
     logging.debug('Data @depositCheck' + str(values))
@@ -690,11 +702,12 @@ def deposit_cheuqe():
         return jsonify(response), 200
     else:
         print('Not logged In')
-        return redirect(url_for('get_login_page_ui', _external=True, _scheme='https'))
+        return redirect(url_for('get_login_page_ui', _external=True, _scheme='http'))
 
 
 ###############         HANDLE FOR GET  ISSUED CHEQUE'S LIST (BY CUSTOMER)           ###############
-@app.route('/getChequeList', methods=['POST'])
+@app.route('/getChequeList', methods=['POST', 'GET'])
+@cross_origin()
 def get_cheque_list():
     values = request.get_json()
     logging.debug('Data @getChequeList' + str(values))
@@ -720,11 +733,12 @@ def get_cheque_list():
         return jsonify(response), 200
     else:
         print('Not logged In')
-        return redirect(url_for('get_login_page_ui', _external=True, _scheme='https'))
+        return redirect(url_for('get_login_page_ui', _external=True, _scheme='http'))
 
 
 ###############                         HANDLE FOR MAKE APPOINTMENT (BY CUSTOMER)                    ###############
-@app.route('/makeAppointment', methods=['POST'])
+@app.route('/makeAppointment', methods=['POST', 'GET'])
+@cross_origin()
 def make_appointment():
     values = request.get_json()
     logging.debug('Data @makeAppointment' + str(values))
@@ -748,11 +762,12 @@ def make_appointment():
         return jsonify(response), 200
     else:
         print('Not logged In')
-        return redirect(url_for('get_login_page_ui', _external=True, _scheme='https'))
+        return redirect(url_for('get_login_page_ui', _external=True, _scheme='http'))
 
 
 ###############                HANDLE TO GET APPOINTMENT LIST (BY CUSTOMER)                 ###############
-@app.route('/getAppointmentList', methods=['POST'])
+@app.route('/getAppointmentList', methods=['POST', 'GET'])
+@cross_origin()
 def get_appointment_list():
     values = request.get_json()
     logging.debug('Data @getAppointmentList' + str(values))
@@ -776,11 +791,12 @@ def get_appointment_list():
         return jsonify(response), 200
     else:
         print('Not logged In')
-        return redirect(url_for('get_login_page_ui', _external=True, _scheme='https'))
+        return redirect(url_for('get_login_page_ui', _external=True, _scheme='http'))
 
 
 ###############                HANDLE TO REQUEST UPDATE INFO BY CUSTOMER                 ###############
-@app.route('/updateInfo', methods=['POST'])
+@app.route('/updateInfo', methods=['POST', 'GET'])
+@cross_origin()
 def update_info():
     values = request.get_json()
     logging.debug('Data @updateInfo' + str(values))
@@ -806,11 +822,12 @@ def update_info():
         return jsonify(response), 200
     else:
         print('Not logged In')
-        return redirect(url_for('get_login_page_ui', _external=True, _scheme='https'))
+        return redirect(url_for('get_login_page_ui', _external=True, _scheme='http'))
 
 
 ###############                HANDLE TO APPROVE UPDATE INFO (BY BANK)                 ###############
-@app.route('/approveUpdateInfo', methods=['POST'])
+@app.route('/approveUpdateInfo', methods=['POST', 'GET'])
+@cross_origin()
 def approve_update_info():
     values = request.get_json()
     logging.debug('Data @approveUpdateInfo' + str(values))
@@ -834,11 +851,12 @@ def approve_update_info():
         return jsonify(response), 200
     else:
         print('Not logged In')
-        return redirect(url_for('get_login_page_ui', _external=True, _scheme='https'))
+        return redirect(url_for('get_login_page_ui', _external=True, _scheme='http'))
 
 
 ###############                HANDLE TO deny UPDATE INFO (BY BANK)                 ###############
-@app.route('/denyUpdateInfo', methods=['POST'])
+@app.route('/denyUpdateInfo', methods=['POST', 'GET'])
+@cross_origin()
 def deny_update_info():
     values = request.get_json()
     logging.debug('Data @denyUpdateInfo' + str(values))
@@ -862,11 +880,12 @@ def deny_update_info():
         return jsonify(response), 200
     else:
         print('Not logged In')
-        return redirect(url_for('get_login_page_ui', _external=True, _scheme='https'))
+        return redirect(url_for('get_login_page_ui', _external=True, _scheme='http'))
 
 
 ###############                 HANDLE TO GET WHOLE CUSTOMER INFO (FOR BANK)               ###############
-@app.route('/getCustomer', methods=['POST'])
+@app.route('/getCustomer', methods=['POST', 'GET'])
+@cross_origin()
 def get_customer():
     values = request.get_json()
     logging.debug('Data @getCustomer' + str(values))
@@ -893,11 +912,12 @@ def get_customer():
         return jsonify(response), 200
     else:
         print('Not logged In')
-        return redirect(url_for('get_login_page_ui', _external=True, _scheme='https'))
+        return redirect(url_for('get_login_page_ui', _external=True, _scheme='http'))
 
 
 ###############                 HANDLE TO GET WHOLE EMPLOYEE INFO (FOR BANK)               ###############
-@app.route('/getEmployee', methods=['POST'])
+@app.route('/getEmployee', methods=['POST', 'GET'])
+@cross_origin()
 def get_employee():
     values = request.get_json()
     logging.debug('Data @getEmployee' + str(values))
@@ -924,11 +944,12 @@ def get_employee():
         return jsonify(response), 200
     else:
         print('Not logged In')
-        return redirect(url_for('get_login_page_ui', _external=True, _scheme='https'))
+        return redirect(url_for('get_login_page_ui', _external=True, _scheme='http'))
 
 
 ###############                 HANDLE TO MODIFY CUSTOMER ACCOUNT (FOR BANK-ADMIN)               ###############
-@app.route('/modifyCustomer', methods=['POST'])
+@app.route('/modifyCustomer', methods=['POST', 'GET'])
+@cross_origin()
 def modify_customer():
     values = request.get_json()
     logging.debug('Data @modifyCustomer' + str(values))
@@ -958,11 +979,12 @@ def modify_customer():
         return jsonify(response), 200
     else:
         print('Not logged In')
-        return redirect(url_for('get_login_page_ui', _external=True, _scheme='https'))
+        return redirect(url_for('get_login_page_ui', _external=True, _scheme='http'))
 
 
 ###############                 HANDLE TO MODIFY EMPLOYEE ACCOUNT (FOR BANK-ADMIN)               ###############
-@app.route('/modifyEmployee', methods=['POST'])
+@app.route('/modifyEmployee', methods=['POST', 'GET'])
+@cross_origin()
 def modify_employee():
     values = request.get_json()
     logging.debug('Data @modifyEmployee' + str(values))
@@ -992,11 +1014,12 @@ def modify_employee():
         return jsonify(response), 200
     else:
         print('Not logged In')
-        return redirect(url_for('get_login_page_ui', _external=True, _scheme='https'))
+        return redirect(url_for('get_login_page_ui', _external=True, _scheme='http'))
 
 
 ###############                 HANDLE TO DEACTIVATE ACCOUNT (FOR BANK)               ###############
-@app.route('/deactivateAccount', methods=['POST'])
+@app.route('/deactivateAccount', methods=['POST', 'GET'])
+@cross_origin()
 def deactivate_account():
     values = request.get_json()
     logging.debug('Data @deactivateAccount' + str(values))
@@ -1022,11 +1045,12 @@ def deactivate_account():
         return jsonify(response), 200
     else:
         print('Not logged In')
-        return redirect(url_for('get_login_page_ui', _external=True, _scheme='https'))
+        return redirect(url_for('get_login_page_ui', _external=True, _scheme='http'))
 
 
 ###############                 HANDLE TO DEACTIVATE CUSTOMER (FOR BANK)               ###############
-@app.route('/deactivateCustomer', methods=['POST'])
+@app.route('/deactivateCustomer', methods=['POST', 'GET'])
+@cross_origin()
 def deactivate_customer():
     values = request.get_json()
     logging.debug('Data @deactivateCustomer' + str(values))
@@ -1052,7 +1076,7 @@ def deactivate_customer():
         return jsonify(response), 200
     else:
         print('Not logged In')
-        return redirect(url_for('get_login_page_ui', _external=True, _scheme='https'))
+        return redirect(url_for('get_login_page_ui', _external=True, _scheme='http'))
 
 
 ###############                 HANDLE TO UPDATE EMPLOYEE (FOR BANK)               ###############
@@ -1087,7 +1111,8 @@ def deactivate_customer():
 #         return redirect(url_for('get_login_page_ui', _external=True, _scheme='https'))
 
 ###############                 HANDLE TO DEACTIVATE EMPLOYEE (FOR BANK)               ###############
-@app.route('/deactivateEmployee', methods=['POST'])
+@app.route('/deactivateEmployee', methods=['POST', 'GET'])
+@cross_origin()
 def deactivate_employee():
     values = request.get_json()
     logging.debug('Data @deactivateEmployee' + str(values))
@@ -1113,11 +1138,12 @@ def deactivate_employee():
         return jsonify(response), 200
     else:
         print('Not logged In')
-        return redirect(url_for('get_login_page_ui', _external=True, _scheme='https'))
+        return redirect(url_for('get_login_page_ui', _external=True, _scheme='http'))
 
 
 ###############                HANDLE TO REQUEST OTP                 ###############
-@app.route('/sendOTP', methods=['POST'])
+@app.route('/sendOTP', methods=['POST', 'GET'])
+@cross_origin()
 def send_otp():
     values = request.get_json()
     logging.debug('Data @sendOTP' + str(values))
@@ -1156,7 +1182,8 @@ def send_otp():
 
 
 ###############                HANDLE TO VERIFY OTP                 ###############
-@app.route('/verifyOTP', methods=['POST'])
+@app.route('/verifyOTP', methods=['POST', 'GET'])
+@cross_origin()
 def verify_otp():
     values = request.get_json()
     logging.debug('Data @verifyOTP' + str(values))
@@ -1188,7 +1215,8 @@ def verify_otp():
 
 
 ###############                HANDLE TO RESET PASSWORD                 ###############
-@app.route('/resetPassword', methods=['POST'])
+@app.route('/resetPassword', methods=['POST', 'GET'])
+@cross_origin()
 def reset_password():
     values = request.get_json()
     logging.debug('Data @resetPassword' + str(values))
@@ -1217,7 +1245,7 @@ def reset_password():
             return jsonify(response), 200
         else:
             print('Not logged In')
-            return redirect(url_for('get_login_page_ui', _external=True, _scheme='https'))
+            return redirect(url_for('get_login_page_ui', _external=True, _scheme='http'))
     else:
         response = {
             'message': obj.reset_fpassword(values['userid'], values['newPassword'])
@@ -1226,7 +1254,8 @@ def reset_password():
 
 
 ###############                         HANDLE FOR LOGOUT                    ###############
-@app.route('/logout', methods=['POST'])
+@app.route('/logout', methods=['POST', 'GET'])
+@cross_origin()
 def logout():
     values = request.get_json()
     logging.debug('Data @logout' + str(values))
@@ -1243,11 +1272,12 @@ def logout():
         }
         return jsonify(response), 400
     session.pop(values['userid'], None)
-    return redirect(url_for('get_login_page_ui', _external=True, _scheme='https'))
+    return redirect(url_for('get_login_page_ui', _external=True, _scheme='http'))
 
 
 ###############                         HANDLE TO GET SYSTEM LOGS                     ###############
-@app.route("/getSystemLogs", methods=['POST'])
+@app.route("/getSystemLogs", methods=['POST', 'GET'])
+@cross_origin()
 def get_report():
     values = request.get_json()
     logging.debug('Data @getSystemLogs' + str(values))
@@ -1276,11 +1306,11 @@ def get_report():
             return jsonify(response), 400
     else:
         print('Not logged In')
-        return redirect(url_for('get_login_page_ui', _external=True, _scheme='https'))
+        return redirect(url_for('get_login_page_ui', _external=True, _scheme='http'))
 
 
 if __name__ == '__main__':
     from argparse import ArgumentParser
 
     logging.debug('Banking Server has Started')
-    app.run()
+    app.run(ssl_context="adhoc", debug=True, host='0.0.0.0')

@@ -1,10 +1,86 @@
-23-03-2024 17:25:18 - werkzeug - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+08-04-2024 00:22:47 - werkzeug - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
  * Running on http://127.0.0.1:5000
-23-03-2024 17:25:18 - werkzeug - INFO - [33mPress CTRL+C to quit[0m
-23-03-2024 17:29:05 - werkzeug - INFO - 127.0.0.1 - - [23/Mar/2024 17:29:05] "GET /tier1 HTTP/1.1" 200 -
-23-03-2024 17:29:06 - werkzeug - INFO - 127.0.0.1 - - [23/Mar/2024 17:29:06] "[33mGET /static/css/tier1_style.css HTTP/1.1[0m" 404 -
-23-03-2024 17:29:06 - werkzeug - INFO - 127.0.0.1 - - [23/Mar/2024 17:29:06] "[36mGET /static/main_js/tier1.js HTTP/1.1[0m" 304 -
-23-03-2024 17:29:13 - werkzeug - INFO - 127.0.0.1 - - [23/Mar/2024 17:29:13] "GET /tier2 HTTP/1.1" 200 -
-23-03-2024 17:29:13 - werkzeug - INFO - 127.0.0.1 - - [23/Mar/2024 17:29:13] "[33mGET /static/css/tier2_style.css HTTP/1.1[0m" 404 -
-23-03-2024 17:29:13 - werkzeug - INFO - 127.0.0.1 - - [23/Mar/2024 17:29:13] "GET /static/main_js/tier2.js HTTP/1.1" 200 -
-23-03-2024 17:29:39 - werkzeug - INFO - 127.0.0.1 - - [23/Mar/2024 17:29:39] "GET /tier2 HTTP/1.1" 200 -
+08-04-2024 00:22:47 - werkzeug - INFO - [33mPress CTRL+C to quit[0m
+08-04-2024 00:22:53 - werkzeug - INFO - 127.0.0.1 - - [08/Apr/2024 00:22:53] "[31m[1mPOST /registerEmployee HTTP/1.1[0m" 400 -
+08-04-2024 00:23:08 - werkzeug - INFO - 127.0.0.1 - - [08/Apr/2024 00:23:08] "POST /registerEmployee HTTP/1.1" 200 -
+08-04-2024 00:24:16 - app - ERROR - Exception on /login [POST]
+Traceback (most recent call last):
+  File "C:\Users\jayan\Documents\BeyondPasswordsSecureOnlineBanking\venv\Lib\site-packages\flask\app.py", line 1463, in wsgi_app
+    response = self.full_dispatch_request()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\jayan\Documents\BeyondPasswordsSecureOnlineBanking\venv\Lib\site-packages\flask\app.py", line 872, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\jayan\Documents\BeyondPasswordsSecureOnlineBanking\venv\Lib\site-packages\flask_cors\extension.py", line 176, in wrapped_function
+    return cors_after_request(app.make_response(f(*args, **kwargs)))
+                                                ^^^^^^^^^^^^^^^^^^
+  File "C:\Users\jayan\Documents\BeyondPasswordsSecureOnlineBanking\venv\Lib\site-packages\flask\app.py", line 870, in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\jayan\Documents\BeyondPasswordsSecureOnlineBanking\venv\Lib\site-packages\flask\app.py", line 855, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\jayan\Documents\BeyondPasswordsSecureOnlineBanking\venv\Lib\site-packages\flask_cors\decorator.py", line 130, in wrapped_function
+    resp = make_response(f(*args, **kwargs))
+                         ^^^^^^^^^^^^^^^^^^
+  File "C:\Users\jayan\Documents\BeyondPasswordsSecureOnlineBanking\app.py", line 193, in login
+    session[values['userid']] = values['userid']
+    ~~~~~~~^^^^^^^^^^^^^^^^^^
+  File "C:\Users\jayan\Documents\BeyondPasswordsSecureOnlineBanking\venv\Lib\site-packages\flask\sessions.py", line 102, in _fail
+    raise RuntimeError(
+RuntimeError: The session is unavailable because no secret key was set.  Set the secret_key on the application to something unique and secret.
+08-04-2024 00:24:16 - werkzeug - INFO - 127.0.0.1 - - [08/Apr/2024 00:24:16] "[35m[1mPOST /login HTTP/1.1[0m" 500 -
+08-04-2024 00:25:07 - werkzeug - INFO - 127.0.0.1 - - [08/Apr/2024 00:25:07] "[36mGET /admin HTTP/1.1[0m" 304 -
+08-04-2024 00:25:07 - werkzeug - INFO - 127.0.0.1 - - [08/Apr/2024 00:25:07] "[36mGET /static/css/admin.css HTTP/1.1[0m" 304 -
+08-04-2024 00:25:07 - werkzeug - INFO - 127.0.0.1 - - [08/Apr/2024 00:25:07] "[36mGET /static/main_js/admin.js HTTP/1.1[0m" 304 -
+08-04-2024 00:25:07 - werkzeug - INFO - 127.0.0.1 - - [08/Apr/2024 00:25:07] "[32mPOST /loadEmployee HTTP/1.1[0m" 302 -
+08-04-2024 00:25:07 - werkzeug - INFO - 127.0.0.1 - - [08/Apr/2024 00:25:07] "[36mGET / HTTP/1.1[0m" 304 -
+08-04-2024 00:25:07 - werkzeug - INFO - 127.0.0.1 - - [08/Apr/2024 00:25:07] "[36mGET / HTTP/1.1[0m" 304 -
+08-04-2024 00:25:07 - werkzeug - INFO - 127.0.0.1 - - [08/Apr/2024 00:25:07] "[36mGET /static/css/login_style.css HTTP/1.1[0m" 304 -
+08-04-2024 00:25:07 - werkzeug - INFO - 127.0.0.1 - - [08/Apr/2024 00:25:07] "[36mGET /static/main_js/login.js HTTP/1.1[0m" 304 -
+08-04-2024 00:25:18 - werkzeug - INFO - 127.0.0.1 - - [08/Apr/2024 00:25:18] "[36mGET /tier2 HTTP/1.1[0m" 304 -
+08-04-2024 00:25:18 - werkzeug - INFO - 127.0.0.1 - - [08/Apr/2024 00:25:18] "[36mGET /static/css/tier2.css HTTP/1.1[0m" 304 -
+08-04-2024 00:25:18 - werkzeug - INFO - 127.0.0.1 - - [08/Apr/2024 00:25:18] "[36mGET /static/main_js/tier2.js HTTP/1.1[0m" 304 -
+08-04-2024 00:25:18 - werkzeug - INFO - 127.0.0.1 - - [08/Apr/2024 00:25:18] "[32mPOST /loadEmployee HTTP/1.1[0m" 302 -
+08-04-2024 00:25:18 - werkzeug - INFO - 127.0.0.1 - - [08/Apr/2024 00:25:18] "[36mGET / HTTP/1.1[0m" 304 -
+08-04-2024 00:25:18 - werkzeug - INFO - 127.0.0.1 - - [08/Apr/2024 00:25:18] "[36mGET / HTTP/1.1[0m" 304 -
+08-04-2024 00:25:18 - werkzeug - INFO - 127.0.0.1 - - [08/Apr/2024 00:25:18] "[36mGET /static/css/login_style.css HTTP/1.1[0m" 304 -
+08-04-2024 00:25:18 - werkzeug - INFO - 127.0.0.1 - - [08/Apr/2024 00:25:18] "[36mGET /static/main_js/login.js HTTP/1.1[0m" 304 -
+08-04-2024 00:25:24 - werkzeug - INFO - 127.0.0.1 - - [08/Apr/2024 00:25:24] "[36mGET /tier1 HTTP/1.1[0m" 304 -
+08-04-2024 00:25:24 - werkzeug - INFO - 127.0.0.1 - - [08/Apr/2024 00:25:24] "[36mGET /static/css/tier1.css HTTP/1.1[0m" 304 -
+08-04-2024 00:25:24 - werkzeug - INFO - 127.0.0.1 - - [08/Apr/2024 00:25:24] "[36mGET /static/main_js/tier1.js HTTP/1.1[0m" 304 -
+08-04-2024 00:31:19 - werkzeug - INFO - 127.0.0.1 - - [08/Apr/2024 00:31:19] "[32mGET /loadCustomer HTTP/1.1[0m" 302 -
+08-04-2024 00:31:19 - werkzeug - INFO - 127.0.0.1 - - [08/Apr/2024 00:31:19] "GET / HTTP/1.1" 200 -
+08-04-2024 00:35:52 - werkzeug - INFO - 127.0.0.1 - - [08/Apr/2024 00:35:52] "[32mPOST /openNewAccount HTTP/1.1[0m" 302 -
+08-04-2024 00:35:52 - werkzeug - INFO - 127.0.0.1 - - [08/Apr/2024 00:35:52] "GET / HTTP/1.1" 200 -
+08-04-2024 00:36:20 - werkzeug - INFO - 127.0.0.1 - - [08/Apr/2024 00:36:20] "[31m[1mPOST /openNewAccount HTTP/1.1[0m" 400 -
+08-04-2024 00:36:50 - werkzeug - INFO - 127.0.0.1 - - [08/Apr/2024 00:36:50] "[36mGET / HTTP/1.1[0m" 304 -
+08-04-2024 00:36:50 - werkzeug - INFO - 127.0.0.1 - - [08/Apr/2024 00:36:50] "[36mGET /static/css/login_style.css HTTP/1.1[0m" 304 -
+08-04-2024 00:36:50 - werkzeug - INFO - 127.0.0.1 - - [08/Apr/2024 00:36:50] "[36mGET /static/main_js/login.js HTTP/1.1[0m" 304 -
+08-04-2024 00:36:58 - app - ERROR - Exception on /login [POST]
+Traceback (most recent call last):
+  File "C:\Users\jayan\Documents\BeyondPasswordsSecureOnlineBanking\venv\Lib\site-packages\flask\app.py", line 1463, in wsgi_app
+    response = self.full_dispatch_request()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\jayan\Documents\BeyondPasswordsSecureOnlineBanking\venv\Lib\site-packages\flask\app.py", line 872, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\jayan\Documents\BeyondPasswordsSecureOnlineBanking\venv\Lib\site-packages\flask_cors\extension.py", line 176, in wrapped_function
+    return cors_after_request(app.make_response(f(*args, **kwargs)))
+                                                ^^^^^^^^^^^^^^^^^^
+  File "C:\Users\jayan\Documents\BeyondPasswordsSecureOnlineBanking\venv\Lib\site-packages\flask\app.py", line 870, in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\jayan\Documents\BeyondPasswordsSecureOnlineBanking\venv\Lib\site-packages\flask\app.py", line 855, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\jayan\Documents\BeyondPasswordsSecureOnlineBanking\venv\Lib\site-packages\flask_cors\decorator.py", line 130, in wrapped_function
+    resp = make_response(f(*args, **kwargs))
+                         ^^^^^^^^^^^^^^^^^^
+  File "C:\Users\jayan\Documents\BeyondPasswordsSecureOnlineBanking\app.py", line 179, in login
+    session[values['userid']] = values['userid']
+    ~~~~~~~^^^^^^^^^^^^^^^^^^
+  File "C:\Users\jayan\Documents\BeyondPasswordsSecureOnlineBanking\venv\Lib\site-packages\flask\sessions.py", line 102, in _fail
+    raise RuntimeError(
+RuntimeError: The session is unavailable because no secret key was set.  Set the secret_key on the application to something unique and secret.
+08-04-2024 00:36:58 - werkzeug - INFO - 127.0.0.1 - - [08/Apr/2024 00:36:58] "[35m[1mPOST /login HTTP/1.1[0m" 500 -

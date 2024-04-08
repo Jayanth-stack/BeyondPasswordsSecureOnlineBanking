@@ -9,7 +9,7 @@ document.addEventListener("contextmenu", function(e){
   e.preventDefault();
 })
 
-const homeURL = 'http://127.0.0.1:5000';
+const homeURL = 'http://127.0.0.1:5000/';
 
 var userid, usertype, firstname, midname, lastname, email, contact, dob, ssn, address;
 
@@ -25,7 +25,7 @@ function getUser() {
   };
 
   fetch(homeURL+'loadEmployee', {
-    method : 'post',
+    method : 'get',
     body : JSON.stringify(loadUserData),
     headers : {
       'Content-type' : 'application/json'

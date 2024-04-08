@@ -9,26 +9,8 @@ document.addEventListener("contextmenu", function(e){
   e.preventDefault();
 })
 
-const homeURL = 'http://127.0.0.1:5000';
+const homeURL = 'http://127.0.0.1:5000/';
 
-// var data = {
-//   "Accounts" : {
-//     "checkin" : "None",
-//     "credit" : {
-//       "Account" : 2,
-//       "Balance" : 0
-//     },
-//     "savings" : {
-//       "Account" : 3,
-//       "Balance" : 500
-//     }
-//   },
-//   "Info" : [
-//     [
-//       "rohitkh","khadwal","","ROHIT","Sun, 21 MAR 2021 00:00:00 GMT","8894141786","anil.khadwal@gmail.com","","","ssn",1,"Sun, 21 MAR 2021 00:00:00 GMT","sdk"
-//     ]
-//   ]
-// };
 
 var userid, usertype, first_name, savings_ac_no, savings_ac_no_masked, savings_ac_bal, checking_ac_no, checking_ac_no_masked, checking_ac_bal, cc_no, cc_no_masked, cc_bal;
 var midname, lastname, email, contact, dob, ssn, ssn_masked, address;

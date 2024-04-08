@@ -14,7 +14,7 @@ input {
 .container {
   position: relative;
   width: 100%;
-  background-color: maroon;
+  background-color: blue;
   min-height: 100vh;
   overflow: hidden;
 }
@@ -98,7 +98,7 @@ a {
 .forgotpwtxt {
   max-width: 380px;
   width: 100%;
-  color: yellow;
+  color: greenyellow;
   font-size: 1.1rem;
   text-align: center;
 }
@@ -258,7 +258,7 @@ a {
   cursor: grab;
   color: white;
   font-weight: 600;
-  background-color: #ff6600;
+  background-color: #fff200;
 }
 
 .num {
@@ -282,7 +282,7 @@ a {
 
 .btn {
   width: 150px;
-  background-color: #d23153;
+  background-color: #9231d2;
   border: none;
   outline: none;
   height: 49px;
@@ -330,11 +330,6 @@ a {
   z-index: 6;
 }
 
-.image {
-  width: 100%;
-  transition: transform 1.1s ease-in-out;
-  transition-delay: 0.4s;
-}
 
 .panel {
   display: flex;
