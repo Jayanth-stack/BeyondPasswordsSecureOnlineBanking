@@ -1,6 +1,6 @@
 from time import time
 # from employee import Employee
-from utility.encrypt import encrypt, encrypt_ssn
+from utility.encrypt import encrypt, encrypt_ssn, check_encrypted_password
 from datetime import datetime
 import mysql.connector
 
@@ -401,6 +401,21 @@ class Customers:
             return 0
         return 1
 
+    def verify_customer(self, customer_id, password):
+        hashed_password_in_db = self.retrieve_hashed_password(customer_id)
+        if hashed_password_in_db and check_encrypted_password(password, hashed_password_in_db):
+            return 1
+        else:
+            return 0
+
+    def retrieve_hashed_password(self, userid):
+        query = "SELECT password FROM Customers WHERE customer_id = %s"
+        cursor.execute(query, (userid,))
+        result = cursor.fetchone()
+        if result:
+            return result[0]  # Return the hashed password
+        return None
+
     #################        FUNCTION TO GET CUSTOMER'S CONTACT_NO                    #################
     def get_customer_contactNo(self, customer_id):
         query = """
@@ -723,9 +738,9 @@ class Customers:
         if self.check_user_id(userid) == 0:
             return 'UserID doesn\'t exists'
 
-        query = """
-                UPDATE Customers Set password = '%s' 
-                WHERE customer_id = '%s';""" % (encrypt(newPassword), userid)
+        query = f"""
+                UPDATE Customers Set password = '{encrypt(newPassword)}' 
+                WHERE customer_id = '{userid}';"""
         print(encrypt(newPassword))
         cursor.execute(query)
         try:
@@ -735,6 +750,7 @@ class Customers:
             db.rollback()
             print('Cannot make request:', e)
             return 'Try Again Later'
+
 
 
 #customer = Customers()

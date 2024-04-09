@@ -1,5 +1,5 @@
 import logging
-
+import os
 from flask_bcrypt import Bcrypt
 from flask import Flask, session, jsonify, request, send_from_directory, redirect, url_for
 from flask_cors import CORS, cross_origin
@@ -7,17 +7,19 @@ import json
 from customer import Customers
 from markupsafe import escape
 from employee import Employee
-import json
 
 from werkzeug.utils import secure_filename
-
+from utility.encrypt import encrypt, check_encrypted_password
 from otp import OtpInterface
+from utility.encrypt import verify_password
 
 logging.basicConfig(level=logging.INFO, filename='SystemLogs/bank.log', filemode='w',
                     format='%(asctime)-15s - %(name)s - %(levelname)s - %(message)s', datefmt='%d-%m-%Y %H:%M:%S')
 otpSet = {}
 
 app = Flask(__name__)
+
+app.secret_key = os.urandom(24)
 
 CORS(app)
 Bcrypt(app)
@@ -155,17 +157,31 @@ def registerEmployee():
 
 
 ###############                   HANDLE FOR LOGIN (EMP + CUST)             ###############
+from flask import request, jsonify, session, redirect, url_for
+from flask_cors import cross_origin
+import logging
+
+
+# Import your encrypt function here. If it's in the same file, you don't need to import it.
+# from yourmodule import encrypt, Customers, Employee
+
+from flask import request, jsonify, session, redirect, url_for
+from flask_cors import cross_origin
+import logging
+# Assume the Customers and Employee classes are defined elsewhere
+# from yourmodule import Customers, Employee, verify_password
+
 @app.route('/login', methods=['POST', 'GET'])
 @cross_origin()
 def login():
     values = request.get_json()
     logging.debug('Data @login' + str(values))
-    # print('Data @loginRequest', values)
     if not values:
         response = {
-            'message': 'No data Found'
+            'message': 'No data found'
         }
         return jsonify(response), 400
+
     required = ['userid', 'password', 'usertype']
     if not all(key in values for key in required):
         response = {
@@ -173,23 +189,26 @@ def login():
         }
         return jsonify(response), 400
 
+    user_provided_password = values['password']
+
     if values['usertype'] == 'customer':
         c = Customers()
-        if c.verify_customer(values['userid'], values['password']) == 1:
+        # Retrieve the hashed password for the user from the database
+        hashed_password_in_db = c.retrieve_hashed_password(values['userid'])
+        if hashed_password_in_db and check_encrypted_password(values['password'], hashed_password_in_db):
             session[values['userid']] = values['userid']
             c.update_login_history(values['userid'])
             logging.info("Customer " + values['userid'] + " logged in")
-            print('Redirecting to Customer dashboard')
-            return redirect(url_for('get_customer_dashboard_ui', _external=True, _scheme='http'))
-            return redirect(url_for('get_customer_dashboard_ui', userid=values['userid']))
+            return redirect(url_for('get_customer_dash_ui', _external=True, _scheme='http'))
         else:
             response = {
-                'message': 'UserID/Password doesn\'t Exists'
+                'message': 'UserID/Password doesn\'t match'
             }
             return jsonify(response), 400
     else:
         emp = Employee()
-        if emp.verify_employee(values['userid'], values['password']) == 1:
+        hashed_password_in_db = emp.retrieve_hashed_password(values['userid'])
+        if hashed_password_in_db and verify_password(hashed_password_in_db, user_provided_password):
             session[values['userid']] = values['userid']
             emp_tier = emp.get_employee_tier(values['userid'])
             logging.info("Employee " + values['userid'] + " logged in")
@@ -199,9 +218,10 @@ def login():
                 return redirect(url_for('get_tier' + str(emp_tier) + '_dashboard_ui', _external=True, _scheme='http'))
         else:
             response = {
-                'message': 'invalid username/password'
+                'message': 'Invalid username/password'
             }
             return jsonify(response), 400
+
 
 
 ###############                 HANDLE FOR FILL CUSTOMER DASH               ###############

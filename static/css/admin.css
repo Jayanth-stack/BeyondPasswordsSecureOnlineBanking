@@ -25,7 +25,7 @@ body, h1, h2, h3, h4, h5, h6, p, label, input, textarea, button, select, a {
 }
 
 .navbar-custom .icon-bar {
-    background-color: #fff; /* White toggle icon */
+    background-color: #04f877; /* White toggle icon */
 }
 
 /* Loader Styles */
@@ -120,5 +120,5 @@ input[type=text], input[type=email], input[type=password], textarea, select {
 }
 
 .header_divider {
-    border-top: 2px solid #004d99; /* Dark blue divider */
+    border-top: 2px solid #990045;
 }
