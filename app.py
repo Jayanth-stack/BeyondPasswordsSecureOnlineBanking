@@ -208,7 +208,7 @@ def login():
     else:
         emp = Employee()
         hashed_password_in_db = emp.retrieve_hashed_password(values['userid'])
-        if hashed_password_in_db and verify_password(hashed_password_in_db, user_provided_password):
+        if hashed_password_in_db and check_encrypted_password(values['password'], hashed_password_in_db):
             session[values['userid']] = values['userid']
             emp_tier = emp.get_employee_tier(values['userid'])
             logging.info("Employee " + values['userid'] + " logged in")

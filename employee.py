@@ -106,6 +106,14 @@ class Employee:
             return 0
         return 1
 
+    def retrieve_hashed_password(self, userid):
+        query = "SELECT password FROM Employees WHERE emp_id = %s"
+        cursor.execute(query, (userid,))
+        result = cursor.fetchone()
+        if result:
+            return result[0]  # Return the hashed password
+        return None
+
     #################        FUNCTION TO CHECK CONTACT NO EXISTANCE                  #################
     def check_existing_contact(self, contact_no):
         query = """
