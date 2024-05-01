@@ -516,10 +516,10 @@ function fund_transfer(userid, fromAccount, toAccount, amount) {
     return response.json();
   }).then(function (data) {
     console.log(data);
-    if(data.message == 'done'){
+    if(data.message === 'done'){
       window.alert('Successfully transferred!');
     }
-    else if(data.message == 'Request to be approved by Tier2 employee'){
+    else if(data.message === 'Request to be approved by Tier2 employee'){
       window.alert(data.message);
     }
     else {
@@ -550,7 +550,7 @@ function deposit(userid, account, amount) {
     return response.json();
   }).then(function (data) {
     console.log(data);
-    if(data.message == 'Success') {
+    if(data.message === 'Success') {
       window.alert("Amount deposited!");
     }
     else {

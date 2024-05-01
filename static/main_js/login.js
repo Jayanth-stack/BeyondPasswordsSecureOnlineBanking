@@ -122,7 +122,7 @@ otp_verify_btn.addEventListener("click", () => {
     requester : auth_user_type
   };
 
-  fetch(homeURL+'verifyOTP', {
+  fetch(homeURL+'OTPAccess', {
     method : 'post',
     body : JSON.stringify(otpData),
     headers : {

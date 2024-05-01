@@ -31,7 +31,7 @@ function getUser() {
       'Content-type' : 'application/json'
     }
   }).then(function(response) {
-    console.log("getadmin response received");
+    console.log("get admin response received");
     if (response.redirected) {
       localStorage.setItem('loggedStatus', '0');
       window.location.href = response.url;
@@ -380,29 +380,42 @@ function updateAdmin() {
 }
 
 function deleteUser(userid, delete_id) {
-  console.log("deleteUser called");
+    console.log("deleteUser called");
 
-  const deleteUserData = {
-    userid: userid,
-    employee_id: delete_id
-  };
+    // Disable the delete button to prevent multiple clicks
+    const deleteButton = document.getElementById('delete_employee_id_btn');
+    deleteButton.disabled = true;
 
-  fetch(homeURL+'deactivateEmployee', {
-    method : 'post',
-    body : JSON.stringify(deleteUserData),
-    headers : {
-      'Content-type' : 'application/json'
-    }
-  }).then(function(response) {
-    console.log("deleteUser response received");
-    return response.json();
-  }).then(function (data) {
-    console.log(data);
-    window.alert(data.message);
-  }).catch(function(error){
-    console.error(error);
-  });
+    const deleteUserData = {
+        userid: userid,
+        employee_id: delete_id
+    };
+    console.log("deleteUserData:", deleteUserData);
+
+    fetch(homeURL + 'deactivateEmployee', {
+        method: 'POST',
+        body: JSON.stringify(deleteUserData),
+        headers: {
+            'Content-Type': 'application/json',
+        }
+    }).then(function(response) {
+        console.log("deleteUser response received");
+        if (!response.ok) {
+            throw new Error('Server responded with status ' + response.status);
+        }
+        return response.json();
+    }).then(function(data) {
+        console.log(data);
+        window.alert(data.message);
+    }).catch(function(error) {
+        console.error('Error occurred:', error);
+        window.alert('Error: ' + error.message);
+    }).finally(() => {
+        // Re-enable the delete button
+        deleteButton.disabled = false;
+    });
 }
+
 
 function changePassword(userid, oldPassword, newPassword) {
   const resetpwData = {
@@ -413,7 +426,7 @@ function changePassword(userid, oldPassword, newPassword) {
     flag : 1
   };
 
-  fetch(homeURL+'resetpPassword', {
+  fetch(homeURL+'resetPassword', {
     method : 'post',
     body : JSON.stringify(resetpwData),
     headers : {

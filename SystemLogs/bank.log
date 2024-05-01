@@ -1,10 +1,56 @@
-09-04-2024 18:00:48 - werkzeug - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+30-04-2024 21:25:00 - werkzeug - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
  * Running on http://127.0.0.1:5000
-09-04-2024 18:00:48 - werkzeug - INFO - [33mPress CTRL+C to quit[0m
-09-04-2024 18:08:11 - werkzeug - INFO - 127.0.0.1 - - [09/Apr/2024 18:08:11] "[36mGET / HTTP/1.1[0m" 304 -
-09-04-2024 18:08:11 - werkzeug - INFO - 127.0.0.1 - - [09/Apr/2024 18:08:11] "[36mGET /static/main_js/login.js HTTP/1.1[0m" 304 -
-09-04-2024 18:08:11 - werkzeug - INFO - 127.0.0.1 - - [09/Apr/2024 18:08:11] "[36mGET /static/css/login_style.css HTTP/1.1[0m" 304 -
-09-04-2024 18:08:19 - werkzeug - INFO - 127.0.0.1 - - [09/Apr/2024 18:08:19] "GET / HTTP/1.1" 200 -
-09-04-2024 18:08:19 - werkzeug - INFO - 127.0.0.1 - - [09/Apr/2024 18:08:19] "GET /static/css/login_style.css HTTP/1.1" 200 -
-09-04-2024 18:08:19 - werkzeug - INFO - 127.0.0.1 - - [09/Apr/2024 18:08:19] "GET /static/main_js/login.js HTTP/1.1" 200 -
-09-04-2024 18:08:20 - werkzeug - INFO - 127.0.0.1 - - [09/Apr/2024 18:08:20] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
+30-04-2024 21:25:00 - werkzeug - INFO - [33mPress CTRL+C to quit[0m
+30-04-2024 21:25:07 - werkzeug - INFO - 127.0.0.1 - - [30/Apr/2024 21:25:07] "[36mGET / HTTP/1.1[0m" 304 -
+30-04-2024 21:25:07 - werkzeug - INFO - 127.0.0.1 - - [30/Apr/2024 21:25:07] "[36mGET /static/css/login_style.css HTTP/1.1[0m" 304 -
+30-04-2024 21:25:07 - werkzeug - INFO - 127.0.0.1 - - [30/Apr/2024 21:25:07] "[36mGET /static/main_js/login.js HTTP/1.1[0m" 304 -
+30-04-2024 21:25:16 - werkzeug - INFO - 127.0.0.1 - - [30/Apr/2024 21:25:16] "[31m[1mPOST /login HTTP/1.1[0m" 401 -
+30-04-2024 21:25:28 - werkzeug - INFO - 127.0.0.1 - - [30/Apr/2024 21:25:28] "[31m[1mPOST /login HTTP/1.1[0m" 401 -
+30-04-2024 21:26:20 - werkzeug - INFO - 127.0.0.1 - - [30/Apr/2024 21:26:20] "[31m[1mPOST /login HTTP/1.1[0m" 401 -
+30-04-2024 21:26:31 - werkzeug - INFO - 127.0.0.1 - - [30/Apr/2024 21:26:31] "[31m[1mPOST /login HTTP/1.1[0m" 401 -
+30-04-2024 21:26:42 - werkzeug - INFO - 127.0.0.1 - - [30/Apr/2024 21:26:42] "[36mGET / HTTP/1.1[0m" 304 -
+30-04-2024 21:26:42 - werkzeug - INFO - 127.0.0.1 - - [30/Apr/2024 21:26:42] "[36mGET /static/css/login_style.css HTTP/1.1[0m" 304 -
+30-04-2024 21:26:42 - werkzeug - INFO - 127.0.0.1 - - [30/Apr/2024 21:26:42] "[36mGET /static/main_js/login.js HTTP/1.1[0m" 304 -
+30-04-2024 21:26:53 - twilio.http_client - INFO - -- BEGIN Twilio API Request --
+30-04-2024 21:26:53 - twilio.http_client - INFO - POST Request: https://verify.twilio.com/v2/Services/VA53b2fca108d249d85b5f33dbe92af113/Verifications
+30-04-2024 21:26:53 - twilio.http_client - INFO - Headers:
+30-04-2024 21:26:53 - twilio.http_client - INFO - User-Agent : twilio-python/9.0.4 (Windows AMD64) Python/3.12.2
+30-04-2024 21:26:53 - twilio.http_client - INFO - X-Twilio-Client : python-9.0.4
+30-04-2024 21:26:53 - twilio.http_client - INFO - Accept-Charset : utf-8
+30-04-2024 21:26:53 - twilio.http_client - INFO - Content-Type : application/x-www-form-urlencoded
+30-04-2024 21:26:53 - twilio.http_client - INFO - Accept : application/json
+30-04-2024 21:26:53 - twilio.http_client - INFO - -- END Twilio API Request --
+30-04-2024 21:26:53 - twilio.http_client - INFO - Response Status Code: 201
+30-04-2024 21:26:53 - twilio.http_client - INFO - Response Headers: {'Date': 'Wed, 01 May 2024 01:26:52 GMT', 'Content-Type': 'application/json; charset=utf-8', 'Content-Length': '633', 'Connection': 'keep-alive', 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'Accept, Authorization, Content-Type, If-Match, If-Modified-Since, If-None-Match, If-Unmodified-Since, Idempotency-Key', 'Access-Control-Allow-Credentials': 'true', 'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS', 'Access-Control-Expose-Headers': 'ETag', 'Twilio-Request-Id': 'RQ4cd4dae8a29437022f1f78fc91c0aab8', 'Twilio-Request-Duration': '0.183', 'Twilio-Concurrent-Requests': '1', 'X-Shenanigans': 'none', 'X-Powered-By': 'AT-5000', 'X-Home-Region': 'us1', 'X-API-Domain': 'verify.twilio.com'}
+30-04-2024 21:26:53 - werkzeug - INFO - 127.0.0.1 - - [30/Apr/2024 21:26:53] "[32mPOST /login HTTP/1.1[0m" 302 -
+30-04-2024 21:26:53 - werkzeug - INFO - 127.0.0.1 - - [30/Apr/2024 21:26:53] "[36mGET /otp_page HTTP/1.1[0m" 304 -
+30-04-2024 21:26:53 - werkzeug - INFO - 127.0.0.1 - - [30/Apr/2024 21:26:53] "[36mGET /otp_page HTTP/1.1[0m" 304 -
+30-04-2024 21:26:54 - werkzeug - INFO - 127.0.0.1 - - [30/Apr/2024 21:26:54] "[36mGET /static/css/OtpAuthentication.css HTTP/1.1[0m" 304 -
+30-04-2024 21:26:54 - werkzeug - INFO - 127.0.0.1 - - [30/Apr/2024 21:26:54] "[36mGET /static/main_js/OtpAuthentication.js HTTP/1.1[0m" 304 -
+30-04-2024 21:29:41 - twilio.http_client - INFO - -- BEGIN Twilio API Request --
+30-04-2024 21:29:41 - twilio.http_client - INFO - POST Request: https://verify.twilio.com/v2/Services/VA53b2fca108d249d85b5f33dbe92af113/VerificationCheck
+30-04-2024 21:29:41 - twilio.http_client - INFO - Headers:
+30-04-2024 21:29:41 - twilio.http_client - INFO - User-Agent : twilio-python/9.0.4 (Windows AMD64) Python/3.12.2
+30-04-2024 21:29:41 - twilio.http_client - INFO - X-Twilio-Client : python-9.0.4
+30-04-2024 21:29:41 - twilio.http_client - INFO - Accept-Charset : utf-8
+30-04-2024 21:29:41 - twilio.http_client - INFO - Content-Type : application/x-www-form-urlencoded
+30-04-2024 21:29:41 - twilio.http_client - INFO - Accept : application/json
+30-04-2024 21:29:41 - twilio.http_client - INFO - -- END Twilio API Request --
+30-04-2024 21:29:42 - twilio.http_client - INFO - Response Status Code: 200
+30-04-2024 21:29:42 - twilio.http_client - INFO - Response Headers: {'Date': 'Wed, 01 May 2024 01:29:40 GMT', 'Content-Type': 'application/json; charset=utf-8', 'Content-Length': '339', 'Connection': 'keep-alive', 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'Accept, Authorization, Content-Type, If-Match, If-Modified-Since, If-None-Match, If-Unmodified-Since, Idempotency-Key', 'Access-Control-Allow-Credentials': 'true', 'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS', 'Access-Control-Expose-Headers': 'ETag', 'Twilio-Request-Id': 'RQca76a0fdfb35adfa011a17d6077c1e14', 'Twilio-Request-Duration': '0.029', 'Twilio-Concurrent-Requests': '1', 'X-Shenanigans': 'none', 'X-Powered-By': 'AT-5000', 'X-Home-Region': 'us1', 'X-API-Domain': 'verify.twilio.com'}
+30-04-2024 21:29:42 - werkzeug - INFO - 127.0.0.1 - - [30/Apr/2024 21:29:42] "[32mPOST /verify-otp HTTP/1.1[0m" 302 -
+30-04-2024 21:29:42 - werkzeug - INFO - 127.0.0.1 - - [30/Apr/2024 21:29:42] "GET /admin HTTP/1.1" 200 -
+30-04-2024 21:29:42 - werkzeug - INFO - 127.0.0.1 - - [30/Apr/2024 21:29:42] "[36mGET /admin HTTP/1.1[0m" 304 -
+30-04-2024 21:29:42 - werkzeug - INFO - 127.0.0.1 - - [30/Apr/2024 21:29:42] "GET /static/css/admin.css HTTP/1.1" 200 -
+30-04-2024 21:29:42 - werkzeug - INFO - 127.0.0.1 - - [30/Apr/2024 21:29:42] "GET /static/main_js/admin.js HTTP/1.1" 200 -
+30-04-2024 21:29:42 - werkzeug - INFO - 127.0.0.1 - - [30/Apr/2024 21:29:42] "POST /loadEmployee HTTP/1.1" 200 -
+30-04-2024 21:31:17 - werkzeug - INFO - 127.0.0.1 - - [30/Apr/2024 21:31:17] "[36mGET /admin HTTP/1.1[0m" 304 -
+30-04-2024 21:31:17 - werkzeug - INFO - 127.0.0.1 - - [30/Apr/2024 21:31:17] "[36mGET /static/main_js/admin.js HTTP/1.1[0m" 304 -
+30-04-2024 21:31:17 - werkzeug - INFO - 127.0.0.1 - - [30/Apr/2024 21:31:17] "[36mGET /static/css/admin.css HTTP/1.1[0m" 304 -
+30-04-2024 21:31:17 - werkzeug - INFO - 127.0.0.1 - - [30/Apr/2024 21:31:17] "POST /loadEmployee HTTP/1.1" 200 -
+30-04-2024 21:31:26 - werkzeug - INFO - 127.0.0.1 - - [30/Apr/2024 21:31:26] "POST /getEmployee HTTP/1.1" 200 -
+30-04-2024 21:32:16 - werkzeug - INFO - 127.0.0.1 - - [30/Apr/2024 21:32:16] "[36mGET /admin HTTP/1.1[0m" 304 -
+30-04-2024 21:32:16 - werkzeug - INFO - 127.0.0.1 - - [30/Apr/2024 21:32:16] "[36mGET /static/css/admin.css HTTP/1.1[0m" 304 -
+30-04-2024 21:32:16 - werkzeug - INFO - 127.0.0.1 - - [30/Apr/2024 21:32:16] "[36mGET /static/main_js/admin.js HTTP/1.1[0m" 304 -
+30-04-2024 21:32:16 - werkzeug - INFO - 127.0.0.1 - - [30/Apr/2024 21:32:16] "POST /loadEmployee HTTP/1.1" 200 -
+30-04-2024 21:33:40 - werkzeug - INFO - 127.0.0.1 - - [30/Apr/2024 21:33:40] "POST /loadEmployee HTTP/1.1" 200 -

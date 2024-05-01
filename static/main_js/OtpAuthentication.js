@@ -1,33 +1,44 @@
 document.getElementById('verifyBtn').addEventListener('click', function() {
-    // Get the user-entered OTP from the input field
     const userEnteredOTP = document.getElementById('otp').value;
+    const homeURL = 'http://127.0.0.1:5000/';
+    const otpInputField = document.getElementById('otp');
+    const verifyButton = document.getElementById('verifyBtn');
 
-    // Example: Sending the OTP to the server for verification
-    // Note: This is a placeholder. You'll need to replace it with an actual AJAX request or fetch API call to your server.
+    if (userEnteredOTP.trim() === '') {
+        alert('Please enter the OTP.');
+        return;
+    }
+
+    verifyButton.textContent = 'Verifying...';
+    verifyButton.disabled = true;
+
     console.log('Verifying OTP:', userEnteredOTP);
-    // Pretend we're sending the OTP to a server endpoint '/verify-otp'
-    fetch('/verify-otp', {
+    fetch(homeURL + 'verify-otp', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ otp: userEnteredOTP }),
+        body: JSON.stringify({ otp_code: userEnteredOTP }),
     })
-    .then(response => response.json())
-    .then(data => {
-        if(data.success) {
-            // OTP verification succeeded
-            alert('OTP verified successfully! You are now logged in.');
-            // Redirect the user to the dashboard or another page as necessary
-            window.location.href = '/dashboard';
+    .then(response => {
+        console.log("OTP verification response received");
+        if (response.redirected) {
+            window.location.href = response.url;
         } else {
-            // OTP verification failed
-            alert('Incorrect OTP. Please try again.');
-            // Optionally, clear the OTP field or take other actions in response to the failed verification
+            return response.json();
+        }
+    })
+    .then(data => {
+        if (data && !data.success) {
+            throw new Error(data.error || 'Incorrect OTP. Please try again.');
         }
     })
     .catch(error => {
         console.error('Error verifying OTP:', error);
-        alert('An error occurred while verifying the OTP. Please try again.');
+        alert('Error: ' + error.message);
+    })
+    .finally(() => {
+        verifyButton.textContent = 'Verify OTP';
+        verifyButton.disabled = false;
     });
 });
