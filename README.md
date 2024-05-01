@@ -11,7 +11,7 @@ Our aim is to achieve few goals we set for ourselves inorder make a safer bankin
 
 # Set Up a Virtual Environment (optional but recommended)
 Instructions for setting up a virtual environment to isolate package dependencies locally
-python -m venv venv
+1. python -m venv venv
 # On Windows
 venv\Scripts\activate
 # On Unix or MacOS
