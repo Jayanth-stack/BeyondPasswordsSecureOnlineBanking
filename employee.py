@@ -23,7 +23,7 @@ def getdate():
 
 
 class Employee:
-    def __init__(self):
+    def  __init__(self):
         pass
 
     #################        FUNCTION TO CREATE EMPLOYEE          #################
@@ -51,7 +51,7 @@ class Employee:
         cursor.execute(query)
         try:
             db.commit()
-            # result = cursor.fetchall()
+            result = cursor.fetchall()
             print('Employee added $$ ' + emp_id)
             return 1
         except Exception as e:
@@ -72,7 +72,7 @@ class Employee:
         cursor.execute(query)
         try:
             db.commit()
-            # result = cursor.fetchall()
+            result = cursor.fetchall()
             print('Customer Updated')
             return 'updated'
         except Exception as e:
@@ -102,9 +102,17 @@ class Employee:
         result = cursor.fetchall()
         # print(len(result))
         if len(result) == 0:
-            # print('Customer with this ID not exists')
+            #print('Customer with this ID not exists')
             return 0
         return 1
+
+    def retrieve_hashed_password(self, userid):
+        query = "SELECT password FROM Employees WHERE emp_id = %s"
+        cursor.execute(query, (userid,))
+        result = cursor.fetchone()
+        if result:
+            return result[0]  # Return the hashed password
+        return None
 
     #################        FUNCTION TO CHECK CONTACT NO EXISTANCE                  #################
     def check_existing_contact(self, contact_no):
@@ -174,17 +182,17 @@ class Employee:
         return result[0][0]
 
     # #################        FUNCTION TO VERIFY EMPLOYEE                   #################
-    #     def verify_employee(self, emp_id, password):
-    #         query = """
-    #             SELECT customer_id FROM Employees
-    #             WHERE emp_id='%s' and password='%s';""" % (emp_id, encrypt(password))
-    #         cursor.execute(query)
-    #         result = cursor.fetchall()
-    #         # print(len(result))
-    #         if len(result) == 0:
-    #             # print('Customer with this ID not exists')
-    #             return 0
-    #         return 1
+        def verify_employee(self, emp_id, password):
+            query = """
+                SELECT customer_id FROM Employees
+                WHERE emp_id='%s' and password='%s';""" % (emp_id, encrypt(password))
+            cursor.execute(query)
+            result = cursor.fetchall()
+            # print(len(result))
+            if len(result) == 0:
+                # print('Customer with this ID not exists')
+                return 0
+            return 1
 
     #################        FUNCTION TO ADD TRANSACTIONS (APPROVER: TIER2)                    #################
     def add_transaction(self, account1, account2, amount):
@@ -226,11 +234,11 @@ class Employee:
                     INSERT into Transactions(from_account, to_account, approver1_id, approver2, amount, status, deposit) 
                     VALUES(%d, %d, '-1', %d, %d, 1, 1)
                     """ % (int(account), int(account), approver, float(amount))
-        # Status 1 means still pending
+        #Status 1 means still pending
         cursor.execute(query)
         try:
             db.commit()
-            # result = cursor.fetchall()
+            result = cursor.fetchall()
             msg = 'Request to be approved by tier' + str(approver) + ' employee'
             print(msg)
             return msg
@@ -252,7 +260,7 @@ class Employee:
         cursor.execute(query)
         try:
             db.commit()
-            # result = cursor.fetchall()
+            result = cursor.fetchall()
             return 'Request Cancelled'
         except Exception as e:
             db.rollback()
@@ -275,13 +283,13 @@ class Employee:
     #################        FUNCTION TO GET FUND TRANSFER REQUESTs LIST                    #################
     def fund_transfer_requests(self, employee_id):
         tier = self.get_employee_tier(employee_id)
-        # if tier != 2 :
-        #     return 'None'
+        if tier != 2 :
+             return 'None'
 
         query = """
             SELECT * FROM Transactions 
             WHERE approver2 = %d and status = 1; """ % (tier)
-        # print(len(result))
+        #print(len(result))
         try:
             db.commit()
             cursor.execute(query)
@@ -294,7 +302,7 @@ class Employee:
             print(e, ' : Error in  getting  fund_transfer_requests List')
 
     #################        FUNCTION TO GET ACCOUNT UPDATE REQUEST's LIST                    #################
-    def update_info_reqest_list(self, employee_id):
+    def update_info_request_list(self, employee_id):
         tier = self.get_employee_tier(employee_id)
         approver = 1
         if tier == 3:
@@ -306,7 +314,7 @@ class Employee:
 
         cursor.execute(query)
         result = cursor.fetchall()
-        # print(result)
+        print(result)
 
         try:
             db.commit()
@@ -315,22 +323,21 @@ class Employee:
             print(e, ' : Error in  update cache after undateInfo request List')
 
         if len(result) == 0:
-            # print('Customer with this ID not exists')
+            print('Customer with this ID not exists')
             return 0
         return result
 
     def handle_appointment(self):
-        pass
-        # query = """
-        # DELETE FROM Appointments WHERE emp_id='%s';""" % (self.__emp_id);
-        # cursor.execute(query)
-        # try:
-        #     db.commit()
-        #     result = cursor.fetchall()
-        #     print('Appointment attended.')
-        # except Exception as e:
-        #     db.rollback()
-        #     print('Cannot Delete Appointment:', e)
+         query = """
+         DELETE FROM Appointments WHERE emp_id='%s';""" % (self.__emp_id);
+         cursor.execute(query)
+         try:
+             db.commit()
+             result = cursor.fetchall()
+             print('Appointment attended.')
+         except Exception as e:
+             db.rollback()
+             print('Cannot Delete Appointment:', e)
 
     def get_employee_tier(self, emp_id):
         query = """
@@ -340,7 +347,7 @@ class Employee:
         cursor.execute(query)
         result = cursor.fetchall()
         if len(result) == 0:
-            # print('Account doesn\'t exists')
+            print('Account doesn\'t exists')
             return "None"
         return result[0][0]
 
@@ -350,7 +357,7 @@ class Employee:
             WHERE transaction_no=%d ; """ % (int(transaction_no))
         cursor.execute(query)
         result = cursor.fetchall()
-        # print(len(result))
+        print(len(result))
         if len(result) == 0:
             return -1
         return result[0][0]
@@ -389,7 +396,7 @@ class Employee:
         return result[0][0]
 
     def transfer_transaction_to_tier2(self, transaction_no):
-        # tier2_id = self.getTier2_emp()
+        tier2_id = self.getTier2_emp()
         query = """
             UPDATE Transactions SET approver1_id='-1', approver2 = 2 
             WHERE transaction_no = %d;""" % (int(transaction_no))
@@ -404,22 +411,21 @@ class Employee:
             return 0
 
     def system_logs(self):  # TIER 3
-        pass
-        # if(self.__tier == '3'):
-        #     query = """
-        #         SELECT * FROM System_Log;
-        #         """
-        #     cursor.execute(query)
-        #     try:
-        #         #db.commit()
-        #         result = cursor.fetchall()
-        #         for x in result:
-        #             print(x)
-        #     except Exception as e:
-        #         #db.rollback()
-        #         print('Cannot view System Logs:', e)
-        # else:
-        #     print("You are not authorized to view System logs.")
+         if(self.__tier == '3'):
+             query = """
+                 SELECT * FROM System_Log;
+                """
+             cursor.execute(query)
+             try:
+                 db.commit()
+                 result = cursor.fetchall()
+                 for x in result:
+                     print(x)
+             except Exception as e:
+                db.rollback()
+                print('Cannot view System Logs:', e)
+         else:
+             print("You are not authorized to view System logs.")
 
     #################        FUNCTION TO UPDATE EMPLOYEE ACCOUNT INFO                     #################
     def update_employee(self, userid, emp_id, email, firstname, midname, lastname, contact_no, dob, address):
@@ -467,13 +473,13 @@ class Employee:
         return res
 
     def deactivate_account(self, userid, account):
-        # tier = self.get_employee_tier(userid)
-        # if tier !=2:
-        #     return 'Not authorized to dectivate accounts'
-        # tier2_id = self.getTier2_emp()
-        # query = """
-        #     UPDATE Accounts SET active = 0
-        #     WHERE account_no = %d;""" % (int(account))
+        tier = self.get_employee_tier(userid)
+        if tier !=2:
+            return 'Not authorized to dectivate accounts'
+        tier2_id = self.getTier2_emp()
+        query = """
+            UPDATE Accounts SET active = 0
+            WHERE account_no = %d;""" % (int(account))
         c = Customers()
         if c.verify_account(int(account)) == 0:
             return 'account doesn\'t exists'
@@ -491,25 +497,25 @@ class Employee:
             return 'Account cannot be Closed'
 
     def deactivate_customer(self, userid, customer_id):
-        # tier = self.get_employee_tier(userid)
-        # if tier !=2:
-        #     return 'Not authorized to dectivate customer'
-        # tier2_id = self.getTier2_emp()
-        # query = """
-        #     UPDATE Customers SET active = 0
-        #     WHERE customer_id = %d;""" % (customer_id)
+        tier = self.get_employee_tier(userid)
+        if tier !=2:
+            return 'Not authorized to dectivate customer'
+        tier2_id = self.getTier2_emp()
+        query = """
+            UPDATE Customers SET active = 0
+            WHERE customer_id = %d;""" % customer_id
         c = Customers()
         if c.check_user_id(customer_id) == 0:
             return 'customer doesn\'t exists'
 
         query = """
             DELETE FROM Accounts
-            WHERE customer_id = '%s';""" % (customer_id)
+            WHERE customer_id = '%s';""" % customer_id
         cursor.execute(query)
 
         query = """
             DELETE FROM Customers
-            WHERE customer_id = '%s';""" % (customer_id)
+            WHERE customer_id = '%s';""" % customer_id
         cursor.execute(query)
 
         try:
@@ -528,7 +534,7 @@ class Employee:
         tier = self.get_employee_tier(userid)
         if tier != 3:
             return 'Not authorized to dectivate employee'
-        # tier2_id = self.getTier2_emp()
+        tier2_id = self.getTier2_emp()
         query = """
             UPDATE Employees SET active = 0 
             WHERE emp_id = '%s';""" % (emp_id)
@@ -543,10 +549,10 @@ class Employee:
             return 'Cannot deactivate Employee'
 
     def approve_update_info(self, userid, update_req_no):
-        # tier = self.get_employee_tier(userid)
-        # if tier !=2:
-        #     return 'Not authorized to update customer'
-        # tier2_id = self.getTier2_emp()
+        tier = self.get_employee_tier(userid)
+        if tier !=2:
+            return 'Not authorized to update customer'
+        tier2_id = self.getTier2_emp()
         query = """
             SELECT requester, userid, contact_no, email_id, address FROM Updateinfo
             WHERE update_req_no = %d;""" % (int(update_req_no))
@@ -641,6 +647,16 @@ class Employee:
             return 'Try Again Later'
 
         # emp = Employee('1', '2')
+
+    def retrieve_phone_number(self, userid):
+        query = "SELECT contact_no FROM Employees WHERE emp_id = %s;"
+        cursor.execute(query, (userid,))
+        result = cursor.fetchone()
+        if result:
+            return result[0]  # Return the phone number
+        else:
+            print("No contact number found for the given user ID.")
+            return None
 
 
 # emp.get_employee_tier('1')

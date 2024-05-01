@@ -9,7 +9,7 @@ document.addEventListener("contextmenu", function(e){
   e.preventDefault();
 })
 
-const homeURL = 'http://127.0.0.1:5000';
+const homeURL = 'http://127.0.0.1:5000/';
 
 var userid, usertype, firstname, midname, lastname, email, contact, dob, ssn, address;
 
@@ -25,7 +25,7 @@ function getUser() {
   };
 
   fetch(homeURL+'loadEmployee', {
-    method : 'post',
+    method : 'get',
     body : JSON.stringify(loadUserData),
     headers : {
       'Content-type' : 'application/json'
@@ -516,10 +516,10 @@ function fund_transfer(userid, fromAccount, toAccount, amount) {
     return response.json();
   }).then(function (data) {
     console.log(data);
-    if(data.message == 'done'){
+    if(data.message === 'done'){
       window.alert('Successfully transferred!');
     }
-    else if(data.message == 'Request to be approved by Tier2 employee'){
+    else if(data.message === 'Request to be approved by Tier2 employee'){
       window.alert(data.message);
     }
     else {
@@ -550,7 +550,7 @@ function deposit(userid, account, amount) {
     return response.json();
   }).then(function (data) {
     console.log(data);
-    if(data.message == 'Success') {
+    if(data.message === 'Success') {
       window.alert("Amount deposited!");
     }
     else {

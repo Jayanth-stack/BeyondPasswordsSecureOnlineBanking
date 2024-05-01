@@ -1,6 +1,9 @@
 from time import time
+
+import phonenumbers
+
 # from employee import Employee
-from utility.encrypt import encrypt, encrypt_ssn
+from utility.encrypt import encrypt, encrypt_ssn, check_encrypted_password
 from datetime import datetime
 import mysql.connector
 
@@ -9,7 +12,7 @@ import pymysql
 db = mysql.connector.connect(
     host="localhost",
     user="root",
-    port ="3306",
+    port="3306",
     password="root",
     database="bankingapplication"
 )
@@ -20,6 +23,14 @@ cursor = db.cursor()
 def getdate():
     now = datetime.now()
     return now.strftime("%d/%m/%Y %H:%M:%S")
+
+
+def format_phone_number(phone):
+    try:
+        parsed_phone = phonenumbers.parse(phone, None)
+        return phonenumbers.format_number(parsed_phone, phonenumbers.PhoneNumberFormat.E164)
+    except phonenumbers.phonenumberutil.NumberParseException:
+        return None
 
 
 class Customers:
@@ -46,8 +57,8 @@ class Customers:
         query = """
                 INSERT INTO Customers(customer_id, last_name, middle_name, first_name, dob, contact_no, email_id, address, password, ssn, active, login_history)
                 VALUES('%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', %d, '%s');""" % (
-        customer_id, last_name, middle_name,
-        first_name, dob, contact_no, email_id, address, encrypt(password), encrypt_ssn(ssn), active, login_history)
+            customer_id, last_name, middle_name,
+            first_name, dob, contact_no, email_id, address, encrypt(password), encrypt_ssn(ssn), active, login_history)
         cursor.execute(query)
         try:
             db.commit()
@@ -110,7 +121,7 @@ class Customers:
             UPDATE Customers 
             SET customer_id='%s', last_name='%s', middle_name='%s', first_name='%s', dob='%s', contact_no='%s', email_id='%s', address='%s', ssn='%s'  
             WHERE customer_id='%s';""" % (
-        customer_id, last_name, middle_name, first_name, dob, contact_no, email_id, address, ssn, customer_id)
+            customer_id, last_name, middle_name, first_name, dob, contact_no, email_id, address, ssn, customer_id)
         cursor.execute(query)
         try:
             db.commit()
@@ -284,8 +295,8 @@ class Customers:
             """ % (int(account))
         cursor.execute(query)
         result = cursor.fetchall()
-        # bal = result[0][0]
-        # print(result)
+        bal = result[0][0]
+        print(result)
         if len(result) != 0:
             if result[0][1] != 1:
                 print('Account not active')
@@ -327,7 +338,7 @@ class Customers:
             """ % (int(account))
         cursor.execute(query)
         result = cursor.fetchall()
-        # print(result[0])
+        print(result[0])
         if len(result) != 0:
             if result[0][0] != 1:
                 print('Account(to credit) not active')
@@ -373,7 +384,7 @@ class Customers:
             SELECT transaction_history FROM Accounts where account_no = %d;""" % (int(account_no))
         cursor.execute(query)
         result = cursor.fetchall()
-        # print(result)
+        print(result)
         return result
 
     #################        FUNCTION TO CHECK EXISTING CUSTOMER ID          #################
@@ -382,9 +393,9 @@ class Customers:
             SELECT customer_id FROM Customers WHERE customer_id='%s' and active=1""" % (customer_id)
         cursor.execute(query)
         result = cursor.fetchall()
-        # print(len(result))
+        print(len(result))
         if len(result) == 0:
-            # print('Customer with this ID not exists')
+            print('Customer with this ID not exists')
             return 0
         return 1
 
@@ -392,14 +403,29 @@ class Customers:
     def verify_customer(self, customer_id, password):
         query = """
             SELECT customer_id FROM Customers WHERE customer_id='%s' and active=1 and password='%s';""" % (
-        customer_id, encrypt(password))
+            customer_id, encrypt(password))
         cursor.execute(query)
         result = cursor.fetchall()
         print(encrypt(password))
         if len(result) == 0:
-            # print('Customer with this ID not exists')
+            print('Customer with this ID not exists')
             return 0
         return 1
+
+    def verify_customer(self, customer_id, password):
+        hashed_password_in_db = self.retrieve_hashed_password(customer_id)
+        if hashed_password_in_db and check_encrypted_password(password, hashed_password_in_db):
+            return 1
+        else:
+            return 0
+
+    def retrieve_hashed_password(self, userid):
+        query = "SELECT password FROM Customers WHERE customer_id = %s"
+        cursor.execute(query, (userid,))
+        result = cursor.fetchone()
+        if result:
+            return result[0]  # Return the hashed password
+        return None
 
     #################        FUNCTION TO GET CUSTOMER'S CONTACT_NO                    #################
     def get_customer_contactNo(self, customer_id):
@@ -418,7 +444,7 @@ class Customers:
     def check_account(self, customer_id, account_type):
         query = """
             SELECT account_type FROM Accounts WHERE customer_id='%s' and account_type='%s';""" % (
-        customer_id, account_type)
+            customer_id, account_type)
         cursor.execute(query)
         result = cursor.fetchall()
         # print(len(result))
@@ -558,7 +584,7 @@ class Customers:
             return 'Receiver\'s Account doesn\'t Exists'
         query = """
             INSERT INTO Cheque(issuer_id, to_account, from_account, amount, active) VALUES('%s', %d, %d, %f, 1); """ % (
-        issuer_id, int(to_account), int(from_account), float(amount))
+            issuer_id, int(to_account), int(from_account), float(amount))
         cursor.execute(query)
         try:
             db.commit()
@@ -621,7 +647,7 @@ class Customers:
         WHERE ac.customer_id = '%s';""" % (userid)
         cursor.execute(query)
         result = cursor.fetchall()
-        # print(len(result))
+        print(len(result))
         if len(result) == 0:
             return 'None'
         try:
@@ -656,7 +682,7 @@ class Customers:
         cursor.execute(query)
         try:
             db.commit()
-            # result = cursor.fetchall()
+            result = cursor.fetchall()
             return 'Request Cancelled'
         except Exception as e:
             db.rollback()
@@ -695,7 +721,7 @@ class Customers:
             SELECT * FROM Appointments where customer_id = '%s' and status = 1 ; """ % (customer_id)
         cursor.execute(query)
         result = cursor.fetchall()
-        # print(len(result))
+        print(len(result))
         if len(result) == 0:
             return 'None'
         return result
@@ -723,9 +749,9 @@ class Customers:
         if self.check_user_id(userid) == 0:
             return 'UserID doesn\'t exists'
 
-        query = """
-                UPDATE Customers Set password = '%s' 
-                WHERE customer_id = '%s';""" % (encrypt(newPassword), userid)
+        query = f"""
+                UPDATE Customers Set password = '{encrypt(newPassword)}' 
+                WHERE customer_id = '{userid}';"""
         print(encrypt(newPassword))
         cursor.execute(query)
         try:
@@ -736,18 +762,13 @@ class Customers:
             print('Cannot make request:', e)
             return 'Try Again Later'
 
-
-#customer = Customers()
-#customer.create_customer_id('anilkh', "khadwal",  "", "ROHIT",  "8894141486", "anil@gmail.com", "password", "ssn", 1)
-
-#customer.open_account('savings', 'anilkh',last_name="khadwal", middle_name="", first_name="ROHIT", dob=getdate(), contact_no="8894141786", email_id="anil.khadwal@gmail.com", address="abc", password="samsung", ssn="123756901", active=True )
-#customer.update_account_info('rohitkh',last_name="khadwal", middle_name="", first_name="ROHIT", dob=getdate(), contact_no="8894141786", email_id="anil.khadwal@gmail.com", address="abc", password="samsung", ssn="123756901", active=True)
-#customer.fund_transfers(1, 2, 5000)
-#customer.get_statement(1)
-#customer.open_another_account('savings')
-#customer.printcustomer(), customer.debit_request(1, 50)
-#customer.credit_request(1, 50), customer.check_account('rohitkh', 'samsung')
-#customer.check_user_id('rohitkh', 'samsung')
-#customer.get_all_account('rohitkh')
-#customer.get_customer_details('rohitkh')
-#print(customer.credit_request(1, 1000))
+    def retrieve_phone_number(self, userid):
+        query = "SELECT contact_no FROM Customers WHERE customer_id = %s;"
+        cursor.execute(query, (userid,))
+        result = cursor.fetchone()
+        if result:
+            phone_number = result[0]
+            if not phone_number.startswith('+'):
+                phone_number = '+1' + phone_number
+            return phone_number
+        return None
