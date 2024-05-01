@@ -59,8 +59,8 @@ flask db upgrade
 
 # Run the Application
 How to start the server locally
-flask run
-gunicorn -w 4 -b 127.0.0.1:5000 run:app
+1. flask run
+2. gunicorn -w 4 -b 127.0.0.1:5000 run:app
 
 # Creating Twilio Client details for OTP verification
 1. Create a free Twilio account now.
