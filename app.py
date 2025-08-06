@@ -8,6 +8,9 @@ from customer import Customers
 from employee import Employee
 from twilio.base.exceptions import TwilioRestException
 from utility.encrypt import check_encrypted_password
+from dotenv import load_dotenv
+
+load_dotenv()
 
 logging.basicConfig(level=logging.INFO, filename='SystemLogs/bank.log', filemode='w',
                     format='%(asctime)-15s - %(name)s - %(levelname)s - %(message)s', datefmt='%d-%m-%Y %H:%M:%S')
@@ -1159,7 +1162,8 @@ def deactivate_employee():
 
 ###############                HANDLE TO REQUEST OTP                 ###############
 
-twilio_client = Client(account_sid, auth_token)
+twilio_client = Client(os.getenv('TWILIO_ACCOUNT_SID'), os.getenv('TWILIO_AUTH_TOKEN'))
+verify_sid = os.getenv('TWILIO_VERIFY_SID')
 
 
 @app.route('/sendOTP', methods=['POST', 'GET'])

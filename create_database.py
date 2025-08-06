@@ -3,8 +3,10 @@ from customer import Customers
 from employee import Employee
 from utility.encrypt import encrypt
 from datetime import datetime
+from dotenv import load_dotenv
+import os
 
-
+load_dotenv()
 
 
 def getdate():
@@ -13,11 +15,11 @@ def getdate():
 
 
 db = mysql.connector.connect(
-    host="localhost",
-    user="root",
-    password="root",
-    port="3306",
-    database="bankingapplication"
+    host=os.getenv('DB_HOST'),
+    user=os.getenv('DB_USER'),
+    password=os.getenv('DB_PASSWORD'),
+    port=os.getenv('DB_PORT'),
+    database=os.getenv('DB_NAME')
 )
 
 cursor = db.cursor()
