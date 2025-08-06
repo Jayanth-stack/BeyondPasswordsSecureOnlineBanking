@@ -5,16 +5,22 @@ import phonenumbers
 # from employee import Employee
 from utility.encrypt import encrypt, encrypt_ssn, check_encrypted_password
 from datetime import datetime
-import mysql.connector
+from mysql import connector as mysql    
+import os
+from dotenv import load_dotenv
+import uuid
+from utility.crypto_receipt import generate_receipt, generate_nonce, current_timestamp
 
-import pymysql
+load_dotenv()
+
+
 
 db = mysql.connector.connect(
-    host="localhost",
-    user="root",
-    port="3306",
-    password="root",
-    database="bankingapplication"
+    host=os.getenv('DB_HOST'),
+    user=os.getenv('DB_USER'),
+    port=os.getenv('DB_PORT'),
+    password=os.getenv('DB_PASSWORD'),
+    database=os.getenv('DB_NAME')
 )
 
 cursor = db.cursor()
@@ -72,27 +78,27 @@ class Customers:
 
         ############             OPEN NEW CUSTOMER ACCOUNT (DEFAULT: CHECKIN ACCOUNT)         ############
 
-    # def open_account(self, account_type, customer_id, last_name, middle_name, first_name, contact_no, email_id,  password, ssn, active, dob=getdate(), login_history="sdk", address="", balance=500):
+    def open_account(self, account_type, customer_id, last_name, middle_name, first_name, contact_no, email_id,  password, ssn, active, dob=getdate(), login_history="sdk", address="", balance=500):
 
-    #     # res = self.create_customer_id(customer_id, last_name, middle_name, first_name, contact_no, email_id,  password, ssn, active, dob=getdate(), login_history="sdk", address="")
+        res = self.create_customer_id(customer_id, last_name, middle_name, first_name, contact_no, email_id,  password, ssn, active, dob=getdate(), login_history="sdk", address="")
 
-    #     if self.check_account(customer_id, account_type) == 0:
-    #         query = """
-    #             INSERT INTO Accounts(customer_id, account_type, balance, active, transaction_history) VALUES('%s', '%s', %d, 1, 'Open');
-    #             """ % (customer_id, account_type, balance)
-    #         cursor.execute(query) 
-    #         try:
-    #             db.commit()
-    #             # result = cursor.fetchall()
-    #             print('New account opened')
-    #             return 'done'
-    #         except Exception as e:
-    #             db.rollback()
-    #             print('Cannot open account:', e)
-    #             return 'Try again later'
-    #     else:
-    #         print(customer_id, 'is already having', account_type)
-    #         return customer_id, 'is already having', account_type
+        if self.check_account(customer_id, account_type) == 0:
+            query = """
+                INSERT INTO Accounts(customer_id, account_type, balance, active, transaction_history) VALUES('%s', '%s', %d, 1, 'Open');
+                """ % (customer_id, account_type, balance)
+            cursor.execute(query) 
+            try:
+                db.commit()
+                # result = cursor.fetchall()
+                print('New account opened')
+                return 'done'
+            except Exception as e:
+                db.rollback()
+                print('Cannot open account:', e)
+                return 'Try again later'
+        else:
+            print(customer_id, 'is already having', account_type)
+            return customer_id, 'is already having', account_type
 
     #################        FUNCTION TO OPEN NEW ACCOUNT                    #################
     def open_account(self, customer_id, account_type):
@@ -261,9 +267,17 @@ class Customers:
 
         try:
             db.commit()
-            # result = cursor.fetchall()
             print('Fund transfered')
-            return 'done'
+            # generate cryptographic receipt
+            receipt_data = {
+                "transaction_no": transaction_no,
+                "from_account": account1,
+                "to_account": account2,
+                "amount": amount,
+                "timestamp": getdate(),
+                "nonce": generate_nonce()
+            }
+            return generate_receipt(receipt_data)
         except Exception as e:
             db.rollback()
             print('Cannot transfer funds:', e)
