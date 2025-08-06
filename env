@@ -1,0 +1,8 @@
+TWILIO_ACCOUNT_SID=your_account_sid
+TWILIO_AUTH_TOKEN=your_auth_token
+TWILIO_VERIFY_SID=your_verify_sid
+DB_HOST=localhost
+DB_USER=root
+DB_PASSWORD=root
+DB_PORT=3306
+DB_NAME=bankingapplication

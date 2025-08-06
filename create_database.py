@@ -288,20 +288,3 @@ try:
 except Exception as e:
     db.rollback()
     print(e)
-
-##############              CREATING DUMMY USERS                                    ##############
-customer = Customers()
-employee = Employee()
-customer.create_customer_id('cust1', "green", "", "rachel", "0004141486", "rachel@gmail.com", "password", "rachelssn",
-                            getdate(), 1)
-customer.create_customer_id('cust2', "geller", "", "monika", "0004141485", "monika@gmail.com", "password", "monikassn",
-                            getdate(), 1)
-customer.create_customer_id('cust3', "buffay", "", "phoebe", "0004141489", "phoebe@gmail.com", "password", "phoebessn",
-                            getdate(), 1)
-
-employee.create_employee('empl1', "geller", "", "ross", "0005709722", "ross@gmail.com", "password", "gellerssn",
-                         getdate(), 1)
-employee.create_employee('empl2', "bing", "", "chandler", "0005709723", "chandler@gmail.com", "password", "bing1ssn",
-                         getdate(), 2)
-employee.create_employee('empl3', "tribbiani", "", "joey", "0005709721", "joey@gmail.com", "password", "joey1ssn",
-                         getdate(), 3)

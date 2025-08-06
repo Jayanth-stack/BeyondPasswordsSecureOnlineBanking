@@ -1,0 +1,13 @@
+# Ignore env files
+.env
+
+# Other common ignores (add if needed)
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.log
+.idea/
+flask_session/
