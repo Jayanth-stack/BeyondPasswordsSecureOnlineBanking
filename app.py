@@ -589,8 +589,15 @@ def get_transaction_history():
 
     try:
         customer = Customers()
-        transactions = customer.get_transaction_history(values['account_no'])
-        return jsonify({'transactions': transactions}), 200
+        history = customer.get_transaction_history(values['account_no'], customer_id=values['userid'])
+        if history is None:
+            logging.warning('Account ownership mismatch - getTransactionHistory')
+            return jsonify({'message': 'Account not found'}), 404
+        return jsonify({
+            'transactions': history['entries'],
+            'source': history.get('source'),
+            'message': [[history.get('html') or '']],
+        }), 200
     except Exception as e:
         logging.error(f"Error fetching transaction history for customer: {str(e)}")
         return jsonify({'message': 'Failed to retrieve transaction history', 'error': str(e)}), 500

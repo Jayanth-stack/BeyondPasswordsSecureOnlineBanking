@@ -502,6 +502,52 @@ function deny_request(userid, xactno) {
   });
 }
 
+function escapeHtml(value) {
+  return String(value == null ? '' : value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function renderLedger(containerId, data) {
+  const el = document.getElementById(containerId);
+  if (!el) {
+    return;
+  }
+  const rows = Array.isArray(data.transactions) ? data.transactions : [];
+  if (rows.length && typeof rows[0] === 'object' && rows[0] !== null && !Array.isArray(rows[0])) {
+    let html = '<table class="table table-striped ledger-table"><thead><tr>' +
+      '<th>Date</th><th>Type</th><th>Amount</th><th>Details</th><th>Balance</th>' +
+      '</tr></thead><tbody>';
+    rows.forEach(function(r) {
+      const credit = r.direction === 'credit';
+      const amtClass = credit ? 'ledger-credit' : 'ledger-debit';
+      const sign = credit ? '+' : '-';
+      const amount = Number(r.amount);
+      const amountText = isNaN(amount) ? '' : (sign + '$' + amount.toFixed(2));
+      const balance = r.balance_after == null || r.balance_after === '' ? '' : ('$' + Number(r.balance_after).toFixed(2));
+      html += '<tr>' +
+        '<td>' + escapeHtml(r.created_at) + '</td>' +
+        '<td>' + escapeHtml(r.kind) + '</td>' +
+        '<td class="' + amtClass + '">' + escapeHtml(amountText) + '</td>' +
+        '<td>' + escapeHtml(r.description) + '</td>' +
+        '<td>' + escapeHtml(balance) + '</td>' +
+        '</tr>';
+    });
+    html += '</tbody></table>';
+    el.innerHTML = html;
+    return;
+  }
+  const legacy = data.message && data.message[0] && data.message[0][0];
+  if (legacy) {
+    el.textContent = String(legacy).replace(/,<br>/g, '\n').replace(/<br>/g, '\n');
+    return;
+  }
+  el.innerHTML = '<p class="ledger-empty">No transactions yet.</p>';
+}
+
 function getSavingXacts(userid, acno) {
   console.log("savings transactions called");
 
@@ -521,9 +567,7 @@ function getSavingXacts(userid, acno) {
     return response.json();
   }).then(function (data) {
     console.log(data);
-    if(data.message[0][0] != ''){
-      document.getElementById('sa_trans_tbl').innerHTML = data.message[0][0];
-    }
+    renderLedger('sa_trans_tbl', data);
   }).catch(function(error){
     console.error(error);
   });
@@ -548,7 +592,7 @@ function getCheckingXacts(userid, acno) {
     return response.json();
   }).then(function (data) {
     console.log(data);
-    document.getElementById('ca_trans_tbl').innerHTML = data.message[0][0];
+    renderLedger('ca_trans_tbl', data);
   }).catch(function(error){
     console.error(error);
   });
@@ -573,7 +617,7 @@ function getCCXacts(userid, acno) {
     return response.json();
   }).then(function (data) {
     console.log(data);
-    document.getElementById('cc_trans_tbl').innerHTML = data.message[0][0];
+    renderLedger('cc_trans_tbl', data);
   }).catch(function(error){
     console.error(error);
   });
