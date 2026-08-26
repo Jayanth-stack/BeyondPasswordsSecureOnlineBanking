@@ -116,7 +116,7 @@ def registerCustomer():
     if temp == 1:
         session[values['userid']] = values['userid']
         print('Redirecting to Customer dashboard')
-        return redirect(url_for('get_customer_dashboard_ui', _external=True, _scheme='http'))
+        return redirect(url_for('get_customer_dash_ui', _external=True, _scheme='http'))
 
     response = {
         'message': 'Something Went wrong, Please try again later'
@@ -458,8 +458,7 @@ def approve_request():
     if not all(key in values for key in required):
         return jsonify({'message': 'Some data missing'}), 400
 
-    # Here, using 'customer_id' in session to validate; ensure you are setting this key in your session correctly in login.
-    if 'customer_id' in session and session['customer_id'] == values['customer_id']:
+    if session.get('usertype') == 'customer' and session.get('userid') == values['customer_id']:
         emp = Employee()
         amount = emp.get_amount_of_transaction(values['transaction_no'])
 
@@ -549,15 +548,18 @@ def deny_request():
         }
         return jsonify(response), 400
 
-    if values['userid'] in session:
-        c = Customers()
-        response = {
-            'message': c.deny_funds_requested(values['transaction_no'])
-        }
-        return jsonify(response), 200
-    else:
-        print('Not logged In')
+    if 'userid' not in session or session.get('userid') != values['userid']:
+        logging.warning('Not logged In or Unauthorized Access - denyRequest')
         return redirect(url_for('get_login_page_ui', _external=True, _scheme='http'))
+
+    if session.get('usertype') != 'customer':
+        return jsonify({'message': 'Unauthorized access'}), 403
+
+    c = Customers()
+    response = {
+        'message': c.deny_funds_requested(values['transaction_no'])
+    }
+    return jsonify(response), 200
 
 
 ###############                HANDLE TO GET TRANSACTION HISTORY            ###############
@@ -808,7 +810,7 @@ def approve_update_info():
         # Check if the employee has the right to approve updates
         if session.get('usertype') in ['admin', 'employee'] and session.get('emp_tier',
                                                                             1) >= 2:  # Assuming tier 2 and above can approve
-            result = emp.approve_update_info(values['update_req_no'])
+            result = emp.approve_update_info(values['userid'], values['update_req_no'])
             return jsonify({'message': result}), 200
         else:
             logging.warning(f"Insufficient permissions for user {session['userid']} to approve update info")
@@ -1035,7 +1037,7 @@ def deactivate_account():
 
     try:
         emp = Employee()
-        result = emp.deactivate_account(values['account_no'])
+        result = emp.deactivate_account(values['userid'], values['account_no'])
         logging.info(f"Account {values['account_no']} deactivated by tier2 employee {session['userid']}")
         return jsonify({'message': result}), 200
     except Exception as e:
@@ -1064,7 +1066,7 @@ def deactivate_customer():
     # Assuming the `deactivate_customer` function takes `customer_id` as an argument
     try:
         emp = Employee()
-        response = emp.deactivate_customer(values['customer_id'])
+        response = emp.deactivate_customer(values['userid'], values['customer_id'])
         return jsonify({'message': response}), 200
     except Exception as e:
         logging.error(f"Failed to deactivate customer {values['customer_id']}: {str(e)}")
@@ -1206,7 +1208,7 @@ def reset_password():
                                                                                                      code=values[
                                                                                                          'otp'])
         if verification_check.status == "approved":
-            response = user.reset_password(values['userid'], values['newPassword'])
+            response = user.reset_fpassword(values['userid'], values['newPassword'])
             return jsonify({'message': response}), 200
         else:
             return jsonify({'message': 'OTP verification failed, cannot reset password'}), 401
@@ -1232,7 +1234,10 @@ def logout():
             'message': 'Some data missing'
         }
         return jsonify(response), 400
-    session.pop(values['userid'], None)
+    if session.get('userid') != values['userid']:
+        return jsonify({'message': 'User ID mismatch'}), 401
+
+    session.clear()
     return redirect(url_for('get_login_page_ui', _external=True, _scheme='http'))
 
 
