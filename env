@@ -6,3 +6,7 @@ DB_USER=root
 DB_PASSWORD=root
 DB_PORT=3306
 DB_NAME=bankingapplication
+SECRET_KEY=change-me-session-secret
+MFA_PROVIDER=auto
+MFA_LOCAL_SECRET=change-me-local-mfa-secret
+RECEIPT_SECRET=change-me-receipt-secret

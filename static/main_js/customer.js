@@ -39,14 +39,18 @@ function getUser() {
     }
   }).then(function(response) {
     console.log("getuser response received");
-    if (response.redirected) {
+    if (response.redirected || response.status === 401) {
       localStorage.setItem('loggedStatus', '0');
-      window.location.href = response.url;
+      window.location.href = response.redirected ? response.url : '/';
+      return;
     }
     else {
       return response.json();
     }
   }).then(function (data) {
+    if (!data) {
+      return;
+    }
     console.log(data);
     appendPrimaryData(data);
   }).catch(function(error){
@@ -123,6 +127,23 @@ function appendPrimaryData(data) {
   document.getElementById("dob").value = dob;
   document.getElementById("ssn").value = ssn_masked;
   document.getElementById("address").value = address;
+
+  var loginList = document.getElementById("login_history_list");
+  if (loginList) {
+    loginList.innerHTML = '';
+    var events = data.Info.login_events || [];
+    if (!events.length) {
+      var emptyItem = document.createElement('li');
+      emptyItem.textContent = 'No previous logins recorded';
+      loginList.appendChild(emptyItem);
+    } else {
+      events.slice(0, 8).forEach(function (entry) {
+        var item = document.createElement('li');
+        item.textContent = entry;
+        loginList.appendChild(item);
+      });
+    }
+  }
 
   createCheckDropdown();
   fillPendingTransTbl(data);

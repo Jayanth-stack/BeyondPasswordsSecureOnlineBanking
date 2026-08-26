@@ -224,6 +224,11 @@
           <textarea id="address" name="address" rows="4" cols="50"></textarea><br><br>
           <button type="button" id="update_info_btn" class="btn btn-primary" style="width:50%;margin-bottom:10px;margin-top:10px;">Update Info</button><br><br>
           <button type="button" id="change_pw_btn" data-toggle="modal" data-target="#changePWModal" class="btn btn-primary" style="width:50%;margin-bottom:10px;margin-top:10px;">Change Password</button>
+          <div id="login_history_section" style="margin-top:20px;">
+            <h4 class="account_type_text">Recent logins</h4>
+            <p class="ac_details_text">Successful sign-ins after MFA, newest first.</p>
+            <ul id="login_history_list"></ul>
+          </div>
         </div>
 
         <!-- changePWModal -->

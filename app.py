@@ -1,60 +1,99 @@
 import logging
 import os
-from twilio.rest import Client
 from flask_bcrypt import Bcrypt
 from flask import Flask, session, jsonify, request, send_from_directory, redirect, url_for
 from flask_cors import CORS, cross_origin
 from customer import Customers
 from employee import Employee
-from twilio.base.exceptions import TwilioRestException
 from utility.encrypt import check_encrypted_password
+from utility.mfa import (
+    LOGIN_PURPOSE,
+    PASSWORD_RESET_PURPOSE,
+    MfaCooldownError,
+    MfaDeliveryError,
+    get_mfa_service,
+)
+from utility.auth_session import (
+    complete_mfa_login,
+    current_identity,
+    dashboard_endpoint,
+    is_fully_authenticated,
+    is_pending_mfa,
+    mark_password_reset_verified,
+    password_reset_verified,
+    pending_identity,
+    require_authenticated,
+    require_pending_mfa,
+    clear_password_reset,
+    clear_session,
+    start_mfa_login,
+)
+from utility.audit import audit
 from dotenv import load_dotenv
 
 load_dotenv()
 
-logging.basicConfig(level=logging.INFO, filename='SystemLogs/bank.log', filemode='w',
+os.makedirs('SystemLogs', exist_ok=True)
+logging.basicConfig(level=logging.INFO, filename='SystemLogs/bank.log', filemode='a',
                     format='%(asctime)-15s - %(name)s - %(levelname)s - %(message)s', datefmt='%d-%m-%Y %H:%M:%S')
-otpSet = {}
 
 app = Flask(__name__)
-
-app.secret_key = os.urandom(24)
+app.secret_key = os.getenv('SECRET_KEY') or os.urandom(24)
 
 CORS(app)
 Bcrypt(app)
 
-account_sid = 'your Account_sid'
-auth_token = 'your Auth_token'
-client = Client(account_sid, auth_token)
-verify_sid = 'your verify_sid'
+
+def _client_ip():
+    return request.headers.get('X-Forwarded-For', request.remote_addr)
+
+
+def _user_model(usertype):
+    if usertype in ['admin', 'employee', 'tier1', 'tier2', 'Employee']:
+        return Employee()
+    return Customers()
+
+
+def _is_customer_type(usertype):
+    return usertype in ('customer', 'Customer')
 
 
 @app.route('/', methods=['GET'])
 def get_login_page_ui():  # put application's code here
+    if is_fully_authenticated(session):
+        identity = current_identity(session)
+        return redirect(url_for(dashboard_endpoint(identity['usertype'], identity['emp_tier'])))
+    if is_pending_mfa(session):
+        return redirect(url_for('get_verifyotp_dashboard_ui'))
     return send_from_directory('templates', 'Login.html')
 
 
 @app.route('/customer_dash', methods=['GET'])
+@require_authenticated('customer')
 def get_customer_dash_ui():
     return send_from_directory('templates', 'customer.html')
 
 
 @app.route('/admin', methods=['GET'])
+@require_authenticated('admin')
 def get_admin_dashboard_ui():
     return send_from_directory('templates', 'admin.html')
 
 
 @app.route('/tier1', methods=['GET'])
+@require_authenticated('tier1', 'employee', 'admin')
 def get_tier1_dashboard_ui():
     return send_from_directory('templates', 'tier1.html')
 
 
 @app.route('/tier2', methods=['GET'])
+@require_authenticated('tier2', 'admin')
 def get_tier2_dashboard_ui():
     return send_from_directory('templates', 'tier2.html')
 
 
 @app.route('/otp_page', methods=['GET'])
+@require_pending_mfa
 def get_verifyotp_dashboard_ui():
     return send_from_directory('templates', 'OtpAuthentication.html')
 
@@ -170,7 +209,7 @@ def registerEmployee():
 @cross_origin()
 def login():
     values = request.get_json()
-    logging.debug('Login attempt: ' + str(values))
+    logging.debug('Login attempt for userid=%s usertype=%s', (values or {}).get('userid'), (values or {}).get('usertype'))
     if not values:
         return jsonify({'message': 'No data found'}), 400
 
@@ -178,70 +217,93 @@ def login():
     if not all(key in values for key in required):
         return jsonify({'message': 'Some data missing'}), 400
 
-    session.clear()
-    user_class = Employee if values['usertype'] in ['admin', 'employee', 'tier1', 'tier2'] else Customers
-    user = user_class()
+    clear_session(session)
+    user = _user_model(values['usertype'])
 
     hashed_password = user.retrieve_hashed_password(values['userid'])
     if hashed_password and check_encrypted_password(values['password'], hashed_password):
-        session['userid'] = values['userid']
-        session['usertype'] = values['usertype']
-        if values['usertype'] != 'customer':
-            session['emp_tier'] = user.get_employee_tier(values['userid'])
-
         phone_number = user.retrieve_phone_number(values['userid'])
-        if phone_number:
-            try:
-                client.verify.v2.services(verify_sid).verifications.create(to=phone_number, channel='sms')
-                return redirect(url_for('get_verifyotp_dashboard_ui', _external=True, _scheme='http'))
-            except TwilioRestException as e:
-                return jsonify({'message': 'Failed to send OTP', 'error': str(e)}), 500
-        else:
+        if not phone_number:
+            audit('login.password_success', 'denied', actor=values['userid'], usertype=values['usertype'],
+                  ip=_client_ip(), reason='no_phone')
             return jsonify({'message': 'No phone number available'}), 400
-    else:
-        return jsonify({'message': 'Invalid credentials'}), 401
+        try:
+            get_mfa_service().send(phone_number, LOGIN_PURPOSE)
+            send_outcome = 'success'
+        except MfaCooldownError:
+            send_outcome = 'rate_limited'
+        except MfaDeliveryError as e:
+            audit('login.mfa_send', 'failure', actor=values['userid'], usertype=values['usertype'],
+                  ip=_client_ip())
+            return jsonify({'message': 'Failed to send OTP', 'error': str(e)}), 500
+
+        emp_tier = None
+        if values['usertype'] != 'customer':
+            emp_tier = user.get_employee_tier(values['userid'])
+        start_mfa_login(session, values['userid'], values['usertype'], emp_tier)
+        audit('login.mfa_send', send_outcome, actor=values['userid'], usertype=values['usertype'], ip=_client_ip())
+        return redirect(url_for('get_verifyotp_dashboard_ui', _external=True, _scheme='http'))
+
+    audit('login.password', 'failure', actor=values['userid'], usertype=values['usertype'], ip=_client_ip())
+    return jsonify({'message': 'Invalid credentials'}), 401
 
 
 @app.route('/verify-otp', methods=['POST', 'GET'])
 @cross_origin()
+@require_pending_mfa
 def verify_otp():
-    logging.debug("Session at start of verify-otp: {}".format(session))
+    logging.debug("Session at start of verify-otp: pending_userid=%s", session.get('pending_userid'))
 
-    userid = session.get('userid')
-    usertype = session.get('usertype')
+    identity = pending_identity(session)
+    userid = identity['userid']
+    usertype = identity['usertype']
 
-    if not userid or not usertype:
-        return jsonify({"error": "Session expired or invalid"}), 401
-
-    values = request.get_json()
+    values = request.get_json(silent=True) or {}
     otp_code = values.get('otp_code')
     if not otp_code:
         return jsonify({"error": "OTP code is required"}), 400
 
-    user_class = Employee if usertype in ['admin', 'employee', 'tier1', 'tier2'] else Customers
-    user = user_class()
+    user = _user_model(usertype)
     phone_number = user.retrieve_phone_number(userid)
 
-    if phone_number:
-        try:
-            result = client.verify.v2.services(verify_sid).verification_checks.create(to=phone_number, code=otp_code)
-            if result.status == "approved":
-                if usertype == 'customer':
-                    redirect_url = 'get_customer_dash_ui'
-                else:
-                    # Assuming there's a common dashboard for all tiers, or specific ones per tier
-                    # Adjust this logic based on your actual routing structure for different tiers or admin
-                    redirect_url = f'get_tier{session.get("emp_tier", 1)}_dashboard_ui'
-                    if usertype == 'admin':
-                        # Redirect admins to a specific admin dashboard if exists, or use a common tier dashboard
-                        redirect_url = 'get_admin_dashboard_ui'  # Ensure this endpoint is defined in your application
-                return redirect(url_for(redirect_url, _external=True, _scheme='http'))
-            else:
-                return jsonify({"error": "Invalid OTP"}), 401
-        except TwilioRestException as e:
-            return jsonify({"error": str(e)}), 500
-    else:
+    if not phone_number:
         return jsonify({"error": "Phone number could not be retrieved"}), 400
+
+    if not get_mfa_service().verify(phone_number, LOGIN_PURPOSE, otp_code):
+        audit('login.mfa', 'failure', actor=userid, usertype=usertype, ip=_client_ip())
+        return jsonify({"error": "Invalid OTP"}), 401
+
+    if not complete_mfa_login(session):
+        return jsonify({"error": "Session expired or invalid"}), 401
+
+    if _is_customer_type(usertype):
+        try:
+            Customers().update_login_history(userid, source='login')
+        except Exception as e:
+            logging.error('Failed to update login history for %s: %s', userid, e)
+
+    audit('login.mfa', 'success', actor=userid, usertype=usertype, ip=_client_ip())
+    redirect_url = dashboard_endpoint(session.get('usertype'), session.get('emp_tier'))
+    return redirect(url_for(redirect_url, _external=True, _scheme='http'))
+
+
+@app.route('/resend-otp', methods=['POST'])
+@cross_origin()
+@require_pending_mfa
+def resend_otp():
+    identity = pending_identity(session)
+    user = _user_model(identity['usertype'])
+    phone_number = user.retrieve_phone_number(identity['userid'])
+    if not phone_number:
+        return jsonify({'error': 'Phone number could not be retrieved'}), 400
+    try:
+        result = get_mfa_service().send(phone_number, LOGIN_PURPOSE)
+    except MfaCooldownError as e:
+        return jsonify({'error': str(e), 'retry_after': e.retry_after}), 429
+    except MfaDeliveryError as e:
+        return jsonify({'error': 'Failed to send OTP', 'detail': str(e)}), 500
+    audit('login.mfa_resend', 'success', actor=identity['userid'], usertype=identity['usertype'], ip=_client_ip())
+    return jsonify({'message': 'OTP Sent', 'destination': result.get('destination')}), 200
 
 
 ###############                 HANDLE FOR FILL CUSTOMER DASH               ###############
@@ -1162,15 +1224,11 @@ def deactivate_employee():
 
 ###############                HANDLE TO REQUEST OTP                 ###############
 
-twilio_client = Client(os.getenv('TWILIO_ACCOUNT_SID'), os.getenv('TWILIO_AUTH_TOKEN'))
-verify_sid = os.getenv('TWILIO_VERIFY_SID')
-
-
 @app.route('/sendOTP', methods=['POST', 'GET'])
 @cross_origin()
 def send_otp():
     values = request.get_json()
-    logging.debug('Data @sendOTP: ' + str(values))
+    logging.debug('Data @sendOTP userid=%s', (values or {}).get('userid'))
 
     if not values:
         return jsonify({'message': 'No data Found'}), 400
@@ -1179,64 +1237,87 @@ def send_otp():
     if not all(key in values for key in required):
         return jsonify({'message': 'Some data missing'}), 400
 
-    user = Customers() if values.get('requester', '') == 'Customer' else Employee()
+    user = _user_model(values.get('requester', ''))
     phone_number = user.retrieve_phone_number(values['userid'])
 
-    if phone_number:
-        verification = twilio_client.verify.v2.services(verify_sid).verifications.create(to=phone_number, channel='sms')
-        return jsonify({'message': 'OTP sent successfully', 'sid': verification.sid}), 200
-    else:
+    if not phone_number:
         return jsonify({'message': 'Invalid User ID or Contact Number'}), 404
+
+    try:
+        get_mfa_service().send(phone_number, PASSWORD_RESET_PURPOSE)
+    except MfaCooldownError as e:
+        return jsonify({'message': str(e), 'retry_after': e.retry_after}), 429
+    except MfaDeliveryError as e:
+        return jsonify({'message': 'Failed to send OTP', 'error': str(e)}), 500
+
+    audit('password_reset.otp_send', 'success', actor=values['userid'], ip=_client_ip())
+    return jsonify({'message': 'OTP Sent'}), 200
+
+
+@app.route('/OTPAccess', methods=['POST', 'GET'])
+@cross_origin()
+def otp_access():
+    values = request.get_json()
+    if not values:
+        return jsonify({'message': 'No data Found'}), 400
+    required = ['userid', 'otp']
+    if not all(key in values for key in required):
+        return jsonify({'message': 'Some data missing'}), 400
+
+    user = _user_model(values.get('requester', ''))
+    phone_number = user.retrieve_phone_number(values['userid'])
+    if not phone_number:
+        return jsonify({'message': 'Invalid User ID or Contact Number'}), 404
+
+    if not get_mfa_service().verify(phone_number, PASSWORD_RESET_PURPOSE, values['otp']):
+        audit('password_reset.otp', 'failure', actor=values['userid'], ip=_client_ip())
+        return jsonify({'message': 'OTP mismatched'}), 401
+
+    mark_password_reset_verified(session, values['userid'], values.get('requester', 'Customer'))
+    audit('password_reset.otp', 'success', actor=values['userid'], ip=_client_ip())
+    return jsonify({'message': 'verified'}), 200
 
 
 @app.route('/resetPassword', methods=['POST', 'GET'])
 @cross_origin()
 def reset_password():
     values = request.get_json()
-    logging.debug('Data @resetPassword' + str(values))
+    logging.debug('Data @resetPassword userid=%s', (values or {}).get('userid'))
 
     if not values:
         return jsonify({'message': 'No data Found'}), 400
 
-    required = ['userid', 'newPassword', 'otp']
-    if not all(key in values for key in required):
+    if 'userid' not in values or 'newPassword' not in values:
         return jsonify({'message': 'Some data missing'}), 400
 
-    user = Customers() if values.get('requester', '') == 'Customer' else Employee()
-    phone_number = user.retrieve_phone_number(values['userid'])
+    user = _user_model(values.get('requester', ''))
+    otp_ok = False
+    if values.get('otp'):
+        phone_number = user.retrieve_phone_number(values['userid'])
+        otp_ok = bool(phone_number) and get_mfa_service().verify(
+            phone_number, PASSWORD_RESET_PURPOSE, values['otp']
+        )
+    if not otp_ok:
+        otp_ok = password_reset_verified(session, values['userid'])
+    if not otp_ok:
+        audit('password_reset', 'denied', actor=values['userid'], ip=_client_ip(), reason='mfa_required')
+        return jsonify({'message': 'OTP verification failed, cannot reset password'}), 401
 
-    if phone_number:
-        verification_check = twilio_client.verify.v2.services(verify_sid).verification_checks.create(to=phone_number,
-                                                                                                     code=values[
-                                                                                                         'otp'])
-        if verification_check.status == "approved":
-            response = user.reset_password(values['userid'], values['newPassword'])
-            return jsonify({'message': response}), 200
-        else:
-            return jsonify({'message': 'OTP verification failed, cannot reset password'}), 401
-    else:
-        return jsonify({'message': 'User ID not found'}), 404
+    reset_fn = getattr(user, 'reset_fpassword', None) or getattr(user, 'reset_password')
+    response = reset_fn(values['userid'], values['newPassword'])
+    clear_password_reset(session)
+    audit('password_reset', 'success', actor=values['userid'], ip=_client_ip())
+    return jsonify({'message': response}), 200
 
 
 ###############                         HANDLE FOR LOGOUT                    ###############
 @app.route('/logout', methods=['POST', 'GET'])
 @cross_origin()
 def logout():
-    values = request.get_json()
-    logging.debug('Data @logout' + str(values))
-    # print('Data @logout:',values)
-    if not values:
-        response = {
-            'message': 'No data Found'
-        }
-        return jsonify(response), 400
-    required = ['userid']
-    if not all(key in values for key in required):
-        response = {
-            'message': 'Some data missing'
-        }
-        return jsonify(response), 400
-    session.pop(values['userid'], None)
+    values = request.get_json(silent=True) or {}
+    actor = session.get('userid') or values.get('userid')
+    audit('logout', 'success', actor=actor, usertype=session.get('usertype'), ip=_client_ip())
+    clear_session(session)
     return redirect(url_for('get_login_page_ui', _external=True, _scheme='http'))
 
 

@@ -3,16 +3,10 @@ from customer import Customers
 
 from utility.encrypt import encrypt, encrypt_ssn
 from datetime import datetime
-import mysql.connector
+from utility.db import get_connection
 import pymysql
 
-db = mysql.connector.connect(
-    host="localhost",
-    user="root",
-    password="root",
-    port="3306",
-    database="bankingapplication"
-)
+db = get_connection()
 
 cursor = db.cursor()
 

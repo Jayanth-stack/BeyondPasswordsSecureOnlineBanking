@@ -63,6 +63,31 @@ button:hover {
     background-color: #0056b3;
 }
 
+.secondary-btn {
+    background-color: #ffffff;
+    color: #007bff;
+    border: 1px solid #007bff;
+}
+
+.secondary-btn:hover {
+    background-color: #e8f1fc;
+    color: #0056b3;
+}
+
+.otp-status {
+    min-height: 1.4em;
+    margin-bottom: 10px;
+    color: #555;
+}
+
+.otp-status.error {
+    color: #c0392b;
+}
+
+.otp-status.success {
+    color: #1e8449;
+}
+
 /* Responsive Design */
 @media (max-width: 768px) {
     body, html {
