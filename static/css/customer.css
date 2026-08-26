@@ -107,6 +107,30 @@ body {
   overflow-y: auto;
 }
 
+.ledger-table {
+  margin-bottom: 0;
+  font-size: 13px;
+}
+
+.ledger-table th {
+  white-space: nowrap;
+}
+
+.ledger-credit {
+  color: var(--success-color);
+  font-weight: 600;
+}
+
+.ledger-debit {
+  color: var(--error-color);
+  font-weight: 600;
+}
+
+.ledger-empty {
+  margin: 12px 0;
+  color: var(--secondary-color);
+}
+
 /* Virtual Keyboard Styles */
 #keyboard .otprow {
   display: flex;

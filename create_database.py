@@ -1,7 +1,8 @@
-import mysql.connector
 from customer import Customers
 from employee import Employee
 from utility.encrypt import encrypt
+from utility.db import get_connection
+from utility.ledger import LEDGER_DDL
 from datetime import datetime
 from dotenv import load_dotenv
 import os
@@ -14,13 +15,7 @@ def getdate():
     return now.strftime("%d/%m/%Y %H:%M:%S")
 
 
-db = mysql.connector.connect(
-    host=os.getenv('DB_HOST'),
-    user=os.getenv('DB_USER'),
-    password=os.getenv('DB_PASSWORD'),
-    port=os.getenv('DB_PORT'),
-    database=os.getenv('DB_NAME')
-)
+db = get_connection()
 
 cursor = db.cursor()
 
@@ -92,6 +87,17 @@ if presence is not None:
     print('Employee Table already exists , so dropping')
     cursor.execute("""
         DROP TABLE Employees
+    """)
+
+#                           Drop AccountLedger Table if it exists                   #
+cursor.execute("""
+    SHOW TABLES LIKE 'AccountLedger'
+""")
+presence = cursor.fetchone()
+if presence is not None:
+    print('AccountLedger Table already exists , so dropping')
+    cursor.execute("""
+        DROP TABLE AccountLedger
     """)
 
 #                           Drop Accounts Table if it exists                        #
@@ -196,6 +202,15 @@ cursor.execute("""
 try:
     db.commit()
     print('Accounts Table created')
+except Exception as e:
+    db.rollback()
+    print(e)
+
+#                               creating table : AccountLedger                      #
+cursor.execute(LEDGER_DDL)
+try:
+    db.commit()
+    print('AccountLedger Table created')
 except Exception as e:
     db.rollback()
     print(e)
