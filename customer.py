@@ -5,23 +5,16 @@ import phonenumbers
 # from employee import Employee
 from utility.encrypt import encrypt, encrypt_ssn, check_encrypted_password
 from datetime import datetime
-from mysql import connector as mysql    
 import os
+import re
 from dotenv import load_dotenv
 import uuid
 from utility.crypto_receipt import generate_receipt, generate_nonce, current_timestamp
+from utility.db import get_connection
 
 load_dotenv()
 
-
-
-db = mysql.connector.connect(
-    host=os.getenv('DB_HOST'),
-    user=os.getenv('DB_USER'),
-    port=os.getenv('DB_PORT'),
-    password=os.getenv('DB_PASSWORD'),
-    database=os.getenv('DB_NAME')
-)
+db = get_connection()
 
 cursor = db.cursor()
 
@@ -37,6 +30,16 @@ def format_phone_number(phone):
         return phonenumbers.format_number(parsed_phone, phonenumbers.PhoneNumberFormat.E164)
     except phonenumbers.phonenumberutil.NumberParseException:
         return None
+
+
+def parse_login_history(raw):
+    """Turn the stored login_history blob into a newest-first list of timestamps."""
+    if not raw or raw in ('None', 'sdk'):
+        return []
+    text = str(raw)
+    if '|' in text:
+        return [part.strip() for part in text.split('|') if part.strip()]
+    return re.findall(r'\d{2}/\d{2}/\d{4} \d{2}:\d{2}:\d{2}', text) or [text]
 
 
 class Customers:
@@ -524,19 +527,20 @@ class Customers:
                'address': result[0][6],
                'ssn': result[0][7],
                'active': result[0][8],
-               'login_history': result[0][9]
+               'login_history': result[0][9],
+               'login_events': parse_login_history(result[0][9])
                }
         return res
 
     #################        FUNCTION TO UPDATE LOGIN HISTORY                 #################
-    def update_login_history(self, customer_id):
-        query = """ 
-                UPDATE Customers SET login_history=concat('%s', login_history) where customer_id = '%s'; 
-            """ % (getdate(), customer_id)
-        cursor.execute(query)
+    def update_login_history(self, customer_id, source='login'):
+        stamp = '%s [%s]|' % (getdate(), source)
+        query = """
+                UPDATE Customers SET login_history=CONCAT(%s, IFNULL(login_history, '')) WHERE customer_id = %s;
+            """
+        cursor.execute(query, (stamp, customer_id))
         try:
             db.commit()
-            # result = cursor.fetchall()
             print('Loging History of customer : ', customer_id, 'updated')
         except Exception as e:
             db.rollback()

@@ -1,10 +1,10 @@
-import mysql.connector
 from customer import Customers
 from employee import Employee
 from utility.encrypt import encrypt
 from datetime import datetime
 from dotenv import load_dotenv
 import os
+from utility.db import get_connection
 
 load_dotenv()
 
@@ -14,13 +14,7 @@ def getdate():
     return now.strftime("%d/%m/%Y %H:%M:%S")
 
 
-db = mysql.connector.connect(
-    host=os.getenv('DB_HOST'),
-    user=os.getenv('DB_USER'),
-    password=os.getenv('DB_PASSWORD'),
-    port=os.getenv('DB_PORT'),
-    database=os.getenv('DB_NAME')
-)
+db = get_connection()
 
 cursor = db.cursor()
 

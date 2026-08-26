@@ -1,29 +1,17 @@
-import pyotp
-import pyotp as pyotp
-import time
-import datetime
-from customer import Customers
+"""Compatibility wrapper around the shared MFA service."""
+from utility.mfa import LOGIN_PURPOSE, get_mfa_service
+
 
 class OtpInterface:
-    def __init__(self):
-        self.totp = pyotp.TOTP(pyotp.random_base32(), interval =300)
+    """Legacy name kept so existing imports continue to work."""
 
+    def __init__(self, service=None):
+        self.service = service or get_mfa_service()
 
+    def send_otp(self, phone, purpose=LOGIN_PURPOSE):
+        return self.service.send(phone, purpose)
 
-    def getObj(self):
-        return self.totp()
-
-    def send_otp(self, phone):
-        phone = "+1" + phone
-
-
-
-    def verify(self, otp):
-        if self.totp is not None:
-            if (self.totp.verify(otp)):
-                self.totp = None
-                return 'Verified'
-            else:
-                return 'Otp not verified'
-        else:
-            return 'Must send OTP first before Verification '
+    def verify(self, phone, otp, purpose=LOGIN_PURPOSE):
+        if self.service.verify(phone, purpose, otp):
+            return 'Verified'
+        return 'Otp not verified'

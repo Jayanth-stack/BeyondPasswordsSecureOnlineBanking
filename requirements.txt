@@ -1,5 +1,8 @@
 twilio~=9.0.4
 Flask~=3.0.3
+Flask-Cors~=4.0.0
+Flask-Bcrypt~=1.0.1
+python-dotenv~=1.0.1
 utility~=1.0
 argparse~=1.4.0
 pyotp~=2.9.0

@@ -1,44 +1,88 @@
-document.getElementById('verifyBtn').addEventListener('click', function() {
+function setStatus(message, kind) {
+    const status = document.getElementById('otpStatus');
+    if (!status) {
+        return;
+    }
+    status.textContent = message || '';
+    status.classList.remove('error', 'success');
+    if (kind) {
+        status.classList.add(kind);
+    }
+}
+
+function postJson(path, body) {
+    return fetch(path, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+        },
+        body: JSON.stringify(body),
+    }).then(function (response) {
+        if (response.redirected) {
+            window.location.href = response.url;
+            return null;
+        }
+        return response.json().then(function (data) {
+            data._httpStatus = response.status;
+            return data;
+        });
+    });
+}
+
+document.getElementById('verifyBtn').addEventListener('click', function () {
     const userEnteredOTP = document.getElementById('otp').value;
-    const homeURL = 'http://127.0.0.1:5000/';
-    const otpInputField = document.getElementById('otp');
     const verifyButton = document.getElementById('verifyBtn');
 
     if (userEnteredOTP.trim() === '') {
-        alert('Please enter the OTP.');
+        setStatus('Please enter the OTP.', 'error');
         return;
     }
 
     verifyButton.textContent = 'Verifying...';
     verifyButton.disabled = true;
+    setStatus('Verifying OTP…');
 
-    console.log('Verifying OTP:', userEnteredOTP);
-    fetch(homeURL + 'verify-otp', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ otp_code: userEnteredOTP }),
-    })
-    .then(response => {
-        console.log("OTP verification response received");
-        if (response.redirected) {
-            window.location.href = response.url;
-        } else {
-            return response.json();
-        }
-    })
-    .then(data => {
-        if (data && !data.success) {
-            throw new Error(data.error || 'Incorrect OTP. Please try again.');
-        }
-    })
-    .catch(error => {
-        console.error('Error verifying OTP:', error);
-        alert('Error: ' + error.message);
-    })
-    .finally(() => {
-        verifyButton.textContent = 'Verify OTP';
-        verifyButton.disabled = false;
-    });
+    postJson('/verify-otp', { otp_code: userEnteredOTP })
+        .then(function (data) {
+            if (!data) {
+                return;
+            }
+            if (data._httpStatus === 401 && (data.error || '').toLowerCase().indexOf('session') !== -1) {
+                window.location.href = '/';
+                return;
+            }
+            throw new Error(data.error || data.message || 'Incorrect OTP. Please try again.');
+        })
+        .catch(function (error) {
+            setStatus(error.message, 'error');
+        })
+        .finally(function () {
+            verifyButton.textContent = 'Verify OTP';
+            verifyButton.disabled = false;
+        });
+});
+
+document.getElementById('resendBtn').addEventListener('click', function () {
+    const resendButton = document.getElementById('resendBtn');
+    resendButton.disabled = true;
+    setStatus('Sending a new OTP…');
+
+    postJson('/resend-otp', {})
+        .then(function (data) {
+            if (!data) {
+                return;
+            }
+            if (data._httpStatus >= 400) {
+                throw new Error(data.error || data.message || 'Unable to resend OTP.');
+            }
+            setStatus('A new OTP was sent to your registered phone.', 'success');
+        })
+        .catch(function (error) {
+            setStatus(error.message, 'error');
+        })
+        .finally(function () {
+            resendButton.disabled = false;
+        });
 });
