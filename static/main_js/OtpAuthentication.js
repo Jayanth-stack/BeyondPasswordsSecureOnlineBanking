@@ -24,6 +24,10 @@ document.getElementById('verifyBtn').addEventListener('click', function() {
         console.log("OTP verification response received");
         if (response.redirected) {
             window.location.href = response.url;
+        } else if (response.status === 429 || response.status === 403) {
+            return response.json().then(data => {
+                throw new Error((data && (data.message || data.error)) || 'Too many attempts. Try again later.');
+            });
         } else {
             return response.json();
         }

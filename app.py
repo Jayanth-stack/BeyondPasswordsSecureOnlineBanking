@@ -2,12 +2,16 @@ import logging
 import os
 from twilio.rest import Client
 from flask_bcrypt import Bcrypt
-from flask import Flask, session, jsonify, request, send_from_directory, redirect, url_for
+from flask import Flask, session, jsonify, request, send_from_directory, redirect, url_for, current_app
 from flask_cors import CORS, cross_origin
 from customer import Customers
 from employee import Employee
 from twilio.base.exceptions import TwilioRestException
 from utility.encrypt import check_encrypted_password
+from utility.request_guard import (
+    init_request_guards, client_ip, identity_key,
+    consume_or_429, reject_if_limited, record_failure, clear_limit, rotate_csrf,
+)
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -18,7 +22,8 @@ otpSet = {}
 
 app = Flask(__name__)
 
-app.secret_key = os.urandom(24)
+app.secret_key = os.getenv('SECRET_KEY') or os.urandom(24)
+init_request_guards(app)
 
 CORS(app)
 Bcrypt(app)
@@ -78,6 +83,13 @@ def registerCustomer():
             'message': 'Some data missing'
         }
         return jsonify(response), 400
+    blocked = consume_or_429(
+        'register:ip:%s' % client_ip(),
+        current_app.config['REGISTER_IP_LIMIT'],
+        current_app.config['REGISTER_IP_WINDOW'],
+    )
+    if blocked:
+        return blocked
     c = Customers()
     if c.check_user_id(values['userid']):
         response = {
@@ -142,6 +154,14 @@ def registerEmployee():
     if not all(key in values for key in required):
         return jsonify({'message': 'Some data missing'}), 400
 
+    blocked = consume_or_429(
+        'register:ip:%s' % client_ip(),
+        current_app.config['REGISTER_IP_LIMIT'],
+        current_app.config['REGISTER_IP_WINDOW'],
+    )
+    if blocked:
+        return blocked
+
     emp = Employee()
     if emp.check_user_id(values['userid']):
         return jsonify({'message': 'AccountID exists'}), 400
@@ -178,12 +198,32 @@ def login():
     if not all(key in values for key in required):
         return jsonify({'message': 'Some data missing'}), 400
 
+    userid = identity_key(values['userid'])
+    blocked = consume_or_429(
+        'login:ip:%s' % client_ip(),
+        current_app.config['LOGIN_IP_LIMIT'],
+        current_app.config['LOGIN_IP_WINDOW'],
+    )
+    if blocked:
+        return blocked
+    blocked = reject_if_limited(
+        'login:user:%s' % userid,
+        current_app.config['LOGIN_USER_LIMIT'],
+        current_app.config['LOGIN_USER_WINDOW'],
+    )
+    if blocked:
+        return blocked
+
+    csrf_keep = session.get('_csrf_token')
     session.clear()
+    if csrf_keep:
+        session['_csrf_token'] = csrf_keep
     user_class = Employee if values['usertype'] in ['admin', 'employee', 'tier1', 'tier2'] else Customers
     user = user_class()
 
     hashed_password = user.retrieve_hashed_password(values['userid'])
     if hashed_password and check_encrypted_password(values['password'], hashed_password):
+        clear_limit('login:user:%s' % userid)
         session['userid'] = values['userid']
         session['usertype'] = values['usertype']
         if values['usertype'] != 'customer':
@@ -199,6 +239,13 @@ def login():
         else:
             return jsonify({'message': 'No phone number available'}), 400
     else:
+        failed = record_failure(
+            'login:user:%s' % userid,
+            current_app.config['LOGIN_USER_LIMIT'],
+            current_app.config['LOGIN_USER_WINDOW'],
+        )
+        if failed:
+            return failed
         return jsonify({'message': 'Invalid credentials'}), 401
 
 
@@ -218,6 +265,21 @@ def verify_otp():
     if not otp_code:
         return jsonify({"error": "OTP code is required"}), 400
 
+    blocked = consume_or_429(
+        'otp:ip:%s' % client_ip(),
+        current_app.config['OTP_VERIFY_LIMIT'] * 4,
+        current_app.config['OTP_VERIFY_WINDOW'],
+    )
+    if blocked:
+        return blocked
+    blocked = consume_or_429(
+        'otp:user:%s' % identity_key(userid),
+        current_app.config['OTP_VERIFY_LIMIT'],
+        current_app.config['OTP_VERIFY_WINDOW'],
+    )
+    if blocked:
+        return blocked
+
     user_class = Employee if usertype in ['admin', 'employee', 'tier1', 'tier2'] else Customers
     user = user_class()
     phone_number = user.retrieve_phone_number(userid)
@@ -226,6 +288,8 @@ def verify_otp():
         try:
             result = client.verify.v2.services(verify_sid).verification_checks.create(to=phone_number, code=otp_code)
             if result.status == "approved":
+                clear_limit('otp:user:%s' % identity_key(userid))
+                rotate_csrf()
                 if usertype == 'customer':
                     redirect_url = 'get_customer_dash_ui'
                 else:
@@ -1179,6 +1243,21 @@ def send_otp():
     if not all(key in values for key in required):
         return jsonify({'message': 'Some data missing'}), 400
 
+    blocked = consume_or_429(
+        'otp-send:ip:%s' % client_ip(),
+        current_app.config['OTP_SEND_LIMIT'] * 3,
+        current_app.config['OTP_SEND_WINDOW'],
+    )
+    if blocked:
+        return blocked
+    blocked = consume_or_429(
+        'otp-send:user:%s' % identity_key(values['userid']),
+        current_app.config['OTP_SEND_LIMIT'],
+        current_app.config['OTP_SEND_WINDOW'],
+    )
+    if blocked:
+        return blocked
+
     user = Customers() if values.get('requester', '') == 'Customer' else Employee()
     phone_number = user.retrieve_phone_number(values['userid'])
 
@@ -1202,6 +1281,22 @@ def reset_password():
     if not all(key in values for key in required):
         return jsonify({'message': 'Some data missing'}), 400
 
+    userid = identity_key(values['userid'])
+    blocked = consume_or_429(
+        'reset:ip:%s' % client_ip(),
+        current_app.config['RESET_LIMIT'] * 4,
+        current_app.config['RESET_WINDOW'],
+    )
+    if blocked:
+        return blocked
+    blocked = reject_if_limited(
+        'reset:user:%s' % userid,
+        current_app.config['RESET_LIMIT'],
+        current_app.config['RESET_WINDOW'],
+    )
+    if blocked:
+        return blocked
+
     user = Customers() if values.get('requester', '') == 'Customer' else Employee()
     phone_number = user.retrieve_phone_number(values['userid'])
 
@@ -1210,11 +1305,26 @@ def reset_password():
                                                                                                      code=values[
                                                                                                          'otp'])
         if verification_check.status == "approved":
+            clear_limit('reset:user:%s' % userid)
             response = user.reset_password(values['userid'], values['newPassword'])
             return jsonify({'message': response}), 200
         else:
+            failed = record_failure(
+                'reset:user:%s' % userid,
+                current_app.config['RESET_LIMIT'],
+                current_app.config['RESET_WINDOW'],
+            )
+            if failed:
+                return failed
             return jsonify({'message': 'OTP verification failed, cannot reset password'}), 401
     else:
+        failed = record_failure(
+            'reset:user:%s' % userid,
+            current_app.config['RESET_LIMIT'],
+            current_app.config['RESET_WINDOW'],
+        )
+        if failed:
+            return failed
         return jsonify({'message': 'User ID not found'}), 404
 
 
