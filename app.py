@@ -504,29 +504,36 @@ def approve_request_employee():
     if not all(key in values for key in required):
         return jsonify({'message': 'Some data missing'}), 400
 
-    # Check if the session has the correct user and they are logged in
-    if 'userid' in session and session['userid'] == values['userid']:
-        emp = Employee()
-        amount = emp.get_amount_of_transaction(values['transaction_no'])
-
-        if amount is None:
-            return jsonify({'message': 'Wrong Transaction number'}), 404
-
-        tier = emp.get_employee_tier(values['userid'])
-
-        from_account = emp.get_fromAccount_of_transaction(values['transaction_no'])
-        to_account = emp.get_toAccount_of_transaction(values['transaction_no'])
-        status = emp.get_transaction_status(values['transaction_no'])
-
-        if from_account != -1 and to_account != -1 and amount != -1 and status != 0:
-            c = Customers()
-            result = c.fund_transfers(from_account, to_account, amount, int(values['transaction_no']))
-            return jsonify({'message': result}), 200
-        else:
-            return jsonify({'message': 'Invalid transaction_no'}), 400
-    else:
+    if 'userid' not in session or session['userid'] != values['userid']:
         logging.warning('Not logged In - ApproveRequestEmp')
         return redirect(url_for('get_login_page_ui', _external=True, _scheme='http'))
+
+    if session.get('usertype') not in ['admin', 'employee', 'tier1', 'tier2']:
+        logging.warning(
+            f"Unauthorized approveRequestEmp attempt by {session.get('userid')} ({session.get('usertype')})")
+        return jsonify({'message': 'Unauthorized access'}), 403
+
+    emp = Employee()
+    tier = emp.get_employee_tier(values['userid'])
+    if tier == "None" or tier is None:
+        logging.warning(f"Non-employee {values['userid']} attempted approveRequestEmp")
+        return jsonify({'message': 'Unauthorized access'}), 403
+
+    amount = emp.get_amount_of_transaction(values['transaction_no'])
+
+    if amount is None:
+        return jsonify({'message': 'Wrong Transaction number'}), 404
+
+    from_account = emp.get_fromAccount_of_transaction(values['transaction_no'])
+    to_account = emp.get_toAccount_of_transaction(values['transaction_no'])
+    status = emp.get_transaction_status(values['transaction_no'])
+
+    if from_account != -1 and to_account != -1 and amount != -1 and status != 0:
+        c = Customers()
+        result = c.fund_transfers(from_account, to_account, amount, int(values['transaction_no']))
+        return jsonify({'message': result}), 200
+    else:
+        return jsonify({'message': 'Invalid transaction_no'}), 400
 
 
 ###############                HANDLE TO deny FUND TRANSFER REQUEST           ###############
