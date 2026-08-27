@@ -6,3 +6,7 @@ DB_USER=root
 DB_PASSWORD=root
 DB_PORT=3306
 DB_NAME=bankingapplication
+SECRET_KEY=change-me-in-production
+RECEIPT_SECRET=change-me-in-production
+CSRF_ENABLED=true
+RATE_LIMIT_STORE=SystemLogs/rate_limit.sqlite

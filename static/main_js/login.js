@@ -19,6 +19,14 @@ window.onload = function() {
 
 const homeURL = 'http://127.0.0.1:5000/';
 
+function alertFromResponse(response, fallback) {
+  return response.json().then(function(data) {
+    window.alert((data && (data.message || data.error)) || fallback);
+  }).catch(function() {
+    window.alert(fallback);
+  });
+}
+
 var auth_user_type, forgotpw_userid_data;
 const sign_in_btn = document.querySelector("#sign-in-btn");
 const sign_up_btn = document.querySelector("#sign-up-btn");
@@ -172,9 +180,15 @@ forgot_pw_form.addEventListener("submit", function(e) {
     }
   }).then(function(response) {
     console.log("forgotpw response received");
+    if (response.status === 429 || response.status === 403) {
+      return alertFromResponse(response, 'Too many attempts. Try again later.');
+    }
     return response.json();
   }).then(function(data) {
-    if(data.message == 'OTP Sent') {
+    if (!data) {
+      return;
+    }
+    if(data.message == 'OTP Sent' || data.message == 'OTP sent successfully') {
       window.alert('An OTP has been sent to your registered mobile phone no.');
     }
     else {
@@ -369,8 +383,14 @@ reset_pw_form.addEventListener("submit", function(e) {
       }
     }).then(function(response) {
       console.log("resetpw response received");
+      if (response.status === 429 || response.status === 403) {
+        return alertFromResponse(response, 'Too many attempts. Try again later.');
+      }
       return response.json();
     }).then(function (data) {
+      if (!data) {
+        return;
+      }
       console.log(data);
       if (data.message == "Password Updated") {
         checkmark.setAttribute('visibility','visible');
@@ -428,6 +448,12 @@ sign_in_form.addEventListener('submit', function(e) {
       console.log("login response received");
       if (response.redirected) {
         window.location.href = response.url;
+      }
+      else if (response.status === 429 || response.status === 403) {
+        return alertFromResponse(
+          response,
+          response.status === 429 ? 'Too many attempts. Try again later.' : 'Request blocked.'
+        );
       }
       else {
         window.alert("Invalid credentials!");
