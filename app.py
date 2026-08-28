@@ -8,6 +8,7 @@ from customer import Customers
 from employee import Employee
 from twilio.base.exceptions import TwilioRestException
 from utility.encrypt import check_encrypted_password
+from utility.account_access import authorize_account, authorize_cheque_credit, flask_error
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -27,6 +28,15 @@ account_sid = 'your Account_sid'
 auth_token = 'your Auth_token'
 client = Client(account_sid, auth_token)
 verify_sid = 'your verify_sid'
+
+
+def _require_account(account_no, purpose):
+    """Gate a money-moving call through the shared account-access policy."""
+    return flask_error(authorize_account(session, account_no, purpose))
+
+
+def _require_cheque_credit(cheque_no):
+    return flask_error(authorize_cheque_credit(session, cheque_no))
 
 
 @app.route('/', methods=['GET'])
@@ -365,6 +375,13 @@ def fund_transfers():
     if values['amount'] < 0:
         return jsonify({'message': 'Enter a valid amount'}), 200
 
+    denied = _require_account(values['fromAccount'], 'transfer_from')
+    if denied:
+        return denied
+    denied = _require_account(values['toAccount'], 'transfer_to')
+    if denied:
+        return denied
+
     employee = Employee()
     transaction_message = employee.add_transaction(values['fromAccount'], values['toAccount'], values['amount'])
     return jsonify({'message': transaction_message}), 200
@@ -390,6 +407,13 @@ def request_funds():
 
     if values['userid'] != session['userid']:
         return jsonify({'message': 'User ID mismatch'}), 401
+
+    denied = _require_account(values['toAccount'], 'request_to')
+    if denied:
+        return denied
+    denied = _require_account(values['fromAccount'], 'request_from')
+    if denied:
+        return denied
 
     customer = Customers()
     response = customer.fund_request(values['fromAccount'], values['toAccount'], values['amount'])
@@ -417,6 +441,10 @@ def deposit_fund():
     if values['userid'] != session['userid']:
         return jsonify({'message': 'User ID mismatch'}), 401
 
+    denied = _require_account(values['account'], 'credit')
+    if denied:
+        return denied
+
     employee = Employee()
     response = employee.add_transaction_deposit(values['account'], values['amount'])
     return jsonify({'message': response}), 200
@@ -442,6 +470,10 @@ def withdraw_fund():
 
     if values['userid'] != session['userid']:
         return jsonify({'message': 'User ID mismatch'}), 401
+
+    denied = _require_account(values['account'], 'debit')
+    if denied:
+        return denied
 
     customer = Customers()
     response = customer.debit_request(values['account'], values['amount'])
@@ -615,7 +647,12 @@ def make_cashier_cheque():
 
     # Validate if the user in the request is the same as the one logged in and check session expiration
     if 'userid' in session and session['userid'] == values['userid']:
-        # Further checks can be added here to validate the user's permission if needed
+        denied = _require_account(values['from_account'], 'issue_cheque_from')
+        if denied:
+            return denied
+        denied = _require_account(values['to_account'], 'issue_cheque_to')
+        if denied:
+            return denied
         c = Customers()
         try:
             response = c.make_cashier_check(values['userid'], values['to_account'],
@@ -644,6 +681,9 @@ def deposit_cheque():
 
     # Ensure that the session is valid for the requested operation
     if 'userid' in session and session.get('usertype') == 'customer' and session['userid'] == values['userid']:
+        denied = _require_cheque_credit(values['cheque_no'])
+        if denied:
+            return denied
         c = Customers()
         response = {
             'message': c.deposit_check(values['userid'], values['cheque_no'])

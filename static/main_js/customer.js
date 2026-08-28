@@ -604,7 +604,7 @@ function order_check(userid, toAccount, fromAccount, amount) {
       window.alert('Cheque Ordered!');
     }
     else {
-      window.alert('Failed! Please re-try.');
+      window.alert(data.message || 'Failed! Please re-try.');
     }
   }).catch(function(error){
     console.error(error);
@@ -633,11 +633,11 @@ function dep_check(userid, checkno) {
     if(data.message == 'Check already used'){
       window.alert('Cheque already used!');
     }
-    if(data.message == 'Success') {
+    else if(data.message == 'Success') {
       window.alert('Cheque successfully deposited!');
     }
     else {
-      window.alert('Failed! Please re-try.');
+      window.alert(data.message || 'Failed! Please re-try.');
     }
   }).catch(function(error){
     console.error(error);
