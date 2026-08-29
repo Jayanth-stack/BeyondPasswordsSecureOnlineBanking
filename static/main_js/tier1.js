@@ -188,13 +188,7 @@ function approve_request(userid, xactno) {
     transaction_no : xactno
   };
 
-  fetch(homeURL+'approveRequestEmp', {
-    method : 'post',
-    body : JSON.stringify(approveRequestData),
-    headers : {
-      'Content-type' : 'application/json'
-    }
-  }).then(function(response) {
+  Idempotency.moneyPost('approveRequestEmp', homeURL+'approveRequestEmp', approveRequestData).then(function(response) {
     console.log("approveRequest response received");
     return response.json();
   }).then(function (data) {
@@ -222,13 +216,7 @@ function deny_request(userid, xactno) {
     transaction_no : xactno
   };
 
-  fetch(homeURL+'denyRequest', {
-    method : 'post',
-    body : JSON.stringify(denyRequestData),
-    headers : {
-      'Content-type' : 'application/json'
-    }
-  }).then(function(response) {
+  Idempotency.moneyPost('denyRequest', homeURL+'denyRequest', denyRequestData).then(function(response) {
     console.log("denyRequest response received");
     return response.json();
   }).then(function (data) {
@@ -440,13 +428,7 @@ function order_check(userid, toAccount, fromAccount, amount) {
     amount : amount
   };
 
-  fetch(homeURL+'getCashierCheque', {
-    method : 'post',
-    body : JSON.stringify(orderCheckData),
-    headers : {
-      'Content-type' : 'application/json'
-    }
-  }).then(function(response) {
+  Idempotency.moneyPost('getCashierCheque', homeURL+'getCashierCheque', orderCheckData).then(function(response) {
     console.log("orderCheck response received");
     return response.json();
   }).then(function (data) {
@@ -470,13 +452,7 @@ function dep_check(userid, checkno) {
     cheque_no : checkno
   };
 
-  fetch(homeURL+'depositCheck', {
-    method : 'post',
-    body : JSON.stringify(depCheckData),
-    headers : {
-      'Content-type' : 'application/json'
-    }
-  }).then(function(response) {
+  Idempotency.moneyPost('depositCheck', homeURL+'depositCheck', depCheckData).then(function(response) {
     console.log("depCheck response received");
     return response.json();
   }).then(function (data) {
@@ -505,13 +481,7 @@ function fund_transfer(userid, fromAccount, toAccount, amount) {
     amount : amount
   };
 
-  fetch(homeURL+'fundTransfer', {
-    method : 'post',
-    body : JSON.stringify(fundTransferData),
-    headers : {
-      'Content-type' : 'application/json'
-    }
-  }).then(function(response) {
+  Idempotency.moneyPost('fundTransfer', homeURL+'fundTransfer', fundTransferData).then(function(response) {
     console.log("fundTransfer response received");
     return response.json();
   }).then(function (data) {
@@ -539,13 +509,7 @@ function deposit(userid, account, amount) {
     amount : amount
   };
 
-  fetch(homeURL+'depositAmount', {
-    method : 'post',
-    body : JSON.stringify(depositData),
-    headers : {
-      'Content-type' : 'application/json'
-    }
-  }).then(function(response) {
+  Idempotency.moneyPost('depositAmount', homeURL+'depositAmount', depositData).then(function(response) {
     console.log("deposit response received");
     return response.json();
   }).then(function (data) {
@@ -570,13 +534,7 @@ function withdraw(userid, account, amount) {
     amount : amount
   };
 
-  fetch(homeURL+'withdrawAmount', {
-    method : 'post',
-    body : JSON.stringify(withdrawData),
-    headers : {
-      'Content-type' : 'application/json'
-    }
-  }).then(function(response) {
+  Idempotency.moneyPost('withdrawAmount', homeURL+'withdrawAmount', withdrawData).then(function(response) {
     console.log("withdraw response received");
     return response.json();
   }).then(function (data) {

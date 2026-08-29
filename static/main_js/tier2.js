@@ -309,13 +309,7 @@ function approve_request(userid, xactno) {
     transaction_no : xactno
   };
 
-  fetch(homeURL+'approveRequestEmp', {
-    method : 'post',
-    body : JSON.stringify(approveRequestData),
-    headers : {
-      'Content-type' : 'application/json'
-    }
-  }).then(function(response) {
+  Idempotency.moneyPost('approveRequestEmp', homeURL+'approveRequestEmp', approveRequestData).then(function(response) {
     console.log("approveRequest response received");
     return response.json();
   }).then(function (data) {
@@ -343,13 +337,7 @@ function deny_request(userid, xactno) {
     transaction_no : xactno
   };
 
-  fetch(homeURL+'denyRequest', {
-    method : 'post',
-    body : JSON.stringify(denyRequestData),
-    headers : {
-      'Content-type' : 'application/json'
-    }
-  }).then(function(response) {
+  Idempotency.moneyPost('denyRequest', homeURL+'denyRequest', denyRequestData).then(function(response) {
     console.log("denyRequest response received");
     return response.json();
   }).then(function (data) {
