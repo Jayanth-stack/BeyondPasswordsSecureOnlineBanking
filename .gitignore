@@ -11,3 +11,5 @@ __pycache__/
 *.log
 .idea/
 flask_session/
+SystemLogs/idempotency.sqlite
+SystemLogs/idempotency.sqlite-*

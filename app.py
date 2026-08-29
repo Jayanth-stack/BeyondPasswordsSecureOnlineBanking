@@ -8,6 +8,13 @@ from customer import Customers
 from employee import Employee
 from twilio.base.exceptions import TwilioRestException
 from utility.encrypt import check_encrypted_password
+from utility.money import parse_amount, AmountError
+from utility.idempotency import (
+    SqliteIdempotencyStore,
+    IdempotencyService,
+    flask_idempotent,
+    set_idempotency,
+)
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -22,6 +29,21 @@ app.secret_key = os.urandom(24)
 
 CORS(app)
 Bcrypt(app)
+
+
+def _parsed_amount(values, field='amount'):
+    """Canonical money parse for mutating routes. Returns (float, error_response)."""
+    try:
+        return float(parse_amount(values.get(field))), None
+    except AmountError as exc:
+        return None, (jsonify({'message': str(exc), 'error': exc.code}), 400)
+
+
+_idemp_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'SystemLogs')
+os.makedirs(_idemp_dir, exist_ok=True)
+set_idempotency(IdempotencyService(
+    SqliteIdempotencyStore(os.path.join(_idemp_dir, 'idempotency.sqlite'))
+))
 
 account_sid = 'your Account_sid'
 auth_token = 'your Auth_token'
@@ -339,6 +361,7 @@ def open_new_account():
 ###############                HANDLE FOR FUND TRASNFER            ###############
 @app.route('/fundTransfer', methods=['POST', 'GET'])
 @cross_origin()
+@flask_idempotent('fund-transfer')
 def fund_transfers():
     if 'userid' not in session:
         logging.warning('Attempt to access fundTransfer without login')
@@ -360,10 +383,10 @@ def fund_transfers():
 
     values['fromAccount'] = int(values['fromAccount'])
     values['toAccount'] = int(values['toAccount'])
-    values['amount'] = float(values['amount'])
-
-    if values['amount'] < 0:
-        return jsonify({'message': 'Enter a valid amount'}), 200
+    amount, err = _parsed_amount(values)
+    if err:
+        return err
+    values['amount'] = amount
 
     employee = Employee()
     transaction_message = employee.add_transaction(values['fromAccount'], values['toAccount'], values['amount'])
@@ -373,6 +396,7 @@ def fund_transfers():
 ###############                HANDLE TO REQUEST FUNDS           ###############
 @app.route('/requestFunds', methods=['POST', 'GET'])
 @cross_origin()
+@flask_idempotent('request-funds')
 def request_funds():
     if 'userid' not in session:
         logging.warning('User not logged in - requestFunds')
@@ -385,8 +409,10 @@ def request_funds():
     if not values or not all(key in values for key in required):
         return jsonify({'message': 'Some data missing or invalid'}), 400
 
-    if float(values.get('amount', 0)) < 0:
-        return jsonify({'message': 'Enter a valid amount'}), 400
+    amount, err = _parsed_amount(values)
+    if err:
+        return err
+    values['amount'] = amount
 
     if values['userid'] != session['userid']:
         return jsonify({'message': 'User ID mismatch'}), 401
@@ -399,6 +425,7 @@ def request_funds():
 ###############                HANDLE TO DEPOSIT MONEY            ###############
 @app.route('/depositAmount', methods=['POST', 'GET'])
 @cross_origin()
+@flask_idempotent('deposit')
 def deposit_fund():
     if 'userid' not in session:
         logging.warning('User not logged in - depositAmount')
@@ -411,8 +438,10 @@ def deposit_fund():
     if not values or not all(key in values for key in required):
         return jsonify({'message': 'Some data missing or invalid'}), 400
 
-    if float(values.get('amount', 0)) < 0:
-        return jsonify({'message': 'Enter a valid amount'}), 400
+    amount, err = _parsed_amount(values)
+    if err:
+        return err
+    values['amount'] = amount
 
     if values['userid'] != session['userid']:
         return jsonify({'message': 'User ID mismatch'}), 401
@@ -425,6 +454,7 @@ def deposit_fund():
 ###############                HANDLE TO WITHDRAW MONEY            ###############
 @app.route('/withdrawAmount', methods=['POST', 'GET'])
 @cross_origin()
+@flask_idempotent('withdraw')
 def withdraw_fund():
     if 'userid' not in session:
         logging.warning('User not logged in - withdrawAmount')
@@ -437,8 +467,10 @@ def withdraw_fund():
     if not values or not all(key in values for key in required):
         return jsonify({'message': 'Some data missing or invalid'}), 400
 
-    if float(values.get('amount', 0)) < 0:
-        return jsonify({'message': 'Enter a valid amount'}), 400
+    amount, err = _parsed_amount(values)
+    if err:
+        return err
+    values['amount'] = amount
 
     if values['userid'] != session['userid']:
         return jsonify({'message': 'User ID mismatch'}), 401
@@ -451,6 +483,7 @@ def withdraw_fund():
 ###############            HANDLE TO APPROVE FUND'S REQUEST By CUSTOMER          ###############
 @app.route('/approveRequest', methods=['POST', 'GET'])
 @cross_origin()
+@flask_idempotent('approve-request')
 def approve_request():
     values = request.get_json()
     logging.debug('Data @approveRequest' + str(values))
@@ -496,6 +529,7 @@ def approve_request():
 ###############            HANDLE TO APPROVE FUND'S REQUEST By EMPLOYEE (not Tier1)         ###############
 @app.route('/approveRequestEmp', methods=['POST', 'GET'])
 @cross_origin()
+@flask_idempotent('approve-request-emp')
 def approve_request_employee():
     values = request.get_json()
     logging.debug('Data @approveRequestEmp' + str(values))
@@ -535,6 +569,7 @@ def approve_request_employee():
 ###############                HANDLE TO deny FUND TRANSFER REQUEST           ###############
 @app.route('/denyRequest', methods=['POST', 'GET'])
 @cross_origin()
+@flask_idempotent('deny-request')
 def deny_request():
     values = request.get_json()
     logging.debug('Data @denyRequest' + str(values))
@@ -599,6 +634,7 @@ def get_transaction_history():
 ###############              HANDLE FOR GET CHEQUE (BY CUSTOMER/BANK)             ###############
 @app.route('/getCashierCheque', methods=['POST', 'GET'])
 @cross_origin()
+@flask_idempotent('cashier-cheque')
 def make_cashier_cheque():
     values = request.get_json()
     logging.debug('Data @getCashierCheque' + str(values))
@@ -610,8 +646,10 @@ def make_cashier_cheque():
     if not all(key in values for key in required):
         return jsonify({'message': 'Some data missing'}), 400
 
-    if float(values['amount']) < 0:
-        return jsonify({'message': 'Enter a valid amount'}), 400
+    amount, err = _parsed_amount(values)
+    if err:
+        return err
+    values['amount'] = amount
 
     # Validate if the user in the request is the same as the one logged in and check session expiration
     if 'userid' in session and session['userid'] == values['userid']:
@@ -632,6 +670,7 @@ def make_cashier_cheque():
 ###############            HANDLE FOR DEPOSIT CHEQUE (BY CUSTOMER/BANK)          ###############
 @app.route('/depositCheck', methods=['POST', 'GET'])
 @cross_origin()
+@flask_idempotent('deposit-cheque')
 def deposit_cheque():
     values = request.get_json()
     logging.debug('Data @depositCheck' + str(values))
