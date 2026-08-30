@@ -8,6 +8,15 @@ from customer import Customers
 from employee import Employee
 from twilio.base.exceptions import TwilioRestException
 from utility.encrypt import check_encrypted_password
+from utility.approval_policy import (
+    ACTION_ESCALATE,
+    ACTION_EXECUTE,
+    ACTION_RECORD_FIRST,
+    Actor,
+    flask_error,
+    get_policy,
+    parse_first_approver,
+)
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -461,36 +470,44 @@ def approve_request():
     if not all(key in values for key in required):
         return jsonify({'message': 'Some data missing'}), 400
 
-    # Here, using 'customer_id' in session to validate; ensure you are setting this key in your session correctly in login.
-    if 'customer_id' in session and session['customer_id'] == values['customer_id']:
-        emp = Employee()
-        amount = emp.get_amount_of_transaction(values['transaction_no'])
-
-        if amount == 'None':
-            return jsonify({'message': 'Wrong Transaction number'}), 400
-
-        if amount > 1000:
-            response = {
-                'message': emp.transfer_transaction_to_tier2(values['transaction_no'])
-            }
-            return jsonify(response), 200
-
-        from_account = emp.get_fromAccount_of_transaction(int(values['transaction_no']))
-        to_account = emp.get_toAccount_of_transaction(int(values['transaction_no']))
-        amount = emp.get_amount_of_transaction(int(values['transaction_no']))
-        status = emp.get_transaction_status(int(values['transaction_no']))
-
-        if from_account != -1 and to_account != -1 and amount != -1 and status != 0:
-            c = Customers()
-            response = {
-                'message': c.fund_transfers(from_account, to_account, amount, int(values['transaction_no']))
-            }
-            return jsonify(response), 200
-        else:
-            return jsonify({'message': 'Invalid transaction details'}), 400
-    else:
+    if 'userid' not in session:
         logging.warning('Not logged In or Unauthorized Access - ApproveRequest')
         return redirect(url_for('get_login_page_ui', _external=True, _scheme='http'))
+
+    if session.get('usertype') != 'customer' or session.get('userid') != values['customer_id']:
+        return jsonify({'message': 'Not authorized to approve this request', 'error': 'not_customer'}), 403
+
+    emp = Employee()
+    amount = emp.get_amount_of_transaction(values['transaction_no'])
+
+    if amount == -1:
+        return jsonify({'message': 'Wrong Transaction number'}), 400
+
+    actor = Actor.from_mapping(session)
+    decision = get_policy().review(actor, 'fund_request', amount, expected_role='customer')
+    denied = flask_error(decision)
+    if denied:
+        return denied
+
+    if decision.action == ACTION_ESCALATE:
+        response = {
+            'message': emp.transfer_transaction_to_tier2(values['transaction_no']),
+            'action': ACTION_ESCALATE,
+        }
+        return jsonify(response), 200
+
+    from_account = emp.get_fromAccount_of_transaction(int(values['transaction_no']))
+    to_account = emp.get_toAccount_of_transaction(int(values['transaction_no']))
+    status = emp.get_transaction_status(int(values['transaction_no']))
+
+    if from_account != -1 and to_account != -1 and amount != -1 and status != 0:
+        c = Customers()
+        response = {
+            'message': c.fund_transfers(from_account, to_account, amount, int(values['transaction_no'])),
+            'action': ACTION_EXECUTE,
+        }
+        return jsonify(response), 200
+    return jsonify({'message': 'Invalid transaction details'}), 400
 
 
 ###############            HANDLE TO APPROVE FUND'S REQUEST By EMPLOYEE (not Tier1)         ###############
@@ -507,29 +524,47 @@ def approve_request_employee():
     if not all(key in values for key in required):
         return jsonify({'message': 'Some data missing'}), 400
 
-    # Check if the session has the correct user and they are logged in
-    if 'userid' in session and session['userid'] == values['userid']:
-        emp = Employee()
-        amount = emp.get_amount_of_transaction(values['transaction_no'])
-
-        if amount is None:
-            return jsonify({'message': 'Wrong Transaction number'}), 404
-
-        tier = emp.get_employee_tier(values['userid'])
-
-        from_account = emp.get_fromAccount_of_transaction(values['transaction_no'])
-        to_account = emp.get_toAccount_of_transaction(values['transaction_no'])
-        status = emp.get_transaction_status(values['transaction_no'])
-
-        if from_account != -1 and to_account != -1 and amount != -1 and status != 0:
-            c = Customers()
-            result = c.fund_transfers(from_account, to_account, amount, int(values['transaction_no']))
-            return jsonify({'message': result}), 200
-        else:
-            return jsonify({'message': 'Invalid transaction_no'}), 400
-    else:
+    if 'userid' not in session or session['userid'] != values['userid']:
         logging.warning('Not logged In - ApproveRequestEmp')
         return redirect(url_for('get_login_page_ui', _external=True, _scheme='http'))
+
+    emp = Employee()
+    amount = emp.get_amount_of_transaction(values['transaction_no'])
+
+    if amount == -1:
+        return jsonify({'message': 'Wrong Transaction number'}), 404
+
+    tier = emp.get_employee_tier(values['userid'])
+    actor = Actor.from_mapping({
+        'userid': session.get('userid'),
+        'usertype': session.get('usertype'),
+        'emp_tier': tier,
+    })
+
+    from_account = emp.get_fromAccount_of_transaction(values['transaction_no'])
+    to_account = emp.get_toAccount_of_transaction(values['transaction_no'])
+    status = emp.get_transaction_status(values['transaction_no'])
+    remark = emp.get_transaction_remark(values['transaction_no'])
+
+    if from_account == -1 or to_account == -1 or amount == -1 or status == 0:
+        return jsonify({'message': 'Invalid transaction_no'}), 400
+
+    decision = get_policy().review(
+        actor, 'transfer', amount, parse_first_approver(remark), expected_role='employee'
+    )
+    denied = flask_error(decision)
+    if denied:
+        return denied
+
+    if decision.action == ACTION_RECORD_FIRST:
+        return jsonify({
+            'message': emp.record_first_approval(values['transaction_no'], values['userid']),
+            'action': ACTION_RECORD_FIRST,
+        }), 200
+
+    c = Customers()
+    result = c.fund_transfers(from_account, to_account, amount, int(values['transaction_no']))
+    return jsonify({'message': result, 'action': ACTION_EXECUTE}), 200
 
 
 ###############                HANDLE TO deny FUND TRANSFER REQUEST           ###############

@@ -6,3 +6,8 @@ DB_USER=root
 DB_PASSWORD=root
 DB_PORT=3306
 DB_NAME=bankingapplication
+# Amounts above this require a tier-2 (or higher) checker. Exclusive, matching amount > 1000.
+APPROVAL_TIER2_THRESHOLD=1000
+# Amounts above this require two distinct employees (maker + checker). Default matches the tier-2 band.
+APPROVAL_DUAL_CONTROL_THRESHOLD=1000
+APPROVAL_MAKER_TIER=1

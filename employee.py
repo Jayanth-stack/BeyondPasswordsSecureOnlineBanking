@@ -2,6 +2,14 @@ from time import time
 from customer import Customers
 
 from utility.encrypt import encrypt, encrypt_ssn
+from utility.approval_policy import (
+    Actor,
+    AmountError,
+    classify_amount,
+    get_policy,
+    first_approval_remark,
+    pending_visible_to,
+)
 from datetime import datetime
 import mysql.connector
 import pymysql
@@ -203,10 +211,12 @@ class Employee:
         if c.verify_account(int(account2)) == 0:
             return 'account ' + str(account2) + ' doesn\'t exists'
 
-        approver = 1
         print('at add_transaction')
-        if float(amount) > 1000:
-            approver = 2
+        try:
+            requirement = classify_amount('transfer', amount)
+        except AmountError as exc:
+            return str(exc)
+        approver = requirement.required_tier
         query = """ 
                     INSERT into Transactions(from_account, to_account, approver1_id, approver2, amount, status, deposit) 
                     VALUES(%d, %d, '-1', %d, %d, 1, 0)
@@ -216,7 +226,7 @@ class Employee:
         try:
             db.commit()
             # result = cursor.fetchall()
-            msg = 'Request to be approved by tier' + str(approver) + ' employee'
+            msg = requirement.queue_message()
             print(msg)
             return msg
         except Exception as e:
@@ -226,10 +236,12 @@ class Employee:
 
     #################        FUNCTION TO ADD TRANSACTION DEPOSIT (APPROVER: TIER2)                    #################
     def add_transaction_deposit(self, account, amount):
-        approver = 1
         print('at add_transaction_deposit')
-        if float(amount) > 1000:
-            approver = 2
+        try:
+            requirement = classify_amount('deposit', amount)
+        except AmountError as exc:
+            return str(exc)
+        approver = requirement.required_tier
         query = """ 
                     INSERT into Transactions(from_account, to_account, approver1_id, approver2, amount, status, deposit) 
                     VALUES(%d, %d, '-1', %d, %d, 1, 1)
@@ -239,7 +251,7 @@ class Employee:
         try:
             db.commit()
             result = cursor.fetchall()
-            msg = 'Request to be approved by tier' + str(approver) + ' employee'
+            msg = requirement.queue_message()
             print(msg)
             return msg
         except Exception as e:
@@ -283,20 +295,26 @@ class Employee:
     #################        FUNCTION TO GET FUND TRANSFER REQUESTs LIST                    #################
     def fund_transfer_requests(self, employee_id):
         tier = self.get_employee_tier(employee_id)
-        if tier != 2 :
-             return 'None'
+        if tier in (None, 'None', 0, '0'):
+            return 'None'
+        try:
+            tier = int(tier)
+        except (TypeError, ValueError):
+            return 'None'
 
+        actor = Actor(user_id=str(employee_id), role='employee', tier=tier,
+                      usertype='tier' + str(tier) if tier in (1, 2) else 'admin')
         query = """
             SELECT * FROM Transactions 
-            WHERE approver2 = %d and status = 1; """ % (tier)
-        #print(len(result))
+            WHERE status = 1; """
         try:
             db.commit()
             cursor.execute(query)
             result = cursor.fetchall()
-            if len(result) == 0:
+            visible = pending_visible_to(actor, result or [], get_policy())
+            if len(visible) == 0:
                 return 'None'
-            return result
+            return visible
         except Exception as e:
             db.rollback()
             print(e, ' : Error in  getting  fund_transfer_requests List')
@@ -394,6 +412,31 @@ class Employee:
         if len(result) == 0:
             return -1
         return result[0][0]
+
+    def get_transaction_remark(self, transaction_no):
+        query = """
+            SELECT remark FROM Transactions 
+            WHERE transaction_no=%d ; """ % (int(transaction_no))
+        cursor.execute(query)
+        result = cursor.fetchall()
+        if len(result) == 0:
+            return ''
+        value = result[0][0]
+        return value if value is not None else ''
+
+    def record_first_approval(self, transaction_no, employee_id):
+        remark = first_approval_remark(employee_id)
+        query = """
+            UPDATE Transactions SET remark='%s'
+            WHERE transaction_no = %d and status = 1;""" % (remark, int(transaction_no))
+        cursor.execute(query)
+        try:
+            db.commit()
+            return 'Awaiting second approval'
+        except Exception as e:
+            db.rollback()
+            print(e, ' : Error in recording first approval')
+            return 'Please try again later'
 
     def transfer_transaction_to_tier2(self, transaction_no):
         tier2_id = self.getTier2_emp()
