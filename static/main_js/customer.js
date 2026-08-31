@@ -115,6 +115,8 @@ function appendPrimaryData(data) {
   document.getElementById("cc_no").innerHTML = cc_no;
   document.getElementById("cc_balance").innerHTML = cc_bal;
 
+  fillVelocityLimits(data);
+
   document.getElementById("first_name").value = first_name;
   document.getElementById("middle_name").value = midname;
   document.getElementById("last_name").value = lastname;
@@ -126,6 +128,51 @@ function appendPrimaryData(data) {
 
   createCheckDropdown();
   fillPendingTransTbl(data);
+}
+
+function moneyLabel(value) {
+  if (value === null || value === undefined || value === '') {
+    return 'unlimited';
+  }
+  return '$' + Number(value).toFixed(2);
+}
+
+function fillVelocityLimits(data) {
+  var velocity = data.Velocity || {};
+  var outbound = velocity.outbound || {};
+  function apply(accountNo, remainingId, hintId) {
+    if (!accountNo || accountNo === 'NA') {
+      return;
+    }
+    var snap = velocity[String(accountNo)] || {};
+    var transfer = snap.transfer || {};
+    var remaining = transfer.remaining_amount;
+    var el = document.getElementById(remainingId);
+    if (el) {
+      el.innerHTML = remaining == null ? '—' : moneyLabel(remaining);
+    }
+    var hint = document.getElementById(hintId);
+    if (hint) {
+      var parts = [];
+      if (transfer.remaining_amount != null) {
+        parts.push('Daily transfer remaining: ' + moneyLabel(transfer.remaining_amount));
+      }
+      if (transfer.per_txn) {
+        parts.push('Max per transfer: ' + moneyLabel(transfer.per_txn));
+      }
+      if (outbound.remaining_amount != null) {
+        parts.push('Daily outbound remaining: ' + moneyLabel(outbound.remaining_amount));
+      }
+      hint.innerHTML = parts.join(' · ');
+    }
+  }
+  apply(savings_ac_no, 'sa_xfer_remaining', 'saTransfer_remaining_hint');
+  apply(checking_ac_no, 'ca_xfer_remaining', 'caTransfer_remaining_hint');
+  apply(cc_no, 'cc_xfer_remaining', 'ccTransfer_remaining_hint');
+  var chequeHint = document.getElementById('orderCheck_remaining_hint');
+  if (chequeHint && outbound.remaining_amount != null) {
+    chequeHint.innerHTML = 'Daily outbound remaining: ' + moneyLabel(outbound.remaining_amount);
+  }
 }
 
 function fillPendingTransTbl(data){
@@ -604,7 +651,7 @@ function order_check(userid, toAccount, fromAccount, amount) {
       window.alert('Cheque Ordered!');
     }
     else {
-      window.alert('Failed! Please re-try.');
+      window.alert(data.message || 'Failed! Please re-try.');
     }
   }).catch(function(error){
     console.error(error);
