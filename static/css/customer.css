@@ -172,3 +172,15 @@ body {
   /*noinspection CssInvalidFunction*/
   border-color: lighten(var(--success-color), 55%);
 }
+
+.velocity_remaining {
+  color: var(--primary-color);
+  font-weight: 600;
+  margin: 0;
+}
+
+.velocity_hint {
+  color: var(--secondary-color);
+  font-size: 13px;
+  margin: 8px 0 0 0;
+}

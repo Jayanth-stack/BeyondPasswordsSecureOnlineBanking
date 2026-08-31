@@ -117,6 +117,9 @@
                 <h5 class="ac_details_text">Available Balance :</h5>
                 <p id="sa_balance">NA</p>
                 <br/>
+                <h5 class="ac_details_text">Daily transfer remaining :</h5>
+                <p id="sa_xfer_remaining" class="velocity_remaining">—</p>
+                <br/>
               </div>
               <button type="button" data-toggle="modal" data-target="#saDepositModal" class="btn btn-primary" style="width:80%;margin-bottom:10px;margin-top:10px;">Deposit Fund</button>
               <button type="button" data-toggle="modal" data-target="#saTransferModal" class="btn btn-primary" style="width:80%;margin-bottom:10px;">Transfer Fund</button>
@@ -133,6 +136,9 @@
                 <br/>
                 <h5 class="ac_details_text">Available Balance :</h5>
                 <p id="ca_balance">NA</p>
+                <br/>
+                <h5 class="ac_details_text">Daily transfer remaining :</h5>
+                <p id="ca_xfer_remaining" class="velocity_remaining">—</p>
                 <br/>
               </div>
               <button type="button" data-toggle="modal" data-target="#caDepositModal" class="btn btn-primary" style="width:80%;margin-bottom:10px;margin-top:10px;">Deposit Fund</button>
@@ -153,6 +159,9 @@
                 <br/>
                 <h5 class="ac_details_text" style="color: red;">Credit Limit :</h5>
                 <p style="color: red;">$5000</p>
+                <br/>
+                <h5 class="ac_details_text">Daily transfer remaining :</h5>
+                <p id="cc_xfer_remaining" class="velocity_remaining">—</p>
                 <br/>
               </div>
               <button type="button" data-toggle="modal" data-target="#ccTransferModal" class="btn btn-primary" style="width:80%;margin-bottom:10px;margin-top:10px;">Initiate Transaction</button>
@@ -352,6 +361,7 @@
                 <label for="sa_request_radio">Request Money</label><br/><br/>
                 <b>&nbsp;&nbsp;&nbsp;</b><input type="text" id= "sa_transfer_acno_input" placeholder="To Account No." pattern="\d*" maxlength="10" oninput="validity.valid||(value='');"/><br/><br/>
                 <b>$</b> <input type="text" id="saTransfer_amt" placeholder="Enter Amount" pattern="\d*" maxlength="6" oninput="validity.valid||(value='');"/>
+                <p class="velocity_hint" id="saTransfer_remaining_hint"></p>
               </div>
               <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
@@ -377,6 +387,7 @@
                 <label for="ca_request_radio">Request Money</label><br/><br/>
                 <b>&nbsp;&nbsp;&nbsp;</b><input type="text" id= "ca_transfer_acno_input" placeholder="To Account No." pattern="\d*" maxlength="10" oninput="validity.valid||(value='');"/><br/><br/>
                 <b>$</b> <input type="text" id="caTransfer_amt" placeholder="Enter Amount" pattern="\d*" maxlength="6" oninput="validity.valid||(value='');"/>
+                <p class="velocity_hint" id="caTransfer_remaining_hint"></p>
               </div>
               <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
@@ -398,6 +409,7 @@
               <div class="modal-body">
                 <b>&nbsp;&nbsp;&nbsp;</b><input type="text" id="cc_transfer_acno_input" placeholder="Recipient Account No." pattern="\d*" maxlength="10" oninput="validity.valid||(value='');"/><br/><br/>
                 <b>$</b> <input type="text" id="ccTransfer_amt" placeholder="Payment Amount" pattern="\d*" maxlength="6" oninput="validity.valid||(value='');"/>
+                <p class="velocity_hint" id="ccTransfer_remaining_hint"></p>
               </div>
               <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
@@ -469,6 +481,7 @@
                 <select id="orderCheck_fromAccount">
                   <option value="select">Select your Account</option>
                 </select>
+                <p class="velocity_hint" id="orderCheck_remaining_hint"></p>
                 <!-- <input type="text" id="orderCheck_fromAccount" placeholder="Enter Your account No." pattern="[0-9]{10}"/> -->
               </div>
               <div class="modal-footer">

@@ -8,6 +8,7 @@ from customer import Customers
 from employee import Employee
 from twilio.base.exceptions import TwilioRestException
 from utility.encrypt import check_encrypted_password
+from utility.velocity import attach_account_snapshots, enforce_velocity
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -22,6 +23,18 @@ app.secret_key = os.urandom(24)
 
 CORS(app)
 Bcrypt(app)
+
+
+def _velocity_denied(operation, account, amount):
+    result = enforce_velocity(session, operation, account, amount)
+    if result is None:
+        return None
+    payload, status, headers = result
+    response = jsonify(payload)
+    response.status_code = status
+    for key, value in headers.items():
+        response.headers[key] = value
+    return response
 
 account_sid = 'your Account_sid'
 auth_token = 'your Auth_token'
@@ -256,10 +269,12 @@ def get_customer_data():
     customer_id = session['userid']
     c = Customers()
     try:
+        accounts = c.get_all_account(customer_id)
         response = {
-            'Accounts': c.get_all_account(customer_id),
+            'Accounts': accounts,
             'Info': c.get_customer_details(customer_id),
-            'FundsRequests': c.get_funds_requests(customer_id)
+            'FundsRequests': c.get_funds_requests(customer_id),
+            'Velocity': attach_account_snapshots(session, accounts),
         }
         return jsonify(response), 200
     except Exception as e:
@@ -365,6 +380,10 @@ def fund_transfers():
     if values['amount'] < 0:
         return jsonify({'message': 'Enter a valid amount'}), 200
 
+    denied = _velocity_denied('transfer', values['fromAccount'], values['amount'])
+    if denied:
+        return denied
+
     employee = Employee()
     transaction_message = employee.add_transaction(values['fromAccount'], values['toAccount'], values['amount'])
     return jsonify({'message': transaction_message}), 200
@@ -443,6 +462,10 @@ def withdraw_fund():
     if values['userid'] != session['userid']:
         return jsonify({'message': 'User ID mismatch'}), 401
 
+    denied = _velocity_denied('withdraw', values['account'], values['amount'])
+    if denied:
+        return denied
+
     customer = Customers()
     response = customer.debit_request(values['account'], values['amount'])
     return jsonify({'message': response}), 200
@@ -481,6 +504,9 @@ def approve_request():
         status = emp.get_transaction_status(int(values['transaction_no']))
 
         if from_account != -1 and to_account != -1 and amount != -1 and status != 0:
+            denied = _velocity_denied('transfer', from_account, amount)
+            if denied:
+                return denied
             c = Customers()
             response = {
                 'message': c.fund_transfers(from_account, to_account, amount, int(values['transaction_no']))
@@ -615,6 +641,9 @@ def make_cashier_cheque():
 
     # Validate if the user in the request is the same as the one logged in and check session expiration
     if 'userid' in session and session['userid'] == values['userid']:
+        denied = _velocity_denied('cheque', values['from_account'], values['amount'])
+        if denied:
+            return denied
         # Further checks can be added here to validate the user's permission if needed
         c = Customers()
         try:
