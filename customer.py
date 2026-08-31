@@ -177,26 +177,26 @@ class Customers:
             """ % (int(account2))
         cursor.execute(query)
         result = cursor.fetchall()
-        # print(result[0])
-        if result is not None:
-            if result[0][0] != 1:
-                print('Receiver\'s Account not active')
-                return 'Receiver\'s Account not active'
-        else:
+        if len(result) == 0:
             print('Receiver\'s Account doesn\'t exists')
             return 'Receiver\'s Account doesn\'t exists'
+        if result[0][0] != 1:
+            print('Receiver\'s Account not active')
+            return 'Receiver\'s Account not active'
 
         print(amount, account1, account2)
 
         db.commit()  # REQUIRED DO NOT DELETE
-        # CHECK IF THE "TRANSFER" IS A DEPOSIT
-        query = """ 
-                Select deposit from Transactions WHERE transaction_no = %d; 
-            """ % (transaction_no)
-        cursor.execute(query)
-        result = cursor.fetchall()
+        is_deposit = False
+        if transaction_no != -1:
+            query = """ 
+                    Select deposit from Transactions WHERE transaction_no = %d; 
+                """ % (transaction_no)
+            cursor.execute(query)
+            result = cursor.fetchall()
+            is_deposit = len(result) > 0 and result[0][0] == 1
         # IF DEPOSIT
-        if (result[0][0] == 1):
+        if is_deposit:
             query = """ 
                     UPDATE Accounts SET balance=balance + %f where account_no = %d; 
                 """ % (amount, account2)
@@ -214,25 +214,23 @@ class Customers:
             """ % (int(account1))
             cursor.execute(query)
             result = cursor.fetchall()
-            # bal = result[0][0]
-            if result is not None:
-                if result[0][1] != 1:
-                    print('Sender\'s Account not active')
-                    return 'Sender\'s Account not active'
-                if result[0][2] == 'credit' and float(result[0][0]) - amount < -5000.0:
-                    print('Insufficient Balance')
-                    print(transaction_no)
-                    if transaction_no != -1:
-                        self.deny_funds_requested(transaction_no)
-                    return 'Insufficient Balance in Credit Card'
-                if result[0][0] < amount and result[0][2] != 'credit':
-                    print('Insufficient Balance')
-                    return 'Insufficient Balance'
-            else:
+            if len(result) == 0:
                 print('Sender\'s Account doesn\'t exists')
                 return 'Sender\'s Account doesn\'t exists'
+            if result[0][1] != 1:
+                print('Sender\'s Account not active')
+                return 'Sender\'s Account not active'
+            if result[0][2] == 'credit' and float(result[0][0]) - amount < -5000.0:
+                print('Insufficient Balance')
+                print(transaction_no)
+                if transaction_no != -1:
+                    self.deny_funds_requested(transaction_no)
+                return 'Insufficient Balance in Credit Card'
+            if result[0][0] < amount and result[0][2] != 'credit':
+                print('Insufficient Balance')
+                return 'Insufficient Balance'
 
-            query = """ 
+            query = """
                     UPDATE Accounts SET balance=balance-%f where account_no = %d; 
                 """ % (amount, account1)
             cursor.execute(query)
@@ -295,24 +293,22 @@ class Customers:
             """ % (int(account))
         cursor.execute(query)
         result = cursor.fetchall()
-        bal = result[0][0]
-        print(result)
-        if len(result) != 0:
-            if result[0][1] != 1:
-                print('Account not active')
-                return 'Account not active'
-            if result[0][2] == 'credit' and float(result[0][0]) - amount < -5000.0:
-                print('Insufficient Balance')
-                # print(transaction_no)
-                return 'Insufficient Balance in Credit Card'
-            if result[0][0] < amount and result[0][2] != 'credit':
-                print('Insufficient Balance')
-                return 'Insufficient Balance'
-        else:
+        if len(result) == 0:
             print('Account doesn\'t exists')
             return 'Account doesn\'t exists'
+        bal = result[0][0]
+        print(result)
+        if result[0][1] != 1:
+            print('Account not active')
+            return 'Account not active'
+        if result[0][2] == 'credit' and float(result[0][0]) - amount < -5000.0:
+            print('Insufficient Balance')
+            return 'Insufficient Balance in Credit Card'
+        if result[0][0] < amount and result[0][2] != 'credit':
+            print('Insufficient Balance')
+            return 'Insufficient Balance'
 
-        query = """ 
+        query = """
                 UPDATE Accounts SET balance=balance-%f where account_no = %d; 
             """ % (float(amount), int(account))
         cursor.execute(query)
