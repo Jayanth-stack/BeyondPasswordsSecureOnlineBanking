@@ -262,7 +262,7 @@
               </div>
               <div class="modal-body">
                 <span style="color:red;">*An OTP has been sent to your registered mobile phone no.*</span><br><br>
-                <span style="color:red;">*DO NOT REFRESH THE PAGE OR CLOSE THE OTP WINDOW!!!*</span><br><br>
+                <span style="color:red;">*This code is bound to this transfer. Do not refresh or close this window.*</span><br><br>
                 <input type="text" id="otpModal_input" placeholder="Enter OTP" oncut="return false" oncopy="return false" onpaste="return false" style="margin-left:5%;"/><br><br>
                 <div id="keyboard">
                   <div class="otprow r1">
@@ -352,6 +352,7 @@
                 <label for="sa_request_radio">Request Money</label><br/><br/>
                 <b>&nbsp;&nbsp;&nbsp;</b><input type="text" id= "sa_transfer_acno_input" placeholder="To Account No." pattern="\d*" maxlength="10" oninput="validity.valid||(value='');"/><br/><br/>
                 <b>$</b> <input type="text" id="saTransfer_amt" placeholder="Enter Amount" pattern="\d*" maxlength="6" oninput="validity.valid||(value='');"/>
+                <p class="step-up-hint">Transfers of $<span class="step-up-threshold">500.00</span>+ require a one-time code sent to your phone.</p>
               </div>
               <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
@@ -377,6 +378,7 @@
                 <label for="ca_request_radio">Request Money</label><br/><br/>
                 <b>&nbsp;&nbsp;&nbsp;</b><input type="text" id= "ca_transfer_acno_input" placeholder="To Account No." pattern="\d*" maxlength="10" oninput="validity.valid||(value='');"/><br/><br/>
                 <b>$</b> <input type="text" id="caTransfer_amt" placeholder="Enter Amount" pattern="\d*" maxlength="6" oninput="validity.valid||(value='');"/>
+                <p class="step-up-hint">Transfers of $<span class="step-up-threshold">500.00</span>+ require a one-time code sent to your phone.</p>
               </div>
               <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
@@ -398,6 +400,7 @@
               <div class="modal-body">
                 <b>&nbsp;&nbsp;&nbsp;</b><input type="text" id="cc_transfer_acno_input" placeholder="Recipient Account No." pattern="\d*" maxlength="10" oninput="validity.valid||(value='');"/><br/><br/>
                 <b>$</b> <input type="text" id="ccTransfer_amt" placeholder="Payment Amount" pattern="\d*" maxlength="6" oninput="validity.valid||(value='');"/>
+                <p class="step-up-hint">Payments of $<span class="step-up-threshold">500.00</span>+ require a one-time code sent to your phone.</p>
               </div>
               <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
@@ -465,6 +468,7 @@
               <div class="modal-body">
                 <b>&nbsp;&nbsp;&nbsp;</b><input type="text" id="orderCheck_toAccount" placeholder="Recipient Account No." pattern="\d*" maxlength="10" oninput="validity.valid||(value='');"/><br/><br/>
                 <b>$</b> <input type="text" id="orderCheck_amt" placeholder="Payment Amount" pattern="\d*" maxlength="6" oninput="validity.valid||(value='');"/><br/><br/>
+                <p class="step-up-hint">Cheques of $<span class="step-up-threshold">500.00</span>+ require a one-time code sent to your phone.</p>
                 <b>&nbsp;&nbsp;</b>
                 <select id="orderCheck_fromAccount">
                   <option value="select">Select your Account</option>

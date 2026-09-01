@@ -6,3 +6,18 @@ DB_USER=root
 DB_PASSWORD=root
 DB_PORT=3306
 DB_NAME=bankingapplication
+
+# Step-up OTP for high-value customer transfers/withdrawals/cheques.
+# Placeholder Twilio creds use a local HMAC OTP (STEP_UP_PROVIDER=auto).
+STEP_UP_ENABLED=true
+STEP_UP_THRESHOLD=500
+STEP_UP_APPROVE_ALWAYS=true
+STEP_UP_CUSTOMER_ONLY=true
+STEP_UP_TTL_SECONDS=300
+STEP_UP_TOKEN_TTL_SECONDS=120
+STEP_UP_COOLDOWN_SECONDS=45
+STEP_UP_MAX_ATTEMPTS=5
+STEP_UP_STORE=sqlite
+STEP_UP_DB=SystemLogs/step_up.sqlite
+STEP_UP_PROVIDER=auto
+# STEP_UP_ECHO_OTP=true
