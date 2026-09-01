@@ -8,6 +8,18 @@ from customer import Customers
 from employee import Employee
 from twilio.base.exceptions import TwilioRestException
 from utility.encrypt import check_encrypted_password
+from utility.step_up import (
+    MONEY_PURPOSES,
+    PURPOSE_APPROVE,
+    PURPOSE_CHEQUE,
+    PURPOSE_TRANSFER,
+    PURPOSE_WITHDRAW,
+    enforce_step_up,
+    fingerprint_from_values,
+    get_step_up_service,
+    infer_purpose,
+    policy_public_dict,
+)
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -22,6 +34,14 @@ app.secret_key = os.urandom(24)
 
 CORS(app)
 Bcrypt(app)
+
+
+def _step_up_response(result):
+    resp = jsonify(result.body)
+    resp.status_code = result.status
+    for key, value in result.headers.items():
+        resp.headers[key] = value
+    return resp
 
 account_sid = 'your Account_sid'
 auth_token = 'your Auth_token'
@@ -259,7 +279,8 @@ def get_customer_data():
         response = {
             'Accounts': c.get_all_account(customer_id),
             'Info': c.get_customer_details(customer_id),
-            'FundsRequests': c.get_funds_requests(customer_id)
+            'FundsRequests': c.get_funds_requests(customer_id),
+            'StepUp': policy_public_dict(),
         }
         return jsonify(response), 200
     except Exception as e:
@@ -365,6 +386,16 @@ def fund_transfers():
     if values['amount'] < 0:
         return jsonify({'message': 'Enter a valid amount'}), 200
 
+    blocked = enforce_step_up(
+        values,
+        userid=session['userid'],
+        usertype=session.get('usertype'),
+        purpose=PURPOSE_TRANSFER,
+        amount_raw=values.get('amount'),
+    )
+    if blocked:
+        return _step_up_response(blocked)
+
     employee = Employee()
     transaction_message = employee.add_transaction(values['fromAccount'], values['toAccount'], values['amount'])
     return jsonify({'message': transaction_message}), 200
@@ -443,6 +474,16 @@ def withdraw_fund():
     if values['userid'] != session['userid']:
         return jsonify({'message': 'User ID mismatch'}), 401
 
+    blocked = enforce_step_up(
+        values,
+        userid=session['userid'],
+        usertype=session.get('usertype'),
+        purpose=PURPOSE_WITHDRAW,
+        amount_raw=values.get('amount'),
+    )
+    if blocked:
+        return _step_up_response(blocked)
+
     customer = Customers()
     response = customer.debit_request(values['account'], values['amount'])
     return jsonify({'message': response}), 200
@@ -463,6 +504,15 @@ def approve_request():
 
     # Here, using 'customer_id' in session to validate; ensure you are setting this key in your session correctly in login.
     if 'customer_id' in session and session['customer_id'] == values['customer_id']:
+        blocked = enforce_step_up(
+            values,
+            userid=values['customer_id'],
+            usertype=session.get('usertype') or 'customer',
+            purpose=PURPOSE_APPROVE,
+        )
+        if blocked:
+            return _step_up_response(blocked)
+
         emp = Employee()
         amount = emp.get_amount_of_transaction(values['transaction_no'])
 
@@ -615,6 +665,16 @@ def make_cashier_cheque():
 
     # Validate if the user in the request is the same as the one logged in and check session expiration
     if 'userid' in session and session['userid'] == values['userid']:
+        blocked = enforce_step_up(
+            values,
+            userid=session['userid'],
+            usertype=session.get('usertype'),
+            purpose=PURPOSE_CHEQUE,
+            amount_raw=values.get('amount'),
+        )
+        if blocked:
+            return _step_up_response(blocked)
+
         # Further checks can be added here to validate the user's permission if needed
         c = Customers()
         try:
@@ -1179,14 +1239,55 @@ def send_otp():
     if not all(key in values for key in required):
         return jsonify({'message': 'Some data missing'}), 400
 
+    purpose = infer_purpose(values)
     user = Customers() if values.get('requester', '') == 'Customer' else Employee()
-    phone_number = user.retrieve_phone_number(values['userid'])
 
+    if purpose in MONEY_PURPOSES:
+        if 'userid' not in session or session['userid'] != values['userid']:
+            return jsonify({'message': 'Unauthorized access or session expired'}), 401
+        phone_number = user.retrieve_phone_number(values['userid'])
+        result = get_step_up_service().start_challenge(
+            userid=values['userid'],
+            purpose=purpose,
+            phone=phone_number or '',
+            fingerprint=fingerprint_from_values(purpose, values),
+        )
+        return _step_up_response(result)
+
+    phone_number = user.retrieve_phone_number(values['userid'])
     if phone_number:
         verification = twilio_client.verify.v2.services(verify_sid).verifications.create(to=phone_number, channel='sms')
-        return jsonify({'message': 'OTP sent successfully', 'sid': verification.sid}), 200
+        return jsonify({'message': 'OTP Sent', 'sid': verification.sid}), 200
     else:
         return jsonify({'message': 'Invalid User ID or Contact Number'}), 404
+
+
+@app.route('/verifyOTP', methods=['POST', 'GET'])
+@cross_origin()
+def verify_step_up_otp():
+    values = request.get_json()
+    logging.debug('Data @verifyOTP: ' + str(values))
+
+    if not values:
+        return jsonify({'message': 'No data Found'}), 400
+
+    required = ['userid', 'otp']
+    if not all(key in values for key in required):
+        return jsonify({'message': 'Some data missing'}), 400
+
+    if 'userid' not in session or session['userid'] != values['userid']:
+        return jsonify({'message': 'Unauthorized access or session expired'}), 401
+
+    purpose = infer_purpose(values)
+    if purpose not in MONEY_PURPOSES:
+        return jsonify({'message': 'Unsupported purpose', 'error': 'invalid_purpose'}), 400
+
+    result = get_step_up_service().verify_challenge(
+        userid=values['userid'],
+        purpose=purpose,
+        code=values.get('otp'),
+    )
+    return _step_up_response(result)
 
 
 @app.route('/resetPassword', methods=['POST', 'GET'])

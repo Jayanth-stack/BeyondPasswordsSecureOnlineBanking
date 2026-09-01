@@ -15,6 +15,30 @@ const homeURL = 'http://127.0.0.1:5000/';
 var userid, usertype, first_name, savings_ac_no, savings_ac_no_masked, savings_ac_bal, checking_ac_no, checking_ac_no_masked, checking_ac_bal, cc_no, cc_no_masked, cc_bal;
 var midname, lastname, email, contact, dob, ssn, ssn_masked, address;
 var otpModal_source;
+var stepUpPolicy = {enabled: true, threshold: '500.00', approve_always: true};
+var stepUpToken = null;
+var pendingStepUp = null;
+
+function needsStepUp(amount, purpose) {
+  if (!stepUpPolicy || stepUpPolicy.enabled === false) {
+    return false;
+  }
+  if (purpose === 'approve' && stepUpPolicy.approve_always !== false) {
+    return true;
+  }
+  var value = Number(amount);
+  if (!isFinite(value)) {
+    return false;
+  }
+  return value >= Number(stepUpPolicy.threshold);
+}
+
+function attachStepUpToken(payload) {
+  if (stepUpToken) {
+    payload.confirmation_token = stepUpToken;
+  }
+  return payload;
+}
 
 const sa_card = document.querySelector("#sa_card");
 const ca_card = document.querySelector("#ca_card");
@@ -55,6 +79,11 @@ function getUser() {
 }
 
 function appendPrimaryData(data) {
+  if (data.StepUp) {
+    stepUpPolicy = data.StepUp;
+    $('.step-up-threshold').text(stepUpPolicy.threshold);
+  }
+
   first_name = data.Info.first_name;
   if(data.Accounts.savings == "None"){
     //sa_card.style.visibility = 'hidden';
@@ -238,8 +267,12 @@ function send_otp(){
 
   const sendotpData = {
     userid : userid,
-    requester : 'Customer'
+    requester : 'Customer',
+    purpose : pendingStepUp ? pendingStepUp.purpose : 'transfer'
   };
+  if (pendingStepUp && pendingStepUp.payload) {
+    Object.assign(sendotpData, pendingStepUp.payload);
+  }
 
   fetch(homeURL+'sendOTP', {
     method : 'post',
@@ -254,26 +287,18 @@ function send_otp(){
     if(data.message == 'OTP Sent'){
       if(otpModal_source == 'saTransfer'){
         $('#saTransfer_close').click();
-        $('#otpModal').modal({backdrop: 'static', keyboard: false});
-        $('#otpModal').modal('show');
       }
       else if(otpModal_source == 'caTransfer'){
         $('#caTransfer_close').click();
-        $('#otpModal').modal({backdrop: 'static', keyboard: false});
-        $('#otpModal').modal('show');
       }
       else if(otpModal_source == 'ccTransfer'){
         $('#ccTransfer_close').click();
-        $('#otpModal').modal({backdrop: 'static', keyboard: false});
-        $('#otpModal').modal('show');
       }
-      else if(otpModal_source == 'approveTransfer'){
-        $('#otpModal').modal({backdrop: 'static', keyboard: false});
-        $('#otpModal').modal('show');
+      else if(otpModal_source == 'orderCheck'){
+        $('#orderCheck_close').click();
       }
-      else {
-        window.alert("OOPS! We encountered an error!");
-      }
+      $('#otpModal').modal({backdrop: 'static', keyboard: false});
+      $('#otpModal').modal('show');
     }
     else {
       window.alert(data.message);
@@ -289,8 +314,12 @@ function verify_otp(otp){
   const otpData = {
     userid : userid,
     otp : otp,
-    requester : 'Customer'
+    requester : 'Customer',
+    purpose : pendingStepUp ? pendingStepUp.purpose : 'transfer'
   };
+  if (pendingStepUp && pendingStepUp.payload) {
+    Object.assign(otpData, pendingStepUp.payload);
+  }
 
   fetch(homeURL+'verifyOTP', {
     method : 'post',
@@ -304,32 +333,20 @@ function verify_otp(otp){
   }).then(function(data) {
     console.log(data);
     if(data.message == 'verified') {
-      if(otpModal_source == 'saTransfer'){
-        $('#otpModal_close').click();
-        $('#otpModal_input').val('');
-        fund_transfer(userid, savings_ac_no, $('#sa_transfer_acno_input').val(), $('#saTransfer_amt').val());
-      }
-      else if(otpModal_source == 'caTransfer'){
-        $('#otpModal_close').click();
-        $('#otpModal_input').val('');
-        fund_transfer(userid, checking_ac_no, $('#ca_transfer_acno_input').val(), $('#caTransfer_amt').val());
-      }
-      else if(otpModal_source == 'ccTransfer'){
-        $('#otpModal_close').click();
-        $('#otpModal_input').val('');
-        fund_transfer(userid, cc_no, $('#cc_transfer_acno_input').val(), $('#ccTransfer_amt').val());
-      }
-      else if(otpModal_source == 'approveTransfer'){
-        $('#otpModal_close').click();
-        $('#otpModal_input').val('');
-        approve_request(userid, $('#xact_id_acc_den').val());
+      stepUpToken = data.confirmation_token || null;
+      $('#otpModal_close').click();
+      $('#otpModal_input').val('');
+      if (pendingStepUp && typeof pendingStepUp.run === 'function') {
+        pendingStepUp.run();
       }
       else {
         window.alert("OOPS! We encountered an error!");
       }
+      stepUpToken = null;
+      pendingStepUp = null;
     }
     else {
-      window.alert("OTP mismatched!");
+      window.alert(data.message || "OTP mismatched!");
     }
   }).catch(function(error){
     console.error(error);
@@ -377,6 +394,7 @@ function fund_transfer(userid, fromAccount, toAccount, amount) {
     toAccount : toAccount,
     amount : amount
   };
+  attachStepUpToken(fundTransferData);
 
   fetch(homeURL+'fundTransfer', {
     method : 'post',
@@ -441,6 +459,7 @@ function approve_request(userid, xactno) {
     customer_id : userid,
     transaction_no : xactno
   };
+  attachStepUpToken(approveRequestData);
 
   fetch(homeURL+'approveRequest', {
     method : 'post',
@@ -588,6 +607,7 @@ function order_check(userid, toAccount, fromAccount, amount) {
     from_account : fromAccount,
     amount : amount
   };
+  attachStepUpToken(orderCheckData);
 
   fetch(homeURL+'getCashierCheque', {
     method : 'post',
@@ -604,7 +624,7 @@ function order_check(userid, toAccount, fromAccount, amount) {
       window.alert('Cheque Ordered!');
     }
     else {
-      window.alert('Failed! Please re-try.');
+      window.alert(data.message || 'Failed! Please re-try.');
     }
   }).catch(function(error){
     console.error(error);
@@ -974,9 +994,25 @@ $(document).ready(function() {
             alert('You can not send more than you have silly!');
           }
           else {
-            otpModal_source = 'saTransfer';
-            send_otp();
-            //fund_transfer(userid, savings_ac_no, $('#sa_transfer_acno_input').val(), $('#saTransfer_amt').val());
+            var amt = $('#saTransfer_amt').val();
+            var toAc = $('#sa_transfer_acno_input').val();
+            var run = function(){
+              fund_transfer(userid, savings_ac_no, toAc, amt);
+            };
+            if (needsStepUp(amt, 'transfer')) {
+              pendingStepUp = {
+                source: 'saTransfer',
+                purpose: 'transfer',
+                payload: { fromAccount: savings_ac_no, toAccount: toAc, amount: amt },
+                run: run
+              };
+              otpModal_source = 'saTransfer';
+              send_otp();
+            }
+            else {
+              $('#saTransfer_close').click();
+              run();
+            }
           }
         }
         else if($('#sa_request_radio').is(':checked')){
@@ -996,9 +1032,25 @@ $(document).ready(function() {
             alert('You can not send more than you have silly!');
           }
           else {
-            otpModal_source = 'caTransfer';
-            send_otp();
-            //fund_transfer(userid, checking_ac_no, $('#ca_transfer_acno_input').val(), $('#caTransfer_amt').val());
+            var amt = $('#caTransfer_amt').val();
+            var toAc = $('#ca_transfer_acno_input').val();
+            var run = function(){
+              fund_transfer(userid, checking_ac_no, toAc, amt);
+            };
+            if (needsStepUp(amt, 'transfer')) {
+              pendingStepUp = {
+                source: 'caTransfer',
+                purpose: 'transfer',
+                payload: { fromAccount: checking_ac_no, toAccount: toAc, amount: amt },
+                run: run
+              };
+              otpModal_source = 'caTransfer';
+              send_otp();
+            }
+            else {
+              $('#caTransfer_close').click();
+              run();
+            }
           }
         }
         else if($('#ca_request_radio').is(':checked')){
@@ -1009,13 +1061,29 @@ $(document).ready(function() {
     });
     $('#ccTransfer_btn').on('click', function(){
       console.log("transfer function");
-      if($('#ccTransfer_amt').val() == '' || $('#ccTransfer_account').val() == ''){
+      if($('#ccTransfer_amt').val() == '' || $('#cc_transfer_acno_input').val() == ''){
         alert('Empty Field detected!');
       }
       else {
-        //fund_transfer(userid, cc_no, $('#ccTransfer_account').val(), $('#ccTransfer_amt').val());
-        otpModal_source = 'ccTransfer';
-        send_otp();
+        var amt = $('#ccTransfer_amt').val();
+        var toAc = $('#cc_transfer_acno_input').val();
+        var run = function(){
+          fund_transfer(userid, cc_no, toAc, amt);
+        };
+        if (needsStepUp(amt, 'transfer')) {
+          pendingStepUp = {
+            source: 'ccTransfer',
+            purpose: 'transfer',
+            payload: { fromAccount: cc_no, toAccount: toAc, amount: amt },
+            run: run
+          };
+          otpModal_source = 'ccTransfer';
+          send_otp();
+        }
+        else {
+          $('#ccTransfer_close').click();
+          run();
+        }
       }
     });
     $('#pending_req_accept').on('click', function(){
@@ -1024,9 +1092,23 @@ $(document).ready(function() {
         alert('No Transaction No. detected!');
       }
       else {
-        //approve_request(userid, $('#xact_id_acc_den').val());
-        otpModal_source = 'approveTransfer';
-        send_otp();
+        var xact = $('#xact_id_acc_den').val();
+        var run = function(){
+          approve_request(userid, xact);
+        };
+        if (needsStepUp(0, 'approve')) {
+          pendingStepUp = {
+            source: 'approveTransfer',
+            purpose: 'approve',
+            payload: { transaction_no: xact },
+            run: run
+          };
+          otpModal_source = 'approveTransfer';
+          send_otp();
+        }
+        else {
+          run();
+        }
       }
     });
     $('#pending_req_deny').on('click', function(){
@@ -1056,8 +1138,26 @@ $(document).ready(function() {
         alert('Empty Field detected!');
       }
       else {
-        order_check(userid, $('#orderCheck_toAccount').val(), $('#orderCheck_fromAccount').val(), $('#orderCheck_amt').val());
-        $('#orderCheck_close').click();
+        var amt = $('#orderCheck_amt').val();
+        var toAc = $('#orderCheck_toAccount').val();
+        var fromAc = $('#orderCheck_fromAccount').val();
+        var run = function(){
+          order_check(userid, toAc, fromAc, amt);
+        };
+        if (needsStepUp(amt, 'cheque')) {
+          pendingStepUp = {
+            source: 'orderCheck',
+            purpose: 'cheque',
+            payload: { from_account: fromAc, to_account: toAc, amount: amt },
+            run: run
+          };
+          otpModal_source = 'orderCheck';
+          send_otp();
+        }
+        else {
+          run();
+          $('#orderCheck_close').click();
+        }
       }
     });
     $('#depCheck_btn').on('click', function(){
