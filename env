@@ -6,3 +6,5 @@ DB_USER=root
 DB_PASSWORD=root
 DB_PORT=3306
 DB_NAME=bankingapplication
+AUDIT_STORE=sqlite
+AUDIT_DB=SystemLogs/audit_trail.sqlite

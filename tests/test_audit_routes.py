@@ -1,3 +1,4 @@
+import os
 import unittest
 
 from flask import Flask, jsonify, request, session
@@ -158,6 +159,30 @@ class AuditRouteTests(unittest.TestCase):
         self.assertEqual(self.client.post("/getSystemLogs", json={"userid": "alice"}).status_code, 401)
         self._login("root", "admin")
         self.assertEqual(self.client.post("/getSystemLogs", json={"userid": "root"}).status_code, 200)
+
+
+class WiringScanTests(unittest.TestCase):
+    root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+
+    def test_app_emits_and_exposes_query_without_importing_mysql(self):
+        with open(os.path.join(self.root, "app.py"), encoding="utf-8") as handle:
+            source = handle.read()
+        self.assertIn("from utility.audit_trail import attach_audit_routes, default_trail, record_request", source)
+        self.assertIn("attach_audit_routes(app, audit_trail)", source)
+        self.assertIn("filemode='a'", source)
+        for action in ("login", "otp_verify", "fund_transfer", "withdraw", "deposit", "cheque_issue",
+                       "approve_transfer", "deactivate_account", "password_reset", "logout"):
+            self.assertIn("_audit('%s'" % action, source)
+
+    def test_admin_ui_queries_audit_trail(self):
+        with open(os.path.join(self.root, "static/main_js/admin.js"), encoding="utf-8") as handle:
+            script = handle.read()
+        self.assertIn("queryAudit", script)
+        self.assertIn("renderAuditTable", script)
+        with open(os.path.join(self.root, "templates/admin.html"), encoding="utf-8") as handle:
+            html = handle.read()
+        self.assertIn("audit_events_tbl", html)
+        self.assertIn("audit_action_filter", html)
 
 
 if __name__ == "__main__":

@@ -8,15 +8,37 @@ from customer import Customers
 from employee import Employee
 from twilio.base.exceptions import TwilioRestException
 from utility.encrypt import check_encrypted_password
+from utility.audit_trail import attach_audit_routes, default_trail, record_request
 from dotenv import load_dotenv
 
 load_dotenv()
 
-logging.basicConfig(level=logging.INFO, filename='SystemLogs/bank.log', filemode='w',
+os.makedirs('SystemLogs', exist_ok=True)
+logging.basicConfig(level=logging.INFO, filename='SystemLogs/bank.log', filemode='a',
                     format='%(asctime)-15s - %(name)s - %(levelname)s - %(message)s', datefmt='%d-%m-%Y %H:%M:%S')
 otpSet = {}
 
 app = Flask(__name__)
+audit_trail = default_trail()
+
+
+def _audit(action, outcome, **kwargs):
+    """Emit one security event. Never raises into the banking path."""
+    try:
+        sess = {key: session.get(key) for key in ('userid', 'usertype', 'emp_tier')}
+        headers = {key: value for key, value in request.headers}
+        addr = request.remote_addr
+    except Exception:
+        sess, headers, addr = None, None, None
+    return record_request(
+        action,
+        outcome,
+        session_data=sess,
+        headers=headers,
+        remote_addr=addr,
+        trail=audit_trail,
+        **kwargs,
+    )
 
 app.secret_key = os.urandom(24)
 
@@ -170,7 +192,9 @@ def registerEmployee():
 @cross_origin()
 def login():
     values = request.get_json()
-    logging.debug('Login attempt: ' + str(values))
+    logging.debug('Login attempt for userid=%s usertype=%s',
+                  None if not values else values.get('userid'),
+                  None if not values else values.get('usertype'))
     if not values:
         return jsonify({'message': 'No data found'}), 400
 
@@ -193,12 +217,18 @@ def login():
         if phone_number:
             try:
                 client.verify.v2.services(verify_sid).verifications.create(to=phone_number, channel='sms')
+                _audit('login', 'success', actor_id=values['userid'], actor_type=values['usertype'])
                 return redirect(url_for('get_verifyotp_dashboard_ui', _external=True, _scheme='http'))
             except TwilioRestException as e:
+                _audit('login', 'failure', actor_id=values['userid'], actor_type=values['usertype'],
+                       details={'reason': 'otp_send_failed'})
                 return jsonify({'message': 'Failed to send OTP', 'error': str(e)}), 500
         else:
+            _audit('login', 'invalid', actor_id=values['userid'], actor_type=values['usertype'],
+                   details={'reason': 'no_phone'})
             return jsonify({'message': 'No phone number available'}), 400
     else:
+        _audit('login', 'denied', actor_id=values.get('userid'), actor_type=values.get('usertype'))
         return jsonify({'message': 'Invalid credentials'}), 401
 
 
@@ -211,11 +241,13 @@ def verify_otp():
     usertype = session.get('usertype')
 
     if not userid or not usertype:
+        _audit('otp_verify', 'denied', details={'reason': 'no_session'})
         return jsonify({"error": "Session expired or invalid"}), 401
 
     values = request.get_json()
     otp_code = values.get('otp_code')
     if not otp_code:
+        _audit('otp_verify', 'invalid', details={'reason': 'missing_otp'})
         return jsonify({"error": "OTP code is required"}), 400
 
     user_class = Employee if usertype in ['admin', 'employee', 'tier1', 'tier2'] else Customers
@@ -235,12 +267,16 @@ def verify_otp():
                     if usertype == 'admin':
                         # Redirect admins to a specific admin dashboard if exists, or use a common tier dashboard
                         redirect_url = 'get_admin_dashboard_ui'  # Ensure this endpoint is defined in your application
+                _audit('otp_verify', 'success')
                 return redirect(url_for(redirect_url, _external=True, _scheme='http'))
             else:
+                _audit('otp_verify', 'denied')
                 return jsonify({"error": "Invalid OTP"}), 401
         except TwilioRestException as e:
+            _audit('otp_verify', 'failure', details={'reason': 'twilio'})
             return jsonify({"error": str(e)}), 500
     else:
+        _audit('otp_verify', 'invalid', details={'reason': 'no_phone'})
         return jsonify({"error": "Phone number could not be retrieved"}), 400
 
 
@@ -326,9 +362,12 @@ def open_new_account():
         try:
             response_message = customer.open_account(values['customer_id'], values['account_type'])
             logging.info(f"New account opened: {response_message}")
+            _audit('open_account', 'success', resource_type='customer', resource_id=values['customer_id'],
+                   details={'account_type': values['account_type']})
             return jsonify({'message': response_message}), 200
         except Exception as e:
             logging.error(f"Failed to open new account for {values['customer_id']} due to {str(e)}")
+            _audit('open_account', 'failure', resource_type='customer', resource_id=values['customer_id'])
             return jsonify({'message': 'Failed to open new account', 'error': str(e)}), 500
     else:
         logging.warning(
@@ -342,10 +381,11 @@ def open_new_account():
 def fund_transfers():
     if 'userid' not in session:
         logging.warning('Attempt to access fundTransfer without login')
+        _audit('fund_transfer', 'denied', details={'reason': 'anonymous'})
         return redirect(url_for('get_login_page_ui', _external=True, _scheme='http'))
 
     values = request.get_json()
-    logging.debug(f'Data @fundTransfer: {values}')
+    logging.debug(f'Data @fundTransfer: from={None if not values else values.get("fromAccount")} to={None if not values else values.get("toAccount")}')
 
     if not values:
         return jsonify({'message': 'No data Found'}), 400
@@ -356,6 +396,7 @@ def fund_transfers():
 
     if values['userid'] != session['userid']:
         logging.warning(f"Session user ID does not match request user ID.")
+        _audit('fund_transfer', 'denied', details={'reason': 'userid_mismatch'})
         return jsonify({'message': 'User ID mismatch'}), 401
 
     values['fromAccount'] = int(values['fromAccount'])
@@ -363,10 +404,14 @@ def fund_transfers():
     values['amount'] = float(values['amount'])
 
     if values['amount'] < 0:
+        _audit('fund_transfer', 'invalid', resource_type='account', resource_id=values['fromAccount'],
+               details={'reason': 'negative_amount'})
         return jsonify({'message': 'Enter a valid amount'}), 200
 
     employee = Employee()
     transaction_message = employee.add_transaction(values['fromAccount'], values['toAccount'], values['amount'])
+    _audit('fund_transfer', 'success', resource_type='account', resource_id=values['fromAccount'],
+           details={'to_account': values['toAccount'], 'amount': values['amount'], 'result': transaction_message})
     return jsonify({'message': transaction_message}), 200
 
 
@@ -402,23 +447,28 @@ def request_funds():
 def deposit_fund():
     if 'userid' not in session:
         logging.warning('User not logged in - depositAmount')
+        _audit('deposit', 'denied', details={'reason': 'anonymous'})
         return redirect(url_for('get_login_page_ui', _external=True, _scheme='http'))
 
     values = request.get_json()
-    logging.debug(f'Data @depositAmount: {values}')
+    logging.debug(f'Data @depositAmount: account={None if not values else values.get("account")}')
 
     required = ['userid', 'account', 'amount']
     if not values or not all(key in values for key in required):
         return jsonify({'message': 'Some data missing or invalid'}), 400
 
     if float(values.get('amount', 0)) < 0:
+        _audit('deposit', 'invalid', details={'reason': 'negative_amount'})
         return jsonify({'message': 'Enter a valid amount'}), 400
 
     if values['userid'] != session['userid']:
+        _audit('deposit', 'denied', details={'reason': 'userid_mismatch'})
         return jsonify({'message': 'User ID mismatch'}), 401
 
     employee = Employee()
     response = employee.add_transaction_deposit(values['account'], values['amount'])
+    _audit('deposit', 'success', resource_type='account', resource_id=values['account'],
+           details={'amount': values['amount'], 'result': response})
     return jsonify({'message': response}), 200
 
 
@@ -428,23 +478,28 @@ def deposit_fund():
 def withdraw_fund():
     if 'userid' not in session:
         logging.warning('User not logged in - withdrawAmount')
+        _audit('withdraw', 'denied', details={'reason': 'anonymous'})
         return redirect(url_for('get_login_page_ui', _external=True, _scheme='http'))
 
     values = request.get_json()
-    logging.debug(f'Data @withdrawAmount: {values}')
+    logging.debug(f'Data @withdrawAmount: account={None if not values else values.get("account")}')
 
     required = ['userid', 'account', 'amount']
     if not values or not all(key in values for key in required):
         return jsonify({'message': 'Some data missing or invalid'}), 400
 
     if float(values.get('amount', 0)) < 0:
+        _audit('withdraw', 'invalid', details={'reason': 'negative_amount'})
         return jsonify({'message': 'Enter a valid amount'}), 400
 
     if values['userid'] != session['userid']:
+        _audit('withdraw', 'denied', details={'reason': 'userid_mismatch'})
         return jsonify({'message': 'User ID mismatch'}), 401
 
     customer = Customers()
     response = customer.debit_request(values['account'], values['amount'])
+    _audit('withdraw', 'success', resource_type='account', resource_id=values['account'],
+           details={'amount': values['amount'], 'result': response})
     return jsonify({'message': response}), 200
 
 
@@ -524,11 +579,17 @@ def approve_request_employee():
         if from_account != -1 and to_account != -1 and amount != -1 and status != 0:
             c = Customers()
             result = c.fund_transfers(from_account, to_account, amount, int(values['transaction_no']))
+            _audit('approve_transfer', 'success', resource_type='transaction',
+                   resource_id=values['transaction_no'],
+                   details={'amount': amount, 'from_account': from_account, 'to_account': to_account})
             return jsonify({'message': result}), 200
         else:
+            _audit('approve_transfer', 'invalid', resource_type='transaction',
+                   resource_id=values['transaction_no'])
             return jsonify({'message': 'Invalid transaction_no'}), 400
     else:
         logging.warning('Not logged In - ApproveRequestEmp')
+        _audit('approve_transfer', 'denied', details={'reason': 'anonymous'})
         return redirect(url_for('get_login_page_ui', _external=True, _scheme='http'))
 
 
@@ -557,9 +618,11 @@ def deny_request():
         response = {
             'message': c.deny_funds_requested(values['transaction_no'])
         }
+        _audit('deny_transfer', 'success', resource_type='transaction', resource_id=values['transaction_no'])
         return jsonify(response), 200
     else:
         print('Not logged In')
+        _audit('deny_transfer', 'denied')
         return redirect(url_for('get_login_page_ui', _external=True, _scheme='http'))
 
 
@@ -620,12 +683,16 @@ def make_cashier_cheque():
         try:
             response = c.make_cashier_check(values['userid'], values['to_account'],
                                             values['from_account'], values['amount'])
+            _audit('cheque_issue', 'success', resource_type='account', resource_id=values['from_account'],
+                   details={'to_account': values['to_account'], 'amount': values['amount']})
             return jsonify({'message': response}), 200
         except Exception as e:
             logging.error(f"Failed to process cashier check: {str(e)}")
+            _audit('cheque_issue', 'failure', resource_type='account', resource_id=values['from_account'])
             return jsonify({'message': 'Failed to process request', 'error': str(e)}), 500
     else:
         logging.warning('Not logged In - getCashierCheque')
+        _audit('cheque_issue', 'denied', details={'reason': 'anonymous'})
         return redirect(url_for('get_login_page_ui', _external=True, _scheme='http'))
 
 
@@ -1034,15 +1101,18 @@ def deactivate_account():
     # Restrict the operation to tier2 employees
     if session['usertype'] != 'tier2':
         logging.warning(f"User {session['userid']} with usertype {session['usertype']} attempted unauthorized access")
+        _audit('deactivate_account', 'denied', details={'reason': 'insufficient_tier'})
         return jsonify({'message': 'Insufficient permissions: Only tier2 employees may deactivate accounts'}), 403
 
     try:
         emp = Employee()
         result = emp.deactivate_account(values['account_no'])
         logging.info(f"Account {values['account_no']} deactivated by tier2 employee {session['userid']}")
+        _audit('deactivate_account', 'success', resource_type='account', resource_id=values['account_no'])
         return jsonify({'message': result}), 200
     except Exception as e:
         logging.error(f"Error deactivating account: {str(e)}")
+        _audit('deactivate_account', 'failure', resource_type='account', resource_id=values['account_no'])
         return jsonify({'message': 'Failed to deactivate account', 'error': str(e)}), 500
 
 
@@ -1052,6 +1122,7 @@ def deactivate_account():
 def deactivate_customer():
     if 'userid' not in session or 'usertype' not in session or session['usertype'] != 'tier2':
         logging.warning('Unauthorized attempt to deactivate customer')
+        _audit('deactivate_customer', 'denied')
         return jsonify({'message': 'Unauthorized access or session expired'}), 401
 
     values = request.get_json()
@@ -1068,9 +1139,11 @@ def deactivate_customer():
     try:
         emp = Employee()
         response = emp.deactivate_customer(values['customer_id'])
+        _audit('deactivate_customer', 'success', resource_type='customer', resource_id=values['customer_id'])
         return jsonify({'message': response}), 200
     except Exception as e:
         logging.error(f"Failed to deactivate customer {values['customer_id']}: {str(e)}")
+        _audit('deactivate_customer', 'failure', resource_type='customer', resource_id=values['customer_id'])
         return jsonify({'message': 'Failed to deactivate customer', 'error': str(e)}), 500
 
 
@@ -1144,6 +1217,7 @@ def deactivate_employee():
 
         if session.get('usertype') != 'admin':
             logging.warning('Unauthorized attempt by non-admin to deactivate employee')
+            _audit('deactivate_employee', 'denied')
             return jsonify({'message': 'Unauthorized: Only admins can deactivate employees'}), 403
 
         if 'emp_id' not in data:
@@ -1153,6 +1227,7 @@ def deactivate_employee():
         # Deactivate employee and handle success/failure
         emp = Employee()
         response = emp.deactivate_employee(data['emp_id'])
+        _audit('deactivate_employee', 'success', resource_type='employee', resource_id=data['emp_id'])
         return jsonify({'message': response}), 200
 
     except Exception as e:
@@ -1211,10 +1286,13 @@ def reset_password():
                                                                                                          'otp'])
         if verification_check.status == "approved":
             response = user.reset_password(values['userid'], values['newPassword'])
+            _audit('password_reset', 'success', actor_id=values['userid'])
             return jsonify({'message': response}), 200
         else:
+            _audit('password_reset', 'denied', actor_id=values['userid'])
             return jsonify({'message': 'OTP verification failed, cannot reset password'}), 401
     else:
+        _audit('password_reset', 'invalid', actor_id=values.get('userid'), details={'reason': 'user_not_found'})
         return jsonify({'message': 'User ID not found'}), 404
 
 
@@ -1237,6 +1315,7 @@ def logout():
         }
         return jsonify(response), 400
     session.pop(values['userid'], None)
+    _audit('logout', 'success', actor_id=values['userid'])
     return redirect(url_for('get_login_page_ui', _external=True, _scheme='http'))
 
 
@@ -1252,6 +1331,7 @@ def get_system_logs():
     # Check if the user is logged in and has admin privileges
     if 'userid' not in session or 'usertype' not in session or session.get('usertype') != 'admin':
         logging.warning('Unauthorized attempt to access system logs')
+        _audit('audit_query', 'denied', details={'source': 'file'})
         return redirect(url_for('get_login_page_ui', _external=True, _scheme='http'))
 
     # Retrieve and validate the incoming data
@@ -1267,6 +1347,7 @@ def get_system_logs():
     # Validate that the user making the request matches the logged-in user for additional security
     if values['userid'] != session['userid']:
         logging.warning("User session mismatch or unauthorized access attempt by user ID: {}".format(session['userid']))
+        _audit('audit_query', 'denied', details={'source': 'file', 'reason': 'userid_mismatch'})
         return jsonify({'message': 'Unauthorized operation: User ID mismatch'}), 401
 
     # Construct the path to the log file
@@ -1283,10 +1364,14 @@ def get_system_logs():
     print(os.path.exists(log_file_path))
     # Attempt to send the log file
     try:
+        _audit('audit_query', 'success', details={'source': 'file'})
         return send_from_directory(directory=logs_directory, filename=log_file_name, as_attachment=True)
     except Exception as e:
         logging.error(f'An error occurred when trying to send the log file: {str(e)}')
         return jsonify({'message': 'Failed to retrieve system logs', 'error': str(e)}), 500
+
+
+attach_audit_routes(app, audit_trail)
 
 
 app.config['SESSION_COOKIE_SECURE'] = True

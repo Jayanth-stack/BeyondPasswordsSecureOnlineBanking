@@ -454,16 +454,46 @@
 
         <div id="sys_log_pane" style="display:none;">
             <div class="sys_log_content">
-                <h4 class="header_text" style="color:white;">System Log</h4>
+                <h4 class="header_text" style="color:white;">Audit Trail</h4>
                 <hr class="header_divider" />
-                <button
-                        type="button"
-                        id="sys_logs_btn"
-                        class="btn btn-primary"
-                        style="width: 50%; margin-bottom: 10px; margin-top: 10px"
-                >
-                    Get System Logs
-                </button>
+                <div class="cust_details_card" id="audit_filter_card">
+                    <label class="custom_label"><b>Action</b></label>
+                    <select id="audit_action_filter">
+                        <option value="">All actions</option>
+                    </select>
+                    <label class="custom_label"><b>Outcome</b></label>
+                    <select id="audit_outcome_filter">
+                        <option value="">All outcomes</option>
+                    </select>
+                    <label class="custom_label"><b>Actor ID</b></label>
+                    <input type="text" id="audit_actor_filter" placeholder="userid"/>
+                    <label class="custom_label"><b>Resource ID</b></label>
+                    <input type="text" id="audit_resource_filter" placeholder="account / transaction"/>
+                    <label class="custom_label"><b>Search</b></label>
+                    <input type="text" id="audit_q_filter" placeholder="ip, amount, message"/>
+                    <button type="button" id="audit_search_btn" class="btn btn-primary"
+                            style="width:50%;margin-bottom:10px;margin-top:10px;">Search</button>
+                    <button type="button" id="sys_logs_btn" class="btn btn-primary"
+                            style="width:50%;margin-bottom:10px;margin-top:10px;">Download bank.log</button>
+                    <p id="audit_status" class="custom_label"></p>
+                </div>
+                <table class="table table-hover table-bordered table-color" id="audit_events_tbl">
+                    <thead>
+                    <tr>
+                        <th>Time (UTC)</th>
+                        <th>Actor</th>
+                        <th>Action</th>
+                        <th>Outcome</th>
+                        <th>Resource</th>
+                        <th>IP</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    </tbody>
+                </table>
+                <button type="button" id="audit_prev_btn" class="btn btn-primary" style="width:20%;">Prev</button>
+                <button type="button" id="audit_next_btn" class="btn btn-primary" style="width:20%;">Next</button>
+                <pre id="audit_event_details" class="audit-details" style="display:none;"></pre>
             </div>
         </div>
 

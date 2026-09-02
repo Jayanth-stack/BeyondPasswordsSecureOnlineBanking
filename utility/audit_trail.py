@@ -97,6 +97,9 @@ def _normalize_key(key: Any) -> str:
     return re.sub(r"[^a-z0-9]", "", str(key).lower())
 
 
+_PII_NORMALIZED = {_normalize_key(key) for key in PII_KEYS}
+
+
 def _is_secret_key(key: Any) -> bool:
     normalized = _normalize_key(key)
     return any(marker.replace("_", "") in normalized for marker in SECRET_KEY_MARKERS)
@@ -107,8 +110,7 @@ def redact(value: Any) -> Any:
     if isinstance(value, dict):
         cleaned = {}
         for key, item in value.items():
-            lowered = str(key).lower().replace("-", "").replace("_", "")
-            if _is_secret_key(key) or lowered in PII_KEYS:
+            if _is_secret_key(key) or _normalize_key(key) in _PII_NORMALIZED:
                 cleaned[key] = REDACT_VALUE
             else:
                 cleaned[key] = redact(item)
@@ -255,7 +257,8 @@ class MemoryAuditStore:
 
     def query(self, filt: AuditFilter) -> Dict[str, Any]:
         with self._lock:
-            matched = [event for event in self._events if _matches(event, filt)]
+            # Newest-first; reverse so same-second events keep insertion order.
+            matched = [event for event in reversed(self._events) if _matches(event, filt)]
         matched.sort(key=lambda event: event.ts, reverse=True)
         total = len(matched)
         page = matched[filt.offset : filt.offset + filt.limit]
