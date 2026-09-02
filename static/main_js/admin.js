@@ -470,10 +470,126 @@ function getSysLog() {
     logDownload.href = URL.createObjectURL(blob);
     logDownload.setAttribute("download", "SystemLogs.txt");
     logDownload.click();
-    // var file = window.URL.createObjectURL(blob);
-    // window.location.assign(file);
   }).catch(function(error){
     console.error(error);
+  });
+}
+
+var auditOffset = 0;
+var auditLimit = 25;
+var auditTotal = 0;
+var auditActionsLoaded = false;
+
+function escapeHtml(value) {
+  return String(value == null ? '' : value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function fillSelectOptions(selectEl, values, blankLabel) {
+  var current = selectEl.value;
+  selectEl.innerHTML = '';
+  var blank = document.createElement('option');
+  blank.value = '';
+  blank.innerHTML = blankLabel;
+  selectEl.appendChild(blank);
+  (values || []).forEach(function(item) {
+    var option = document.createElement('option');
+    option.value = item;
+    option.innerHTML = item;
+    selectEl.appendChild(option);
+  });
+  selectEl.value = current;
+}
+
+function queryAuditEvents() {
+  const payload = {
+    userid: userid,
+    action: document.getElementById('audit_action_filter').value,
+    outcome: document.getElementById('audit_outcome_filter').value,
+    actor_id: document.getElementById('audit_actor_filter').value,
+    resource_id: document.getElementById('audit_resource_filter').value,
+    q: document.getElementById('audit_q_filter').value,
+    limit: auditLimit,
+    offset: auditOffset
+  };
+
+  fetch(homeURL + 'queryAudit', {
+    method: 'post',
+    body: JSON.stringify(payload),
+    headers: {
+      'Content-type': 'application/json'
+    }
+  }).then(function(response) {
+    if (response.redirected) {
+      localStorage.setItem('loggedStatus', '0');
+      window.location.href = response.url;
+      return null;
+    }
+    return response.json().then(function(data) {
+      return { status: response.status, data: data };
+    });
+  }).then(function(result) {
+    if (!result) {
+      return;
+    }
+    if (result.status !== 200) {
+      document.getElementById('audit_status').innerHTML = escapeHtml(result.data && result.data.message ? result.data.message : 'Query failed');
+      return;
+    }
+    renderAuditTable(result.data);
+  }).catch(function(error) {
+    console.error(error);
+    document.getElementById('audit_status').innerHTML = 'Failed to load audit events';
+  });
+}
+
+function renderAuditTable(data) {
+  auditTotal = data.total || 0;
+  if (!auditActionsLoaded) {
+    fillSelectOptions(document.getElementById('audit_action_filter'), data.actions, 'All actions');
+    fillSelectOptions(document.getElementById('audit_outcome_filter'), data.outcomes, 'All outcomes');
+    auditActionsLoaded = true;
+  }
+
+  var table = document.getElementById('audit_events_tbl');
+  while (table.rows.length > 1) {
+    table.deleteRow(1);
+  }
+
+  var events = data.events || [];
+  var detailsEl = document.getElementById('audit_event_details');
+  detailsEl.style.display = 'none';
+  detailsEl.textContent = '';
+
+  if (!events.length) {
+    document.getElementById('audit_status').innerHTML = 'No audit events match these filters.';
+  } else {
+    document.getElementById('audit_status').innerHTML =
+      'Showing ' + (auditOffset + 1) + '-' + (auditOffset + events.length) + ' of ' + auditTotal;
+  }
+
+  events.forEach(function(event) {
+    var row = table.insertRow(-1);
+    row.insertCell(0).innerHTML = escapeHtml(event.ts);
+    row.insertCell(1).innerHTML = escapeHtml((event.actor_id || '') + (event.actor_type ? ' (' + event.actor_type + ')' : ''));
+    row.insertCell(2).innerHTML = escapeHtml(event.action);
+    var outcomeCell = row.insertCell(3);
+    outcomeCell.innerHTML = escapeHtml(event.outcome);
+    outcomeCell.className = 'audit-outcome-' + String(event.outcome || '').replace(/[^a-z0-9_-]/gi, '');
+    var resource = [event.resource_type, event.resource_id].filter(Boolean).join(' ');
+    row.insertCell(4).innerHTML = escapeHtml(resource);
+    row.insertCell(5).innerHTML = escapeHtml(event.ip);
+    row.addEventListener('click', function() {
+      Array.prototype.forEach.call(table.tBodies[0].rows, function(item) {
+        item.classList.remove('audit-selected');
+      });
+      row.classList.add('audit-selected');
+      detailsEl.style.display = 'block';
+      detailsEl.textContent = JSON.stringify(event, null, 2);
+    });
   });
 }
 
@@ -563,6 +679,8 @@ $(document).ready(function() {
       $('#create_accs_btn').css('background-color','maroon');
       $('#modify_accs_btn').css('background-color','maroon');
       $('#sys_log_btn').css('background-color','#FF6600');
+      auditOffset = 0;
+      queryAuditEvents();
     });
     $('#empl_accs_btn').click();
     $(".loader-wrapper").delay( 1000 ).fadeOut("slow");
@@ -645,5 +763,19 @@ $(document).ready(function() {
     });
     $('#sys_logs_btn').on('click', function(){
       getSysLog();
+    });
+    $('#audit_search_btn').on('click', function(){
+      auditOffset = 0;
+      queryAuditEvents();
+    });
+    $('#audit_prev_btn').on('click', function(){
+      auditOffset = Math.max(0, auditOffset - auditLimit);
+      queryAuditEvents();
+    });
+    $('#audit_next_btn').on('click', function(){
+      if (auditOffset + auditLimit < auditTotal) {
+        auditOffset += auditLimit;
+        queryAuditEvents();
+      }
     });
   });

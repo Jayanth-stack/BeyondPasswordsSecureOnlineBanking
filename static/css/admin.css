@@ -122,3 +122,39 @@ input[type=text], input[type=email], input[type=password], textarea, select {
 .header_divider {
     border-top: 2px solid #990045;
 }
+
+#audit_events_tbl tbody tr {
+    cursor: pointer;
+}
+
+#audit_events_tbl tbody tr.audit-selected {
+    background-color: #d9edf7;
+}
+
+.audit-outcome-success {
+    color: #0b7a0b;
+    font-weight: 600;
+}
+
+.audit-outcome-denied {
+    color: #a94442;
+    font-weight: 600;
+}
+
+.audit-outcome-invalid,
+.audit-outcome-failure {
+    color: #8a6d3b;
+    font-weight: 600;
+}
+
+.audit-details {
+    background-color: #f4f4f4;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    padding: 12px;
+    margin-top: 12px;
+    white-space: pre-wrap;
+    word-break: break-word;
+    max-height: 240px;
+    overflow: auto;
+}
