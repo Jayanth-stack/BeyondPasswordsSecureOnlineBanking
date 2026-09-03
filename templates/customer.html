@@ -93,6 +93,15 @@
         </button>
 
         <button type="button" class="btn btn-primary btn-block"
+        id="payees_menu">
+        <span class="glyphicon glyphicon-book gi-3x"
+        style="color: white" aria-hidden="true">
+        </span>
+        <br />
+        Payees
+        </button>
+
+        <button type="button" class="btn btn-primary btn-block"
         id="service_requests_menu">
         <span class="glyphicon glyphicon-edit gi-3x"
         style="color: white" aria-hidden="true">
@@ -204,6 +213,36 @@
           <!-- <input type="text" id="xact_id_acc_den" placeholder="Enter Transaction No." style="height:30px;margin-right:5px;"> -->
           <button type="button" id="pending_req_accept" class="btn btn-primary" style="width:100px;color:white;background-color:green;margin-right:5px;">Accept</button>
           <button type="button" id="pending_req_deny" class="btn btn-primary" style="width:100px;color:white;background-color:red;margin-left:5px;">Deny</button>
+        </div>
+        <div id="payees_pane" style="display:none;">
+          <p class="payee-hint" style="color:white;margin-bottom:12px;">
+            Outbound transfers and cashier cheques can only go to a registered payee or one of your own accounts.
+          </p>
+          <table class="table table-hover table-bordered table-color fixed-header" id="payees_tbl">
+            <col style="width:30%">
+            <col style="width:25%">
+            <col style="width:25%">
+            <col style="width:20%">
+            <thead>
+              <tr>
+                <th> Nickname </th>
+                <th> Account </th>
+                <th> Status </th>
+                <th> </th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td colspan="4">No payees yet.</td>
+              </tr>
+            </tbody>
+          </table>
+          <hr>
+          <label class="details_lbl" for="payee_nickname_input">Nickname:</label>
+          <input type="text" id="payee_nickname_input" maxlength="40" placeholder="e.g. Landlord"><br><br>
+          <label class="details_lbl" for="payee_account_input">Account No.:</label>
+          <input type="text" id="payee_account_input" pattern="\d*" maxlength="16" oninput="validity.valid||(value='');" placeholder="Recipient account"><br><br>
+          <button type="button" id="add_payee_btn" class="btn btn-primary" style="width:50%;margin-bottom:10px;">Add Payee</button>
         </div>
         <div id="account_details_pane" style="display:none;">
 					<label class="details_lbl" for="first_name">First name:</label>
@@ -350,7 +389,11 @@
                 <label for="sa_send_radio">Send Money</label>
                 <b>&nbsp;&nbsp;&nbsp;</b><input type="radio" id="sa_request_radio" name="satransfer" value="sa_request_radio">
                 <label for="sa_request_radio">Request Money</label><br/><br/>
-                <b>&nbsp;&nbsp;&nbsp;</b><input type="text" id= "sa_transfer_acno_input" placeholder="To Account No." pattern="\d*" maxlength="10" oninput="validity.valid||(value='');"/><br/><br/>
+                <select id="sa_payee_select" class="payee-select">
+                  <option value="">Select a registered payee</option>
+                </select><br/>
+                <b>&nbsp;&nbsp;&nbsp;</b><input type="text" id= "sa_transfer_acno_input" placeholder="To Account No." pattern="\d*" maxlength="10" oninput="validity.valid||(value='');"/><br/>
+                <small class="payee-hint">Send Money requires a registered payee or one of your accounts. Request Money does not.</small><br/><br/>
                 <b>$</b> <input type="text" id="saTransfer_amt" placeholder="Enter Amount" pattern="\d*" maxlength="6" oninput="validity.valid||(value='');"/>
               </div>
               <div class="modal-footer">
@@ -375,7 +418,11 @@
                 <label for="ca_send_radio">Send Money</label>
                 <b>&nbsp;&nbsp;&nbsp;</b><input type="radio" id="ca_request_radio" name="catransfer" value="sa_request_radio">
                 <label for="ca_request_radio">Request Money</label><br/><br/>
-                <b>&nbsp;&nbsp;&nbsp;</b><input type="text" id= "ca_transfer_acno_input" placeholder="To Account No." pattern="\d*" maxlength="10" oninput="validity.valid||(value='');"/><br/><br/>
+                <select id="ca_payee_select" class="payee-select">
+                  <option value="">Select a registered payee</option>
+                </select><br/>
+                <b>&nbsp;&nbsp;&nbsp;</b><input type="text" id= "ca_transfer_acno_input" placeholder="To Account No." pattern="\d*" maxlength="10" oninput="validity.valid||(value='');"/><br/>
+                <small class="payee-hint">Send Money requires a registered payee or one of your accounts. Request Money does not.</small><br/><br/>
                 <b>$</b> <input type="text" id="caTransfer_amt" placeholder="Enter Amount" pattern="\d*" maxlength="6" oninput="validity.valid||(value='');"/>
               </div>
               <div class="modal-footer">
@@ -396,7 +443,11 @@
                 </button>
               </div>
               <div class="modal-body">
-                <b>&nbsp;&nbsp;&nbsp;</b><input type="text" id="cc_transfer_acno_input" placeholder="Recipient Account No." pattern="\d*" maxlength="10" oninput="validity.valid||(value='');"/><br/><br/>
+                <select id="cc_payee_select" class="payee-select">
+                  <option value="">Select a registered payee</option>
+                </select><br/>
+                <b>&nbsp;&nbsp;&nbsp;</b><input type="text" id="cc_transfer_acno_input" placeholder="Recipient Account No." pattern="\d*" maxlength="10" oninput="validity.valid||(value='');"/><br/>
+                <small class="payee-hint">Payments require a registered payee or one of your accounts.</small><br/><br/>
                 <b>$</b> <input type="text" id="ccTransfer_amt" placeholder="Payment Amount" pattern="\d*" maxlength="6" oninput="validity.valid||(value='');"/>
               </div>
               <div class="modal-footer">
@@ -463,7 +514,11 @@
                 </button>
               </div>
               <div class="modal-body">
-                <b>&nbsp;&nbsp;&nbsp;</b><input type="text" id="orderCheck_toAccount" placeholder="Recipient Account No." pattern="\d*" maxlength="10" oninput="validity.valid||(value='');"/><br/><br/>
+                <select id="orderCheck_payee_select" class="payee-select">
+                  <option value="">Select a registered payee</option>
+                </select><br/>
+                <b>&nbsp;&nbsp;&nbsp;</b><input type="text" id="orderCheck_toAccount" placeholder="Recipient Account No." pattern="\d*" maxlength="10" oninput="validity.valid||(value='');"/><br/>
+                <small class="payee-hint">Cashier cheques require a registered payee or one of your accounts.</small><br/><br/>
                 <b>$</b> <input type="text" id="orderCheck_amt" placeholder="Payment Amount" pattern="\d*" maxlength="6" oninput="validity.valid||(value='');"/><br/><br/>
                 <b>&nbsp;&nbsp;</b>
                 <select id="orderCheck_fromAccount">

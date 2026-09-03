@@ -8,6 +8,13 @@ from customer import Customers
 from employee import Employee
 from twilio.base.exceptions import TwilioRestException
 from utility.encrypt import check_encrypted_password
+from utility.payee import (
+    attach_payee_routes,
+    enforce_payee,
+    owned_account_numbers,
+    payee_snapshot,
+    set_owned_resolver,
+)
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -259,7 +266,8 @@ def get_customer_data():
         response = {
             'Accounts': c.get_all_account(customer_id),
             'Info': c.get_customer_details(customer_id),
-            'FundsRequests': c.get_funds_requests(customer_id)
+            'FundsRequests': c.get_funds_requests(customer_id),
+            'Payees': payee_snapshot(session),
         }
         return jsonify(response), 200
     except Exception as e:
@@ -336,6 +344,33 @@ def open_new_account():
         return jsonify({'message': 'Unauthorized to open new accounts'}), 403
 
 
+def _owned_accounts_for(userid):
+    try:
+        return owned_account_numbers(Customers().get_all_account(userid))
+    except Exception:
+        logging.warning('Could not resolve owned accounts for payee check userid=%s', userid)
+        return set()
+
+
+set_owned_resolver(_owned_accounts_for)
+
+
+def _deny_unregistered_payee(destination, operation):
+    denied = enforce_payee(
+        session,
+        destination,
+        owned_accounts=_owned_accounts_for(session.get('userid')),
+        operation=operation,
+    )
+    if denied is None:
+        return None
+    payload, status, headers = denied
+    response = jsonify(payload)
+    for key, value in headers.items():
+        response.headers[key] = value
+    return response, status
+
+
 ###############                HANDLE FOR FUND TRASNFER            ###############
 @app.route('/fundTransfer', methods=['POST', 'GET'])
 @cross_origin()
@@ -357,6 +392,10 @@ def fund_transfers():
     if values['userid'] != session['userid']:
         logging.warning(f"Session user ID does not match request user ID.")
         return jsonify({'message': 'User ID mismatch'}), 401
+
+    blocked = _deny_unregistered_payee(values.get('toAccount'), 'transfer')
+    if blocked:
+        return blocked
 
     values['fromAccount'] = int(values['fromAccount'])
     values['toAccount'] = int(values['toAccount'])
@@ -615,6 +654,9 @@ def make_cashier_cheque():
 
     # Validate if the user in the request is the same as the one logged in and check session expiration
     if 'userid' in session and session['userid'] == values['userid']:
+        blocked = _deny_unregistered_payee(values.get('to_account'), 'cheque')
+        if blocked:
+            return blocked
         # Further checks can be added here to validate the user's permission if needed
         c = Customers()
         try:
@@ -1288,6 +1330,8 @@ def get_system_logs():
         logging.error(f'An error occurred when trying to send the log file: {str(e)}')
         return jsonify({'message': 'Failed to retrieve system logs', 'error': str(e)}), 500
 
+
+attach_payee_routes(app)
 
 app.config['SESSION_COOKIE_SECURE'] = True
 app.config['SESSION_COOKIE_HTTPONLY'] = True
