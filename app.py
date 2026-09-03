@@ -116,7 +116,7 @@ def registerCustomer():
     if temp == 1:
         session[values['userid']] = values['userid']
         print('Redirecting to Customer dashboard')
-        return redirect(url_for('get_customer_dashboard_ui', _external=True, _scheme='http'))
+        return redirect(url_for('get_customer_dash_ui', _external=True, _scheme='http'))
 
     response = {
         'message': 'Something Went wrong, Please try again later'
