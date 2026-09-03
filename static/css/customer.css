@@ -172,3 +172,25 @@ body {
   /*noinspection CssInvalidFunction*/
   border-color: lighten(var(--success-color), 55%);
 }
+
+.payee-select {
+  margin-left: 12px;
+  margin-bottom: 8px;
+  min-width: 70%;
+}
+
+.payee-hint {
+  display: block;
+  margin: 4px 12px 0 12px;
+  font-size: 12px;
+  color: var(--secondary-color);
+}
+
+#payees_pane .details_lbl {
+  color: white;
+  margin-right: 8px;
+}
+
+#payees_tbl {
+  color: white;
+}

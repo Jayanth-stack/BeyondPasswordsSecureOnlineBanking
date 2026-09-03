@@ -15,6 +15,8 @@ const homeURL = 'http://127.0.0.1:5000/';
 var userid, usertype, first_name, savings_ac_no, savings_ac_no_masked, savings_ac_bal, checking_ac_no, checking_ac_no_masked, checking_ac_bal, cc_no, cc_no_masked, cc_bal;
 var midname, lastname, email, contact, dob, ssn, ssn_masked, address;
 var otpModal_source;
+var _payees = [];
+var _payeePolicy = { enabled: true, allow_own_accounts: true };
 
 const sa_card = document.querySelector("#sa_card");
 const ca_card = document.querySelector("#ca_card");
@@ -126,6 +128,7 @@ function appendPrimaryData(data) {
 
   createCheckDropdown();
   fillPendingTransTbl(data);
+  applyPayeeSnapshot(data.Payees);
 }
 
 function fillPendingTransTbl(data){
@@ -604,7 +607,7 @@ function order_check(userid, toAccount, fromAccount, amount) {
       window.alert('Cheque Ordered!');
     }
     else {
-      window.alert('Failed! Please re-try.');
+      window.alert(data.message || 'Failed! Please re-try.');
     }
   }).catch(function(error){
     console.error(error);
@@ -803,6 +806,200 @@ function newAcc(userid, account_type) {
   });
 }
 
+function canonicalAccount(value) {
+  if (value === undefined || value === null) {
+    return '';
+  }
+  var digits = String(value).replace(/\D/g, '');
+  if (!digits) {
+    return '';
+  }
+  return String(parseInt(digits, 10));
+}
+
+function isOwnAccount(account) {
+  var n = canonicalAccount(account);
+  if (!n) {
+    return false;
+  }
+  return n === canonicalAccount(savings_ac_no) || n === canonicalAccount(checking_ac_no) || n === canonicalAccount(cc_no);
+}
+
+function findPayee(account) {
+  var n = canonicalAccount(account);
+  if (!n || !_payees) {
+    return null;
+  }
+  for (var i = 0; i < _payees.length; i++) {
+    if (canonicalAccount(_payees[i].account) === n) {
+      return _payees[i];
+    }
+  }
+  return null;
+}
+
+function destinationAllowed(account) {
+  if (_payeePolicy && _payeePolicy.enabled === false) {
+    return true;
+  }
+  var n = canonicalAccount(account);
+  if (!n) {
+    return false;
+  }
+  if (isOwnAccount(n)) {
+    return true;
+  }
+  var payee = findPayee(n);
+  return !!(payee && payee.status === 'active');
+}
+
+function destinationBlockMessage(account) {
+  var payee = findPayee(account);
+  if (payee && payee.status === 'cooling') {
+    var wait = payee.retry_after ? (' Try again in ' + payee.retry_after + 's.') : '';
+    return 'Payee "' + payee.nickname + '" is still cooling.' + wait;
+  }
+  return 'Destination must be a registered payee or one of your accounts. Add it from the Payees menu first.';
+}
+
+function applyPayeeSnapshot(snapshot) {
+  snapshot = snapshot || {};
+  _payees = snapshot.payees || [];
+  _payeePolicy = snapshot;
+  fillPayeeSelects();
+  fillPayeeTable();
+}
+
+function fillPayeeSelects() {
+  var ids = ['sa_payee_select', 'ca_payee_select', 'cc_payee_select', 'orderCheck_payee_select'];
+  for (var s = 0; s < ids.length; s++) {
+    var select = document.getElementById(ids[s]);
+    if (!select) {
+      continue;
+    }
+    select.options.length = 0;
+    var placeholder = document.createElement('OPTION');
+    placeholder.value = '';
+    placeholder.innerHTML = 'Select a registered payee';
+    select.options.add(placeholder);
+    for (var i = 0; i < _payees.length; i++) {
+      var option = document.createElement('OPTION');
+      option.value = _payees[i].account;
+      var label = _payees[i].nickname + ' — ' + _payees[i].account;
+      if (_payees[i].status === 'cooling') {
+        label += ' (cooling)';
+      }
+      option.innerHTML = label;
+      select.options.add(option);
+    }
+  }
+}
+
+function fillPayeeTable() {
+  var table = document.getElementById('payees_tbl');
+  if (!table) {
+    return;
+  }
+  while (table.rows.length > 1) {
+    table.deleteRow(1);
+  }
+  if (!_payees.length) {
+    var empty = table.insertRow(1);
+    var cell = empty.insertCell(0);
+    cell.colSpan = 4;
+    cell.innerHTML = 'No payees yet.';
+    return;
+  }
+  for (var i = 0; i < _payees.length; i++) {
+    var row = table.insertRow(table.rows.length);
+    row.insertCell(0).innerHTML = _payees[i].nickname;
+    row.insertCell(1).innerHTML = _payees[i].account;
+    var status = _payees[i].status;
+    if (status === 'cooling' && _payees[i].retry_after) {
+      status += ' (' + _payees[i].retry_after + 's)';
+    }
+    row.insertCell(2).innerHTML = status;
+    var action = row.insertCell(3);
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'btn btn-danger btn-sm';
+    btn.innerHTML = 'Remove';
+    btn.setAttribute('data-payee-id', _payees[i].payee_id);
+    btn.addEventListener('click', function(evt) {
+      remove_payee(evt.currentTarget.getAttribute('data-payee-id'));
+    });
+    action.appendChild(btn);
+  }
+}
+
+function add_payee(nickname, account) {
+  fetch(homeURL + 'addPayee', {
+    method: 'post',
+    body: JSON.stringify({
+      userid: userid,
+      nickname: nickname,
+      account: account
+    }),
+    headers: {
+      'Content-type': 'application/json'
+    }
+  }).then(function(response) {
+    return response.json().then(function(data) {
+      data._status = response.status;
+      return data;
+    });
+  }).then(function(data) {
+    if (data._status >= 200 && data._status < 300 && data.payees) {
+      applyPayeeSnapshot({
+        enabled: _payeePolicy.enabled,
+        allow_own_accounts: _payeePolicy.allow_own_accounts,
+        cooling_seconds: _payeePolicy.cooling_seconds,
+        max_payees: _payeePolicy.max_payees,
+        payees: data.payees
+      });
+      $('#payee_nickname_input').val('');
+      $('#payee_account_input').val('');
+      window.alert(data.message || 'Payee added.');
+    } else {
+      window.alert(data.message || 'Could not add payee.');
+    }
+  }).catch(function(error) {
+    console.error(error);
+  });
+}
+
+function remove_payee(payeeId) {
+  fetch(homeURL + 'removePayee', {
+    method: 'post',
+    body: JSON.stringify({
+      userid: userid,
+      payee_id: payeeId
+    }),
+    headers: {
+      'Content-type': 'application/json'
+    }
+  }).then(function(response) {
+    return response.json().then(function(data) {
+      data._status = response.status;
+      return data;
+    });
+  }).then(function(data) {
+    if (data._status >= 200 && data._status < 300) {
+      applyPayeeSnapshot({
+        enabled: _payeePolicy.enabled,
+        allow_own_accounts: _payeePolicy.allow_own_accounts,
+        cooling_seconds: _payeePolicy.cooling_seconds,
+        max_payees: _payeePolicy.max_payees,
+        payees: data.payees || []
+      });
+    } else {
+      window.alert(data.message || 'Could not remove payee.');
+    }
+  }).catch(function(error) {
+    console.error(error);
+  });
+}
+
 function changePassword(userid, oldPassword, newPassword) {
   const resetpwData = {
     userid : userid,
@@ -854,6 +1051,7 @@ $(document).ready(function() {
       $('#service_requests_menu').css('background-color','maroon');
       $('#my_accounts_menu').css('background-color','maroon');
       $('#pending_transaction_requests_menu').css('background-color','maroon');
+      $('#payees_menu').css('background-color','maroon');
     });
     $('#service_requests_menu').on('click', function(){
       if($('#service_requests_pane').css('display')=='none'){
@@ -862,6 +1060,7 @@ $(document).ready(function() {
       $('#service_requests_menu').css('background-color','#FF6600');
       $('#my_accounts_menu').css('background-color','maroon');
       $('#pending_transaction_requests_menu').css('background-color','maroon');
+      $('#payees_menu').css('background-color','maroon');
     });
     $('#my_accounts_menu').on('click', function(){
       getUser();
@@ -880,6 +1079,7 @@ $(document).ready(function() {
       $('#my_accounts_menu').css('background-color','#FF6600');
       $('#service_requests_menu').css('background-color','maroon');
       $('#pending_transaction_requests_menu').css('background-color','maroon');
+      $('#payees_menu').css('background-color','maroon');
     });
     $('#pending_transaction_requests_menu').on('click', function(){
       if($('#pending_transaction_requests_pane').css('display')=='none'){
@@ -888,6 +1088,16 @@ $(document).ready(function() {
       $('#pending_transaction_requests_menu').css('background-color','#FF6600');
       $('#my_accounts_menu').css('background-color','maroon');
       $('#service_requests_menu').css('background-color','maroon');
+      $('#payees_menu').css('background-color','maroon');
+    });
+    $('#payees_menu').on('click', function(){
+      if($('#payees_pane').css('display')=='none'){
+          $('#payees_pane').show().siblings('div').hide();
+      }
+      $('#payees_menu').css('background-color','#FF6600');
+      $('#my_accounts_menu').css('background-color','maroon');
+      $('#service_requests_menu').css('background-color','maroon');
+      $('#pending_transaction_requests_menu').css('background-color','maroon');
     });
     $('#my_accounts_menu').click();
 	  $(".loader-wrapper").delay( 1000 ).fadeOut("slow");
@@ -973,6 +1183,9 @@ $(document).ready(function() {
           if($('#saTransfer_amt').val() > savings_ac_bal){
             alert('You can not send more than you have silly!');
           }
+          else if(!destinationAllowed($('#sa_transfer_acno_input').val())){
+            alert(destinationBlockMessage($('#sa_transfer_acno_input').val()));
+          }
           else {
             otpModal_source = 'saTransfer';
             send_otp();
@@ -995,6 +1208,9 @@ $(document).ready(function() {
           if($('#caTransfer_amt').val() > checking_ac_bal){
             alert('You can not send more than you have silly!');
           }
+          else if(!destinationAllowed($('#ca_transfer_acno_input').val())){
+            alert(destinationBlockMessage($('#ca_transfer_acno_input').val()));
+          }
           else {
             otpModal_source = 'caTransfer';
             send_otp();
@@ -1009,8 +1225,11 @@ $(document).ready(function() {
     });
     $('#ccTransfer_btn').on('click', function(){
       console.log("transfer function");
-      if($('#ccTransfer_amt').val() == '' || $('#ccTransfer_account').val() == ''){
+      if($('#ccTransfer_amt').val() == '' || $('#cc_transfer_acno_input').val() == ''){
         alert('Empty Field detected!');
+      }
+      else if(!destinationAllowed($('#cc_transfer_acno_input').val())){
+        alert(destinationBlockMessage($('#cc_transfer_acno_input').val()));
       }
       else {
         //fund_transfer(userid, cc_no, $('#ccTransfer_account').val(), $('#ccTransfer_amt').val());
@@ -1055,9 +1274,40 @@ $(document).ready(function() {
       if($('#orderCheck_amt').val() == '' || $('#orderCheck_toAccount').val() == '' || $('#orderCheck_fromAccount').val() == 'select'){
         alert('Empty Field detected!');
       }
+      else if(!destinationAllowed($('#orderCheck_toAccount').val())){
+        alert(destinationBlockMessage($('#orderCheck_toAccount').val()));
+      }
       else {
         order_check(userid, $('#orderCheck_toAccount').val(), $('#orderCheck_fromAccount').val(), $('#orderCheck_amt').val());
         $('#orderCheck_close').click();
+      }
+    });
+    $('#add_payee_btn').on('click', function(){
+      if($('#payee_nickname_input').val() == '' || $('#payee_account_input').val() == ''){
+        alert('Empty Field detected!');
+      }
+      else {
+        add_payee($('#payee_nickname_input').val(), $('#payee_account_input').val());
+      }
+    });
+    $('#sa_payee_select').on('change', function(){
+      if ($(this).val()) {
+        $('#sa_transfer_acno_input').val($(this).val());
+      }
+    });
+    $('#ca_payee_select').on('change', function(){
+      if ($(this).val()) {
+        $('#ca_transfer_acno_input').val($(this).val());
+      }
+    });
+    $('#cc_payee_select').on('change', function(){
+      if ($(this).val()) {
+        $('#cc_transfer_acno_input').val($(this).val());
+      }
+    });
+    $('#orderCheck_payee_select').on('change', function(){
+      if ($(this).val()) {
+        $('#orderCheck_toAccount').val($(this).val());
       }
     });
     $('#depCheck_btn').on('click', function(){

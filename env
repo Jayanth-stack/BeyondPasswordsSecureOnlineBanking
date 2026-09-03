@@ -6,3 +6,12 @@ DB_USER=root
 DB_PASSWORD=root
 DB_PORT=3306
 DB_NAME=bankingapplication
+
+# Payee allowlist (outbound transfers + cashier cheques)
+PAYEE_ENABLED=true
+PAYEE_STORE=SystemLogs/payees.sqlite
+PAYEE_COOLING_SECONDS=0
+PAYEE_MAX=20
+PAYEE_CUSTOMER_ONLY=true
+PAYEE_ALLOW_OWN_ACCOUNTS=true
+PAYEE_OPERATIONS=transfer,cheque
