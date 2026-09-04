@@ -84,6 +84,36 @@ class SessionAuthRegressionTests(unittest.TestCase):
         )
         self.assertEqual(response.status_code, 403)
 
+    def test_register_customer_sets_session_userid(self):
+        with patch('app.Customers') as customers_cls:
+            c = customers_cls.return_value
+            c.check_user_id.return_value = 0
+            c.check_existing_contact.return_value = 0
+            c.check_existing_email.return_value = 0
+            c.create_customer_id.return_value = 1
+
+            response = self.client.post(
+                '/registerCustomer',
+                json={
+                    'empid': 'None',
+                    'userid': 'newcust',
+                    'password': 'pass',
+                    'email': 'a@b.com',
+                    'firstname': 'A',
+                    'midname': 'B',
+                    'lastname': 'C',
+                    'phone': '+15551234567',
+                    'dob': '01/01/1990',
+                    'ssn': '123456789',
+                    'address': '1 Main St',
+                },
+            )
+
+        self.assertEqual(response.status_code, 302)
+        with self.client.session_transaction() as sess:
+            self.assertEqual(sess.get('userid'), 'newcust')
+            self.assertEqual(sess.get('usertype'), 'customer')
+
 
 if __name__ == '__main__':
     unittest.main()

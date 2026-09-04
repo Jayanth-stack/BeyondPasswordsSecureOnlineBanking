@@ -114,7 +114,8 @@ def registerCustomer():
         return jsonify(response), 200
 
     if temp == 1:
-        session[values['userid']] = values['userid']
+        session['userid'] = values['userid']
+        session['usertype'] = 'customer'
         print('Redirecting to Customer dashboard')
         return redirect(url_for('get_customer_dash_ui', _external=True, _scheme='http'))
 
