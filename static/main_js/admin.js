@@ -32,6 +32,9 @@ function getUser() {
     }
   }).then(function(response) {
     console.log("get admin response received");
+    if (typeof redirectIfSessionGone === 'function' && redirectIfSessionGone(response)) {
+      return null;
+    }
     if (response.redirected) {
       localStorage.setItem('loggedStatus', '0');
       window.location.href = response.url;
@@ -40,6 +43,9 @@ function getUser() {
       return response.json();
     }
   }).then(function (data) {
+    if (!data) {
+      return;
+    }
     console.log(data);
     appendPrimaryData(data);
   }).catch(function(error){
@@ -67,6 +73,9 @@ function appendPrimaryData(data) {
   document.getElementById("account_address").value = address;
 
   fillPendingReqTbl(data);
+  if (typeof renderSessions === 'function') {
+    renderSessions(data.Sessions);
+  }
 }
 
 function fillPendingReqTbl(data){
