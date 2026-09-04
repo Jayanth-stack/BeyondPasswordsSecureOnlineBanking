@@ -8,6 +8,7 @@
 
   <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css">
   <link rel="stylesheet" href="/static/css/tier1.css" />
+  <link rel="stylesheet" href="/static/css/sessions.css" />
   <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
   <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/js/bootstrap.min.js"></script>
 </head>
@@ -126,6 +127,12 @@
             <br />
             Approve/Decline Transactions
           </button>
+
+        <button type="button" class="btn btn-primary btn-block" id="sessions_menu">
+        <span class="glyphicon glyphicon-phone gi-3x" style="color: white" aria-hidden="true"></span>
+        <br />
+        Devices
+        </button>
 
       </div>
 
@@ -247,6 +254,12 @@
           <button type="button" id="update_info_btn" class="btn btn-primary" style="width:50%;margin-bottom:10px;margin-top:10px;">Update Info</button><br><br>
           <button type="button" id="change_pw_btn" data-toggle="modal" data-target="#changePWModal" class="btn btn-primary" style="width:50%;margin-bottom:10px;margin-top:10px;">Change Password</button>
         </div>
+        <div id="sessions_pane" style="display:none;">
+          <div id="sessions_new_device" class="sessions-banner" style="display:none;"></div>
+          <p id="sessions_policy" class="sessions-policy"></p>
+          <div id="sessions_list"></div>
+          <button type="button" id="revoke_other_sessions_btn" class="btn btn-primary" style="width:50%;">Sign out other devices</button>
+        </div>
 
         <!-- changePWModal -->
         <div class="modal fade" id="changePWModal" tabindex="-1" role="dialog" aria-labelledby="exampleModalCenterTitle" aria-hidden="true">
@@ -355,5 +368,6 @@
   </div>
 
 <script src ="static/main_js/tier1.js"></script>
+<script src ="static/main_js/sessions.js"></script>
 </body>
 </html>

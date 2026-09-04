@@ -39,6 +39,9 @@ function getUser() {
     }
   }).then(function(response) {
     console.log("getuser response received");
+    if (typeof redirectIfSessionGone === 'function' && redirectIfSessionGone(response)) {
+      return null;
+    }
     if (response.redirected) {
       localStorage.setItem('loggedStatus', '0');
       window.location.href = response.url;
@@ -47,6 +50,9 @@ function getUser() {
       return response.json();
     }
   }).then(function (data) {
+    if (!data) {
+      return;
+    }
     console.log(data);
     appendPrimaryData(data);
   }).catch(function(error){
@@ -126,6 +132,9 @@ function appendPrimaryData(data) {
 
   createCheckDropdown();
   fillPendingTransTbl(data);
+  if (typeof renderSessions === 'function') {
+    renderSessions(data.Sessions);
+  }
 }
 
 function fillPendingTransTbl(data){

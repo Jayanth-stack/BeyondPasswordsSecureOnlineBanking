@@ -9,6 +9,7 @@ from employee import Employee
 from twilio.base.exceptions import TwilioRestException
 from utility.encrypt import check_encrypted_password
 from dotenv import load_dotenv
+from utility.sessions import init_sessions, session_snapshot
 
 load_dotenv()
 
@@ -17,8 +18,7 @@ logging.basicConfig(level=logging.INFO, filename='SystemLogs/bank.log', filemode
 otpSet = {}
 
 app = Flask(__name__)
-
-app.secret_key = os.urandom(24)
+init_sessions(app)
 
 CORS(app)
 Bcrypt(app)
@@ -259,7 +259,8 @@ def get_customer_data():
         response = {
             'Accounts': c.get_all_account(customer_id),
             'Info': c.get_customer_details(customer_id),
-            'FundsRequests': c.get_funds_requests(customer_id)
+            'FundsRequests': c.get_funds_requests(customer_id),
+            'Sessions': session_snapshot(session),
         }
         return jsonify(response), 200
     except Exception as e:
@@ -285,7 +286,8 @@ def get_employee_data():
         response = {
             'Info': e.get_employee_details(employee_id),
             'FundsRequests': e.fund_transfer_requests(employee_id),
-            'UpdateInfo': e.update_info_request_list(employee_id)
+            'UpdateInfo': e.update_info_request_list(employee_id),
+            'Sessions': session_snapshot(session),
         }
         return jsonify(response), 200
     except Exception as e:
@@ -1236,7 +1238,7 @@ def logout():
             'message': 'Some data missing'
         }
         return jsonify(response), 400
-    session.pop(values['userid'], None)
+    session.clear()
     return redirect(url_for('get_login_page_ui', _external=True, _scheme='http'))
 
 
