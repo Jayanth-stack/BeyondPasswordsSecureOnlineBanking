@@ -93,6 +93,15 @@
         </button>
 
         <button type="button" class="btn btn-primary btn-block"
+        id="held_transfers_menu">
+        <span class="glyphicon glyphicon-time gi-3x"
+        style="color: white" aria-hidden="true">
+        </span>
+        <br />
+        Held Transfers
+        </button>
+
+        <button type="button" class="btn btn-primary btn-block"
         id="service_requests_menu">
         <span class="glyphicon glyphicon-edit gi-3x"
         style="color: white" aria-hidden="true">
@@ -204,6 +213,47 @@
           <!-- <input type="text" id="xact_id_acc_den" placeholder="Enter Transaction No." style="height:30px;margin-right:5px;"> -->
           <button type="button" id="pending_req_accept" class="btn btn-primary" style="width:100px;color:white;background-color:green;margin-right:5px;">Accept</button>
           <button type="button" id="pending_req_deny" class="btn btn-primary" style="width:100px;color:white;background-color:red;margin-left:5px;">Deny</button>
+        </div>
+        <div id="held_transfers_pane" class="my_accs_float" style="display:none;">
+          <p id="held_transfers_hint" style="color:white;">
+            First transfers to a new destination are held before they enter the approval queue.
+            Cancel anytime before release.
+          </p>
+          <table class="table table-hover table-bordered table-color fixed-header" id="held_transfers_tbl">
+            <col style="width:16%">
+            <col style="width:14%">
+            <col style="width:16%">
+            <col style="width:16%">
+            <col style="width:10%">
+            <col style="width:14%">
+            <col style="width:14%">
+            <thead>
+              <tr>
+                <th>Hold ID</th>
+                <th>Type</th>
+                <th>From</th>
+                <th>To</th>
+                <th>Amount</th>
+                <th>Releases</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>NA</td>
+                <td>NA</td>
+                <td>NA</td>
+                <td>NA</td>
+                <td>NA</td>
+                <td>NA</td>
+                <td>NA</td>
+              </tr>
+            </tbody>
+          </table>
+          <select id="held_id_select" style="height:30px;margin-right:5px;">
+            <option value="select">Select Hold ID</option>
+          </select>
+          <button type="button" id="held_cancel_btn" class="btn btn-primary" style="width:140px;color:white;background-color:red;">Cancel Hold</button>
         </div>
         <div id="account_details_pane" style="display:none;">
 					<label class="details_lbl" for="first_name">First name:</label>
@@ -352,6 +402,7 @@
                 <label for="sa_request_radio">Request Money</label><br/><br/>
                 <b>&nbsp;&nbsp;&nbsp;</b><input type="text" id= "sa_transfer_acno_input" placeholder="To Account No." pattern="\d*" maxlength="10" oninput="validity.valid||(value='');"/><br/><br/>
                 <b>$</b> <input type="text" id="saTransfer_amt" placeholder="Enter Amount" pattern="\d*" maxlength="6" oninput="validity.valid||(value='');"/>
+                <p class="hold_hint">First payment to a new account is held for delayed settlement.</p>
               </div>
               <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
@@ -377,6 +428,7 @@
                 <label for="ca_request_radio">Request Money</label><br/><br/>
                 <b>&nbsp;&nbsp;&nbsp;</b><input type="text" id= "ca_transfer_acno_input" placeholder="To Account No." pattern="\d*" maxlength="10" oninput="validity.valid||(value='');"/><br/><br/>
                 <b>$</b> <input type="text" id="caTransfer_amt" placeholder="Enter Amount" pattern="\d*" maxlength="6" oninput="validity.valid||(value='');"/>
+                <p class="hold_hint">First payment to a new account is held for delayed settlement.</p>
               </div>
               <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
@@ -398,6 +450,7 @@
               <div class="modal-body">
                 <b>&nbsp;&nbsp;&nbsp;</b><input type="text" id="cc_transfer_acno_input" placeholder="Recipient Account No." pattern="\d*" maxlength="10" oninput="validity.valid||(value='');"/><br/><br/>
                 <b>$</b> <input type="text" id="ccTransfer_amt" placeholder="Payment Amount" pattern="\d*" maxlength="6" oninput="validity.valid||(value='');"/>
+                <p class="hold_hint">First payment to a new account is held for delayed settlement.</p>
               </div>
               <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
@@ -465,6 +518,7 @@
               <div class="modal-body">
                 <b>&nbsp;&nbsp;&nbsp;</b><input type="text" id="orderCheck_toAccount" placeholder="Recipient Account No." pattern="\d*" maxlength="10" oninput="validity.valid||(value='');"/><br/><br/>
                 <b>$</b> <input type="text" id="orderCheck_amt" placeholder="Payment Amount" pattern="\d*" maxlength="6" oninput="validity.valid||(value='');"/><br/><br/>
+                <p class="hold_hint">First cheque to a new account is held for delayed settlement.</p>
                 <b>&nbsp;&nbsp;</b>
                 <select id="orderCheck_fromAccount">
                   <option value="select">Select your Account</option>

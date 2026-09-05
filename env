@@ -6,3 +6,15 @@ DB_USER=root
 DB_PASSWORD=root
 DB_PORT=3306
 DB_NAME=bankingapplication
+
+# Delayed settlement / transaction hold
+HOLD_ENABLED=true
+HOLD_STORE=sqlite
+HOLD_DB=SystemLogs/settlement.sqlite
+HOLD_SECONDS=0
+HOLD_NEW_DESTINATION_SECONDS=86400
+HOLD_AMOUNT_THRESHOLD=0
+HOLD_CUSTOMER_ONLY=true
+HOLD_ALLOW_OWN_ACCOUNTS=true
+HOLD_OPERATIONS=transfer,withdraw,cheque
+HOLD_MAX_OPEN=20

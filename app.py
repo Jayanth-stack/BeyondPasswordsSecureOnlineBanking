@@ -8,6 +8,13 @@ from customer import Customers
 from employee import Employee
 from twilio.base.exceptions import TwilioRestException
 from utility.encrypt import check_encrypted_password
+from utility.settlement import (
+    attach_hold_routes,
+    build_service,
+    enforce_hold,
+    own_accounts_from_customer_payload,
+    remember_if_destination,
+)
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -27,6 +34,60 @@ account_sid = 'your Account_sid'
 auth_token = 'your Auth_token'
 client = Client(account_sid, auth_token)
 verify_sid = 'your verify_sid'
+
+settlement_service = build_service()
+
+
+def _settlement_accepted(message):
+    text = str(message or '').lower()
+    if not text:
+        return False
+    return not any(marker in text for marker in (
+        'doesn', 'fail', 'try again', 'invalid', 'insufficient', 'not active',
+    ))
+
+
+def _customer_own_accounts(userid):
+    try:
+        return own_accounts_from_customer_payload(Customers().get_all_account(userid))
+    except Exception:
+        return []
+
+
+def _maybe_hold(operation, from_account, to_account, amount):
+    held = enforce_hold(
+        settlement_service,
+        userid=session.get('userid'),
+        usertype=session.get('usertype') or 'customer',
+        operation=operation,
+        from_account=from_account,
+        to_account=to_account,
+        amount=amount,
+        own_accounts=_customer_own_accounts(session.get('userid')),
+    )
+    if not held:
+        return None
+    body, status, headers = held
+    response = jsonify(body)
+    response.status_code = status
+    for key, value in headers.items():
+        response.headers[key] = value
+    return response
+
+
+def _execute_held_transfer(hold):
+    if hold.operation == 'transfer':
+        return Employee().add_transaction(hold.from_account, hold.to_account, hold.amount)
+    if hold.operation == 'withdraw':
+        return Customers().debit_request(hold.from_account, hold.amount)
+    if hold.operation == 'cheque':
+        return Customers().make_cashier_check(
+            hold.userid, hold.to_account, hold.from_account, hold.amount
+        )
+    raise ValueError('unsupported hold operation')
+
+
+attach_hold_routes(app, settlement_service, executor=_execute_held_transfer)
 
 
 @app.route('/', methods=['GET'])
@@ -256,10 +317,12 @@ def get_customer_data():
     customer_id = session['userid']
     c = Customers()
     try:
+        settlement_service.settle_due(_execute_held_transfer)
         response = {
             'Accounts': c.get_all_account(customer_id),
             'Info': c.get_customer_details(customer_id),
-            'FundsRequests': c.get_funds_requests(customer_id)
+            'FundsRequests': c.get_funds_requests(customer_id),
+            'Holds': settlement_service.snapshot(customer_id)
         }
         return jsonify(response), 200
     except Exception as e:
@@ -358,6 +421,10 @@ def fund_transfers():
         logging.warning(f"Session user ID does not match request user ID.")
         return jsonify({'message': 'User ID mismatch'}), 401
 
+    held = _maybe_hold('transfer', values['fromAccount'], values['toAccount'], values['amount'])
+    if held is not None:
+        return held
+
     values['fromAccount'] = int(values['fromAccount'])
     values['toAccount'] = int(values['toAccount'])
     values['amount'] = float(values['amount'])
@@ -367,6 +434,8 @@ def fund_transfers():
 
     employee = Employee()
     transaction_message = employee.add_transaction(values['fromAccount'], values['toAccount'], values['amount'])
+    if _settlement_accepted(transaction_message):
+        remember_if_destination(settlement_service, session['userid'], values['toAccount'])
     return jsonify({'message': transaction_message}), 200
 
 
@@ -442,6 +511,10 @@ def withdraw_fund():
 
     if values['userid'] != session['userid']:
         return jsonify({'message': 'User ID mismatch'}), 401
+
+    held = _maybe_hold('withdraw', values['account'], '', values['amount'])
+    if held is not None:
+        return held
 
     customer = Customers()
     response = customer.debit_request(values['account'], values['amount'])
@@ -615,11 +688,16 @@ def make_cashier_cheque():
 
     # Validate if the user in the request is the same as the one logged in and check session expiration
     if 'userid' in session and session['userid'] == values['userid']:
+        held = _maybe_hold('cheque', values['from_account'], values['to_account'], values['amount'])
+        if held is not None:
+            return held
         # Further checks can be added here to validate the user's permission if needed
         c = Customers()
         try:
             response = c.make_cashier_check(values['userid'], values['to_account'],
                                             values['from_account'], values['amount'])
+            if _settlement_accepted(response):
+                remember_if_destination(settlement_service, session['userid'], values['to_account'])
             return jsonify({'message': response}), 200
         except Exception as e:
             logging.error(f"Failed to process cashier check: {str(e)}")
