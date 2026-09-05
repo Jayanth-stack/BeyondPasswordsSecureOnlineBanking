@@ -126,6 +126,7 @@ function appendPrimaryData(data) {
 
   createCheckDropdown();
   fillPendingTransTbl(data);
+  fillHeldTransfersTbl(data);
 }
 
 function fillPendingTransTbl(data){
@@ -166,6 +167,82 @@ function fillPendingTransTbl(data){
       selection.options.add(option);
     }
   }
+}
+
+function formatHoldRelease(hold) {
+  if (!hold || hold.status !== 'held') {
+    return hold && hold.status ? hold.status : 'NA';
+  }
+  if (hold.seconds_remaining > 0) {
+    var hours = Math.floor(hold.seconds_remaining / 3600);
+    var minutes = Math.floor((hold.seconds_remaining % 3600) / 60);
+    if (hours > 0) {
+      return hours + 'h ' + minutes + 'm';
+    }
+    return minutes + 'm';
+  }
+  return 'due';
+}
+
+function fillHeldTransfersTbl(data) {
+  var table = document.getElementById('held_transfers_tbl');
+  var selection = document.getElementById('held_id_select');
+  if (!table || !selection) {
+    return;
+  }
+  var rowCount = table.rows.length;
+  try {
+    for (var i = 1; i < rowCount; i++) {
+      table.deleteRow(i);
+      rowCount--;
+      i--;
+    }
+  } catch (e) {
+    alert(e);
+  }
+  while (selection.options.length > 1) {
+    selection.remove(1);
+  }
+  var holds = (data && data.Holds && data.Holds.holds) ? data.Holds.holds : [];
+  if (!holds.length) {
+    var empty = table.insertRow(1);
+    for (var c = 0; c < 7; c++) {
+      empty.insertCell(c).innerHTML = 'NA';
+    }
+    return;
+  }
+  for (var i = 0; i < holds.length; i++) {
+    var hold = holds[i];
+    var row = table.insertRow(table.rows.length);
+    row.insertCell(0).innerHTML = hold.hold_id.slice(0, 8);
+    row.insertCell(1).innerHTML = hold.operation;
+    row.insertCell(2).innerHTML = hold.from_account;
+    row.insertCell(3).innerHTML = hold.to_account || '-';
+    row.insertCell(4).innerHTML = hold.amount;
+    row.insertCell(5).innerHTML = formatHoldRelease(hold);
+    row.insertCell(6).innerHTML = hold.status;
+    if (hold.status === 'held') {
+      var option = document.createElement('OPTION');
+      option.innerHTML = hold.hold_id.slice(0, 8);
+      option.value = hold.hold_id;
+      selection.options.add(option);
+    }
+  }
+}
+
+function cancel_hold(userid, holdId) {
+  fetch(homeURL + 'cancelHold', {
+    method: 'post',
+    body: JSON.stringify({ userid: userid, hold_id: holdId }),
+    headers: { 'Content-type': 'application/json' }
+  }).then(function(response) {
+    return response.json();
+  }).then(function(data) {
+    window.alert(data.message);
+    getUser();
+  }).catch(function(error) {
+    console.error(error);
+  });
 }
 
 function createCheckDropdown() {
@@ -389,7 +466,10 @@ function fund_transfer(userid, fromAccount, toAccount, amount) {
     return response.json();
   }).then(function (data) {
     console.log(data);
-    if(data.message == 'done'){
+    if(data.error == 'held' || data.status == 'held'){
+      window.alert(data.message);
+    }
+    else if(data.message == 'done'){
       window.alert('Successfully transferred!');
     }
     else {
@@ -600,11 +680,14 @@ function order_check(userid, toAccount, fromAccount, amount) {
     return response.json();
   }).then(function (data) {
     console.log(data);
-    if(data.message == 'Success') {
+    if(data.error == 'held' || data.status == 'held') {
+      window.alert(data.message);
+    }
+    else if(data.message == 'Success') {
       window.alert('Cheque Ordered!');
     }
     else {
-      window.alert('Failed! Please re-try.');
+      window.alert(data.message || 'Failed! Please re-try.');
     }
   }).catch(function(error){
     console.error(error);
@@ -854,6 +937,7 @@ $(document).ready(function() {
       $('#service_requests_menu').css('background-color','maroon');
       $('#my_accounts_menu').css('background-color','maroon');
       $('#pending_transaction_requests_menu').css('background-color','maroon');
+      $('#held_transfers_menu').css('background-color','maroon');
     });
     $('#service_requests_menu').on('click', function(){
       if($('#service_requests_pane').css('display')=='none'){
@@ -862,6 +946,7 @@ $(document).ready(function() {
       $('#service_requests_menu').css('background-color','#FF6600');
       $('#my_accounts_menu').css('background-color','maroon');
       $('#pending_transaction_requests_menu').css('background-color','maroon');
+      $('#held_transfers_menu').css('background-color','maroon');
     });
     $('#my_accounts_menu').on('click', function(){
       getUser();
@@ -880,6 +965,7 @@ $(document).ready(function() {
       $('#my_accounts_menu').css('background-color','#FF6600');
       $('#service_requests_menu').css('background-color','maroon');
       $('#pending_transaction_requests_menu').css('background-color','maroon');
+      $('#held_transfers_menu').css('background-color','maroon');
     });
     $('#pending_transaction_requests_menu').on('click', function(){
       if($('#pending_transaction_requests_pane').css('display')=='none'){
@@ -888,6 +974,25 @@ $(document).ready(function() {
       $('#pending_transaction_requests_menu').css('background-color','#FF6600');
       $('#my_accounts_menu').css('background-color','maroon');
       $('#service_requests_menu').css('background-color','maroon');
+      $('#held_transfers_menu').css('background-color','maroon');
+    });
+    $('#held_transfers_menu').on('click', function(){
+      getUser();
+      if($('#held_transfers_pane').css('display')=='none'){
+          $('#held_transfers_pane').show().siblings('div').hide();
+      }
+      $('#held_transfers_menu').css('background-color','#FF6600');
+      $('#my_accounts_menu').css('background-color','maroon');
+      $('#service_requests_menu').css('background-color','maroon');
+      $('#pending_transaction_requests_menu').css('background-color','maroon');
+    });
+    $('#held_cancel_btn').on('click', function(){
+      var holdId = $('#held_id_select').val();
+      if(!holdId || holdId == 'select'){
+        window.alert('Select a held transfer first.');
+        return;
+      }
+      cancel_hold(userid, holdId);
     });
     $('#my_accounts_menu').click();
 	  $(".loader-wrapper").delay( 1000 ).fadeOut("slow");

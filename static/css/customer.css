@@ -172,3 +172,19 @@ body {
   /*noinspection CssInvalidFunction*/
   border-color: lighten(var(--success-color), 55%);
 }
+
+.hold_hint {
+  color: #8a6d3b;
+  margin-top: 10px;
+  font-size: 12px;
+}
+
+#held_transfers_pane {
+  background-color: var(--light-color);
+  border-radius: 0.25rem;
+  padding: 16px;
+}
+
+#held_transfers_hint {
+  margin-bottom: 12px;
+}
