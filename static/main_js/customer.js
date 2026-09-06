@@ -126,6 +126,153 @@ function appendPrimaryData(data) {
 
   createCheckDropdown();
   fillPendingTransTbl(data);
+  fillSecurityAlerts(data);
+}
+
+function fillSecurityAlerts(data) {
+  var snapshot = data.Notifications || {};
+  var items = snapshot.items || [];
+  var unread = snapshot.unread || 0;
+  var prefs = snapshot.prefs || {};
+  var badge = document.getElementById('security_alerts_badge');
+  if (badge) {
+    if (unread > 0) {
+      badge.style.display = 'inline';
+      badge.innerHTML = unread;
+    } else {
+      badge.style.display = 'none';
+    }
+  }
+  var banner = document.getElementById('security_alerts_banner');
+  if (banner) {
+    if (unread > 0) {
+      banner.style.display = 'block';
+      banner.innerHTML = 'You have ' + unread + ' unread security alert' + (unread === 1 ? '' : 's') + '.';
+    } else {
+      banner.style.display = 'none';
+    }
+  }
+  var emailBox = document.getElementById('notify_email_enabled');
+  var smsBox = document.getElementById('notify_sms_enabled');
+  if (emailBox && prefs.email_enabled !== undefined) {
+    emailBox.checked = !!prefs.email_enabled;
+  }
+  if (smsBox && prefs.sms_enabled !== undefined) {
+    smsBox.checked = !!prefs.sms_enabled;
+  }
+  var enabledEvents = prefs.events || [];
+  var eventBoxes = document.querySelectorAll('.notify_event');
+  for (var e = 0; e < eventBoxes.length; e++) {
+    if (enabledEvents.length) {
+      eventBoxes[e].checked = enabledEvents.indexOf(eventBoxes[e].value) !== -1;
+    }
+  }
+  var table = document.getElementById('security_alerts_tbl');
+  if (!table) {
+    return;
+  }
+  var rowCount = table.rows.length;
+  try {
+    for (var i = 1; i < rowCount; i++) {
+      table.deleteRow(i);
+      rowCount--;
+      i--;
+    }
+  } catch (err) {
+    console.error(err);
+  }
+  if (!items.length) {
+    var empty = table.insertRow(1);
+    empty.insertCell(0).innerHTML = 'None';
+    empty.insertCell(1).innerHTML = '';
+    empty.insertCell(2).innerHTML = 'No security alerts yet.';
+    empty.insertCell(3).innerHTML = '';
+    return;
+  }
+  for (var j = 0; j < items.length; j++) {
+    var row = table.insertRow(table.rows.length);
+    var when = items[j].created_at ? new Date(items[j].created_at * 1000).toLocaleString() : '';
+    row.insertCell(0).innerHTML = when;
+    row.insertCell(1).innerHTML = items[j].event || '';
+    row.insertCell(2).innerHTML = items[j].body || items[j].title || '';
+    row.insertCell(3).innerHTML = items[j].unread ? 'unread' : (items[j].status || 'read');
+  }
+}
+
+function refreshSecurityAlerts() {
+  fetch(homeURL + 'listNotifications', {
+    method: 'post',
+    body: JSON.stringify({userid: userid}),
+    headers: {'Content-type': 'application/json'}
+  }).then(function(response) {
+    if (response.redirected) {
+      localStorage.setItem('loggedStatus', '0');
+      window.location.href = response.url;
+      return null;
+    }
+    return response.json();
+  }).then(function(data) {
+    if (data) {
+      fillSecurityAlerts({Notifications: data});
+    }
+  }).catch(function(error) {
+    console.error(error);
+  });
+}
+
+function markSecurityAlertsRead() {
+  fetch(homeURL + 'markNotificationRead', {
+    method: 'post',
+    body: JSON.stringify({userid: userid, all: true}),
+    headers: {'Content-type': 'application/json'}
+  }).then(function(response) {
+    if (response.redirected) {
+      localStorage.setItem('loggedStatus', '0');
+      window.location.href = response.url;
+      return null;
+    }
+    return response.json();
+  }).then(function() {
+    getUser();
+  }).catch(function(error) {
+    console.error(error);
+  });
+}
+
+function saveNotifyPrefs() {
+  var selected = [];
+  var boxes = document.querySelectorAll('.notify_event');
+  for (var i = 0; i < boxes.length; i++) {
+    if (boxes[i].checked) {
+      selected.push(boxes[i].value);
+    }
+  }
+  fetch(homeURL + 'updateNotifyPrefs', {
+    method: 'post',
+    body: JSON.stringify({
+      userid: userid,
+      email_enabled: document.getElementById('notify_email_enabled').checked,
+      sms_enabled: document.getElementById('notify_sms_enabled').checked,
+      events: selected
+    }),
+    headers: {'Content-type': 'application/json'}
+  }).then(function(response) {
+    if (response.redirected) {
+      localStorage.setItem('loggedStatus', '0');
+      window.location.href = response.url;
+      return null;
+    }
+    return response.json();
+  }).then(function(data) {
+    if (data && data.error) {
+      window.alert(data.message || data.error);
+    } else {
+      window.alert('Notification preferences saved');
+      getUser();
+    }
+  }).catch(function(error) {
+    console.error(error);
+  });
 }
 
 function fillPendingTransTbl(data){
@@ -854,6 +1001,7 @@ $(document).ready(function() {
       $('#service_requests_menu').css('background-color','maroon');
       $('#my_accounts_menu').css('background-color','maroon');
       $('#pending_transaction_requests_menu').css('background-color','maroon');
+      $('#security_alerts_menu').css('background-color','maroon');
     });
     $('#service_requests_menu').on('click', function(){
       if($('#service_requests_pane').css('display')=='none'){
@@ -862,6 +1010,7 @@ $(document).ready(function() {
       $('#service_requests_menu').css('background-color','#FF6600');
       $('#my_accounts_menu').css('background-color','maroon');
       $('#pending_transaction_requests_menu').css('background-color','maroon');
+      $('#security_alerts_menu').css('background-color','maroon');
     });
     $('#my_accounts_menu').on('click', function(){
       getUser();
@@ -880,6 +1029,7 @@ $(document).ready(function() {
       $('#my_accounts_menu').css('background-color','#FF6600');
       $('#service_requests_menu').css('background-color','maroon');
       $('#pending_transaction_requests_menu').css('background-color','maroon');
+      $('#security_alerts_menu').css('background-color','maroon');
     });
     $('#pending_transaction_requests_menu').on('click', function(){
       if($('#pending_transaction_requests_pane').css('display')=='none'){
@@ -888,6 +1038,23 @@ $(document).ready(function() {
       $('#pending_transaction_requests_menu').css('background-color','#FF6600');
       $('#my_accounts_menu').css('background-color','maroon');
       $('#service_requests_menu').css('background-color','maroon');
+      $('#security_alerts_menu').css('background-color','maroon');
+    });
+    $('#security_alerts_menu').on('click', function(){
+      refreshSecurityAlerts();
+      if($('#security_alerts_pane').css('display')=='none'){
+          $('#security_alerts_pane').show().siblings('div').hide();
+      }
+      $('#security_alerts_menu').css('background-color','#FF6600');
+      $('#my_accounts_menu').css('background-color','maroon');
+      $('#service_requests_menu').css('background-color','maroon');
+      $('#pending_transaction_requests_menu').css('background-color','maroon');
+    });
+    $('#mark_alerts_read_btn').on('click', function(){
+      markSecurityAlertsRead();
+    });
+    $('#save_notify_prefs_btn').on('click', function(){
+      saveNotifyPrefs();
     });
     $('#my_accounts_menu').click();
 	  $(".loader-wrapper").delay( 1000 ).fadeOut("slow");
