@@ -172,3 +172,15 @@ body {
   /*noinspection CssInvalidFunction*/
   border-color: lighten(var(--success-color), 55%);
 }
+
+#security_alerts_pane .table {
+  background-color: #fff8f0;
+}
+
+#security_alerts_badge {
+  margin-left: 6px;
+}
+
+.notify_event, #notify_email_enabled, #notify_sms_enabled {
+  margin-right: 6px;
+}

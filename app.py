@@ -8,6 +8,11 @@ from customer import Customers
 from employee import Employee
 from twilio.base.exceptions import TwilioRestException
 from utility.encrypt import check_encrypted_password
+from utility.notify import (
+    attach_notify_routes,
+    build_service as build_notify_service,
+    request_context,
+)
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -22,6 +27,9 @@ app.secret_key = os.urandom(24)
 
 CORS(app)
 Bcrypt(app)
+
+notify_service = build_notify_service()
+attach_notify_routes(app, notify_service)
 
 account_sid = 'your Account_sid'
 auth_token = 'your Auth_token'
@@ -199,6 +207,13 @@ def login():
         else:
             return jsonify({'message': 'No phone number available'}), 400
     else:
+        ctx = request_context()
+        notify_service.note_login_failure(
+            values['userid'],
+            usertype=values.get('usertype', 'customer'),
+            ip=ctx['ip'],
+            user_agent=ctx['user_agent'],
+        )
         return jsonify({'message': 'Invalid credentials'}), 401
 
 
@@ -226,6 +241,13 @@ def verify_otp():
         try:
             result = client.verify.v2.services(verify_sid).verification_checks.create(to=phone_number, code=otp_code)
             if result.status == "approved":
+                ctx = request_context()
+                notify_service.note_login_success(
+                    userid,
+                    usertype=usertype,
+                    ip=ctx['ip'],
+                    user_agent=ctx['user_agent'],
+                )
                 if usertype == 'customer':
                     redirect_url = 'get_customer_dash_ui'
                 else:
@@ -259,7 +281,8 @@ def get_customer_data():
         response = {
             'Accounts': c.get_all_account(customer_id),
             'Info': c.get_customer_details(customer_id),
-            'FundsRequests': c.get_funds_requests(customer_id)
+            'FundsRequests': c.get_funds_requests(customer_id),
+            'Notifications': notify_service.snapshot(customer_id),
         }
         return jsonify(response), 200
     except Exception as e:
@@ -367,6 +390,17 @@ def fund_transfers():
 
     employee = Employee()
     transaction_message = employee.add_transaction(values['fromAccount'], values['toAccount'], values['amount'])
+    ctx = request_context()
+    notify_service.emit_if_high_value(
+        session['userid'],
+        session.get('usertype', 'customer'),
+        'transfer',
+        values['amount'],
+        values['fromAccount'],
+        values['toAccount'],
+        ip=ctx['ip'],
+        user_agent=ctx['user_agent'],
+    )
     return jsonify({'message': transaction_message}), 200
 
 
@@ -445,6 +479,17 @@ def withdraw_fund():
 
     customer = Customers()
     response = customer.debit_request(values['account'], values['amount'])
+    ctx = request_context()
+    notify_service.emit_if_high_value(
+        session['userid'],
+        session.get('usertype', 'customer'),
+        'withdraw',
+        values['amount'],
+        values['account'],
+        None,
+        ip=ctx['ip'],
+        user_agent=ctx['user_agent'],
+    )
     return jsonify({'message': response}), 200
 
 
@@ -620,6 +665,17 @@ def make_cashier_cheque():
         try:
             response = c.make_cashier_check(values['userid'], values['to_account'],
                                             values['from_account'], values['amount'])
+            ctx = request_context()
+            notify_service.emit_if_high_value(
+                session['userid'],
+                session.get('usertype', 'customer'),
+                'cheque',
+                values['amount'],
+                values['from_account'],
+                values['to_account'],
+                ip=ctx['ip'],
+                user_agent=ctx['user_agent'],
+            )
             return jsonify({'message': response}), 200
         except Exception as e:
             logging.error(f"Failed to process cashier check: {str(e)}")
@@ -778,6 +834,14 @@ def update_info():
         c = Customers()
         result = c.update_info_reqest(values['requester'], values['userid'], values['email'],
                                       values['contact_no'], values['address'])
+        ctx = request_context()
+        notify_service.emit_quietly(
+            'profile_change',
+            userid=session['userid'],
+            usertype=session.get('usertype', 'customer'),
+            ip=ctx['ip'],
+            user_agent=ctx['user_agent'],
+        )
         return jsonify({'message': result}), 200
     except Exception as e:
         logging.error(f"Failed to update customer info for {values['userid']}: {str(e)}")
@@ -1211,6 +1275,14 @@ def reset_password():
                                                                                                          'otp'])
         if verification_check.status == "approved":
             response = user.reset_password(values['userid'], values['newPassword'])
+            ctx = request_context()
+            notify_service.emit_quietly(
+                'password_reset',
+                userid=values['userid'],
+                usertype='customer' if values.get('requester', '') == 'Customer' else 'employee',
+                ip=ctx['ip'],
+                user_agent=ctx['user_agent'],
+            )
             return jsonify({'message': response}), 200
         else:
             return jsonify({'message': 'OTP verification failed, cannot reset password'}), 401

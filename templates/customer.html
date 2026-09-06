@@ -93,6 +93,16 @@
         </button>
 
         <button type="button" class="btn btn-primary btn-block"
+        id="security_alerts_menu">
+        <span class="glyphicon glyphicon-bell gi-3x"
+        style="color: white" aria-hidden="true">
+        </span>
+        <br />
+        Security Alerts
+        <span id="security_alerts_badge" class="badge" style="display:none;background-color:#c9302c;">0</span>
+        </button>
+
+        <button type="button" class="btn btn-primary btn-block"
         id="service_requests_menu">
         <span class="glyphicon glyphicon-edit gi-3x"
         style="color: white" aria-hidden="true">
@@ -172,6 +182,44 @@
           <p style="color:white;">You don't have any accounts with us.</p><br>
           <p style="color:white;">Request to open a new account from the Service Requests menu on the left.</p><br>
           <p style="color:yellow;">You'll get a $250 Bonus when you open a new account with us.</p>
+        </div>
+        <div id="security_alerts_pane" style="display:none;">
+          <div id="security_alerts_banner" class="alert alert-warning" style="display:none;"></div>
+          <p style="color:white;">Outbound email/SMS alerts for new-device sign-in, failed logins, password resets, profile changes, and high-value money movement. Inbox stays even if a channel is down.</p>
+          <table class="table table-hover table-bordered table-color fixed-header" id="security_alerts_tbl">
+            <col style="width:22%">
+            <col style="width:18%">
+            <col style="width:40%">
+            <col style="width:20%">
+            <thead>
+              <tr>
+                <th>When</th>
+                <th>Event</th>
+                <th>Message</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>NA</td>
+                <td>NA</td>
+                <td>NA</td>
+                <td>NA</td>
+              </tr>
+            </tbody>
+          </table>
+          <button type="button" id="mark_alerts_read_btn" class="btn btn-primary" style="margin-bottom:16px;">Mark all read</button>
+          <h4 style="color:white;">Notification preferences</h4>
+          <label class="details_lbl"><input type="checkbox" id="notify_email_enabled" checked> Email</label>
+          <label class="details_lbl"><input type="checkbox" id="notify_sms_enabled" checked> SMS</label>
+          <div id="notify_event_prefs" style="margin-top:8px;color:white;">
+            <label class="details_lbl"><input type="checkbox" class="notify_event" value="new_device" checked> New device</label>
+            <label class="details_lbl"><input type="checkbox" class="notify_event" value="login_failure" checked> Failed logins</label>
+            <label class="details_lbl"><input type="checkbox" class="notify_event" value="password_reset" checked> Password reset</label>
+            <label class="details_lbl"><input type="checkbox" class="notify_event" value="profile_change" checked> Profile change</label>
+            <label class="details_lbl"><input type="checkbox" class="notify_event" value="high_value" checked> High-value transfer</label>
+          </div>
+          <button type="button" id="save_notify_prefs_btn" class="btn btn-primary" style="margin-top:10px;">Save preferences</button>
         </div>
         <div id="pending_transaction_requests_pane" style="display:none;">
 					<table class="table table-hover table-bordered table-color fixed-header" id="pending_requests_tbl">
