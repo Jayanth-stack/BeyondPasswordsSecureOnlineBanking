@@ -226,6 +226,35 @@
                 <tbody>
                 </tbody>
             </table>
+            <div id="freeze_controls" style="display:none;margin-top:20px;">
+              <h4 class="header_text" style="color:white;">Account Freeze / Stop-Payment</h4>
+              <p id="emp_freeze_status" style="color:#ffc107;">No freeze on file.</p>
+              <select id="emp_freeze_account" style="height:30px;margin-right:5px;">
+                <option value="select">Select Account</option>
+              </select>
+              <select id="emp_freeze_reason" style="height:30px;margin-right:5px;">
+                <option value="employee">Staff</option>
+                <option value="fraud">Suspected fraud</option>
+                <option value="legal">Legal hold</option>
+                <option value="lost">Lost / stolen</option>
+              </select>
+              <button type="button" id="emp_freeze_btn" class="btn btn-primary">Freeze</button>
+              <button type="button" id="emp_unfreeze_btn" class="btn btn-primary">Unfreeze</button>
+              <br/><br/>
+              <input type="text" id="emp_stop_cheque" placeholder="Cheque No." style="height:30px;margin-right:5px;"/>
+              <button type="button" id="emp_stop_btn" class="btn btn-primary">Stop Payment</button>
+              <table class="table table-hover table-bordered table-color" id="emp_freeze_tbl" style="margin-top:10px;">
+                <thead>
+                  <tr>
+                    <th>Account</th>
+                    <th>Reason</th>
+                    <th>Status</th>
+                    <th>Freeze ID</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
         </div>
         <div id="account_details_pane" style="display:none;">
           <label class="details_lbl" for="first_name">First name:</label>

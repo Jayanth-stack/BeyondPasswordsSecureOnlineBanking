@@ -126,6 +126,7 @@ function appendPrimaryData(data) {
 
   createCheckDropdown();
   fillPendingTransTbl(data);
+  renderFreezePane(data);
 }
 
 function fillPendingTransTbl(data){
@@ -202,6 +203,237 @@ function optionExists(needle, haystack) {
     }
   }
   return optionExists;
+}
+
+function accountIsFrozen(data, accountNo) {
+  if(!data || !data.Freezes){
+    return false;
+  }
+  if(data.Freezes.customer_frozen){
+    return true;
+  }
+  var frozen = data.Freezes.frozen_accounts || [];
+  var text = String(accountNo);
+  for(var i=0; i<frozen.length; i++){
+    if(String(frozen[i]) === text){
+      return true;
+    }
+  }
+  return false;
+}
+
+function renderFreezePane(data) {
+  var freezeData = (data && data.Freezes) ? data.Freezes : {freezes: [], stops: [], frozen_accounts: []};
+  var badges = [
+    ['sa_freeze_badge', savings_ac_no],
+    ['ca_freeze_badge', checking_ac_no],
+    ['cc_freeze_badge', cc_no]
+  ];
+  for(var b=0; b<badges.length; b++){
+    var el = document.getElementById(badges[b][0]);
+    if(!el){ continue; }
+    if(accountIsFrozen(data, badges[b][1])){
+      el.style.display = 'block';
+    }
+    else {
+      el.style.display = 'none';
+    }
+  }
+
+  var status = document.getElementById('freeze_status_line');
+  if(status){
+    if(freezeData.customer_frozen){
+      status.innerHTML = 'All accounts are frozen.';
+    }
+    else if((freezeData.frozen_accounts || []).length){
+      status.innerHTML = 'Frozen accounts: ' + freezeData.frozen_accounts.join(', ');
+    }
+    else {
+      status.innerHTML = 'No accounts are frozen.';
+    }
+  }
+
+  var select = document.getElementById('freeze_account_select');
+  if(select){
+    while(select.options.length > 1){
+      select.remove(1);
+    }
+    var accounts = [];
+    if($('#sa_card').css('display')!='none' && savings_ac_no){ accounts.push(['Savings - '+savings_ac_no, savings_ac_no]); }
+    if($('#ca_card').css('display')!='none' && checking_ac_no){ accounts.push(['Checking - '+checking_ac_no, checking_ac_no]); }
+    if($('#cc_card').css('display')!='none' && cc_no){ accounts.push(['Credit - '+cc_no, cc_no]); }
+    for(var i=0; i<accounts.length; i++){
+      var option = document.createElement('OPTION');
+      option.innerHTML = accounts[i][0];
+      option.value = accounts[i][1];
+      select.options.add(option);
+    }
+  }
+
+  fillFreezeTable(freezeData.freezes || []);
+  fillStopTable(freezeData.stops || []);
+}
+
+function fillFreezeTable(rows) {
+  var table = document.getElementById('freeze_tbl');
+  if(!table){ return; }
+  var rowCount = table.rows.length;
+  try {
+    for(var i=1; i<rowCount; i++) {
+      table.deleteRow(i);
+      rowCount--;
+      i--;
+    }
+  }catch(e) {}
+  if(!rows.length){
+    var empty = table.insertRow(1);
+    empty.insertCell(0).innerHTML = 'None';
+    empty.insertCell(1).innerHTML = '';
+    empty.insertCell(2).innerHTML = '';
+    empty.insertCell(3).innerHTML = '';
+    return;
+  }
+  for(var i=0; i<rows.length; i++){
+    var row = table.insertRow(table.rows.length);
+    row.insertCell(0).innerHTML = rows[i].account;
+    row.insertCell(1).innerHTML = rows[i].reason;
+    row.insertCell(2).innerHTML = rows[i].status;
+    row.insertCell(3).innerHTML = rows[i].freeze_id;
+  }
+}
+
+function fillStopTable(rows) {
+  var table = document.getElementById('stop_tbl');
+  var select = document.getElementById('stop_id_select');
+  if(!table){ return; }
+  var rowCount = table.rows.length;
+  try {
+    for(var i=1; i<rowCount; i++) {
+      table.deleteRow(i);
+      rowCount--;
+      i--;
+    }
+  }catch(e) {}
+  if(select){
+    while(select.options.length > 1){
+      select.remove(1);
+    }
+  }
+  if(!rows.length){
+    var empty = table.insertRow(1);
+    empty.insertCell(0).innerHTML = 'None';
+    empty.insertCell(1).innerHTML = '';
+    empty.insertCell(2).innerHTML = '';
+    empty.insertCell(3).innerHTML = '';
+    return;
+  }
+  for(var i=0; i<rows.length; i++){
+    var row = table.insertRow(table.rows.length);
+    row.insertCell(0).innerHTML = rows[i].cheque_no;
+    row.insertCell(1).innerHTML = rows[i].reason;
+    row.insertCell(2).innerHTML = rows[i].status;
+    row.insertCell(3).innerHTML = rows[i].stop_id;
+    if(select && rows[i].status === 'active'){
+      var option = document.createElement('OPTION');
+      option.innerHTML = rows[i].cheque_no + ' - ' + rows[i].stop_id.slice(0,8);
+      option.value = rows[i].stop_id;
+      select.options.add(option);
+    }
+  }
+}
+
+function freezeAccount() {
+  var account = $('#freeze_account_select').val();
+  if(account === 'select' || !account){
+    window.alert('Select an account to freeze');
+    return;
+  }
+  fetch(homeURL+'freezeAccount', {
+    method: 'post',
+    body: JSON.stringify({
+      userid: userid,
+      account: account,
+      reason: $('#freeze_reason_select').val()
+    }),
+    headers: { 'Content-type': 'application/json' }
+  }).then(function(response){
+    return response.json();
+  }).then(function(data){
+    window.alert(data.message);
+    getUser();
+  }).catch(function(error){
+    console.error(error);
+  });
+}
+
+function unfreezeSelectedAccount() {
+  var table = document.getElementById('freeze_tbl');
+  var freezeId = null;
+  if(table){
+    for(var i=1; i<table.rows.length; i++){
+      var statusCell = table.rows[i].cells[2];
+      if(statusCell && statusCell.innerHTML === 'active'){
+        freezeId = table.rows[i].cells[3].innerHTML;
+        break;
+      }
+    }
+  }
+  if(!freezeId){
+    window.alert('No active freeze to release');
+    return;
+  }
+  fetch(homeURL+'unfreezeAccount', {
+    method: 'post',
+    body: JSON.stringify({ userid: userid, freeze_id: freezeId }),
+    headers: { 'Content-type': 'application/json' }
+  }).then(function(response){
+    return response.json();
+  }).then(function(data){
+    window.alert(data.message);
+    getUser();
+  }).catch(function(error){
+    console.error(error);
+  });
+}
+
+function placeStopPayment() {
+  var chequeNo = $('#stop_cheque_no').val();
+  if(!chequeNo){
+    window.alert('Enter a cheque number');
+    return;
+  }
+  fetch(homeURL+'stopPayment', {
+    method: 'post',
+    body: JSON.stringify({ userid: userid, cheque_no: chequeNo }),
+    headers: { 'Content-type': 'application/json' }
+  }).then(function(response){
+    return response.json();
+  }).then(function(data){
+    window.alert(data.message);
+    getUser();
+  }).catch(function(error){
+    console.error(error);
+  });
+}
+
+function cancelSelectedStop() {
+  var stopId = $('#stop_id_select').val();
+  if(stopId === 'select' || !stopId){
+    window.alert('Select a stop-payment to cancel');
+    return;
+  }
+  fetch(homeURL+'cancelStopPayment', {
+    method: 'post',
+    body: JSON.stringify({ userid: userid, stop_id: stopId }),
+    headers: { 'Content-type': 'application/json' }
+  }).then(function(response){
+    return response.json();
+  }).then(function(data){
+    window.alert(data.message);
+    getUser();
+  }).catch(function(error){
+    console.error(error);
+  });
 }
 
 function logout() {
@@ -854,6 +1086,7 @@ $(document).ready(function() {
       $('#service_requests_menu').css('background-color','maroon');
       $('#my_accounts_menu').css('background-color','maroon');
       $('#pending_transaction_requests_menu').css('background-color','maroon');
+      $('#account_controls_menu').css('background-color','maroon');
     });
     $('#service_requests_menu').on('click', function(){
       if($('#service_requests_pane').css('display')=='none'){
@@ -862,6 +1095,7 @@ $(document).ready(function() {
       $('#service_requests_menu').css('background-color','#FF6600');
       $('#my_accounts_menu').css('background-color','maroon');
       $('#pending_transaction_requests_menu').css('background-color','maroon');
+      $('#account_controls_menu').css('background-color','maroon');
     });
     $('#my_accounts_menu').on('click', function(){
       getUser();
@@ -880,6 +1114,7 @@ $(document).ready(function() {
       $('#my_accounts_menu').css('background-color','#FF6600');
       $('#service_requests_menu').css('background-color','maroon');
       $('#pending_transaction_requests_menu').css('background-color','maroon');
+      $('#account_controls_menu').css('background-color','maroon');
     });
     $('#pending_transaction_requests_menu').on('click', function(){
       if($('#pending_transaction_requests_pane').css('display')=='none'){
@@ -888,7 +1123,21 @@ $(document).ready(function() {
       $('#pending_transaction_requests_menu').css('background-color','#FF6600');
       $('#my_accounts_menu').css('background-color','maroon');
       $('#service_requests_menu').css('background-color','maroon');
+      $('#account_controls_menu').css('background-color','maroon');
     });
+    $('#account_controls_menu').on('click', function(){
+      if($('#account_controls_pane').css('display')=='none'){
+          $('#account_controls_pane').show().siblings('div').hide();
+      }
+      $('#account_controls_menu').css('background-color','#FF6600');
+      $('#my_accounts_menu').css('background-color','maroon');
+      $('#service_requests_menu').css('background-color','maroon');
+      $('#pending_transaction_requests_menu').css('background-color','maroon');
+    });
+    $('#freeze_account_btn').on('click', function(){ freezeAccount(); });
+    $('#unfreeze_account_btn').on('click', function(){ unfreezeSelectedAccount(); });
+    $('#stop_payment_btn').on('click', function(){ placeStopPayment(); });
+    $('#cancel_stop_btn').on('click', function(){ cancelSelectedStop(); });
     $('#my_accounts_menu').click();
 	  $(".loader-wrapper").delay( 1000 ).fadeOut("slow");
     $('input:radio[name="satransfer"]').change(

@@ -242,6 +242,7 @@ function appendSecondaryData(customer_id, data) {
   document.getElementById("address").innerHTML = data.Info.address;
 
   fillCustomerAccTbl(data);
+  renderEmployeeFreeze(customer_id, data);
   if($('#cust_details_card').css('display')=='none'){
     $('#cust_details_card').show();
   }
@@ -299,6 +300,118 @@ function fillCustomerAccTbl(data){
 	  var cell3 = row.insertCell(2);
 	  cell3.innerHTML = data.Accounts.credit.Balance;
   }
+}
+
+function renderEmployeeFreeze(customer_id, data) {
+  var pane = document.getElementById('freeze_controls');
+  if(!pane){ return; }
+  pane.style.display = 'block';
+  var freezeData = (data && data.Freezes) ? data.Freezes : {freezes: [], frozen_accounts: []};
+  var status = document.getElementById('emp_freeze_status');
+  if(status){
+    if((freezeData.frozen_accounts || []).length || freezeData.customer_frozen){
+      status.innerHTML = 'Frozen: ' + (freezeData.frozen_accounts || []).join(', ') || 'customer-wide';
+    }
+    else {
+      status.innerHTML = 'No freeze on file.';
+    }
+  }
+  var select = document.getElementById('emp_freeze_account');
+  if(select){
+    while(select.options.length > 1){ select.remove(1); }
+    ['savings','checkin','credit'].forEach(function(key){
+      var item = data.Accounts && data.Accounts[key];
+      if(item && item !== 'None' && item.Account){
+        var option = document.createElement('OPTION');
+        option.innerHTML = key + ' - ' + item.Account;
+        option.value = item.Account;
+        select.options.add(option);
+      }
+    });
+  }
+  var table = document.getElementById('emp_freeze_tbl');
+  if(table){
+    var rowCount = table.rows.length;
+    try {
+      for(var i=1; i<rowCount; i++){
+        table.deleteRow(i);
+        rowCount--;
+        i--;
+      }
+    }catch(e){}
+    var rows = freezeData.freezes || [];
+    for(var i=0; i<rows.length; i++){
+      var row = table.insertRow(table.rows.length);
+      row.insertCell(0).innerHTML = rows[i].account;
+      row.insertCell(1).innerHTML = rows[i].reason;
+      row.insertCell(2).innerHTML = rows[i].status;
+      row.insertCell(3).innerHTML = rows[i].freeze_id;
+    }
+  }
+}
+
+function employeeFreezeAccount() {
+  var customerId = $('#customer_id_input').val();
+  var account = $('#emp_freeze_account').val();
+  if(!customerId || account === 'select'){
+    window.alert('Search a customer and select an account');
+    return;
+  }
+  fetch(homeURL+'freezeAccount', {
+    method: 'post',
+    body: JSON.stringify({
+      userid: userid,
+      customer_id: customerId,
+      account: account,
+      reason: $('#emp_freeze_reason').val()
+    }),
+    headers: { 'Content-type': 'application/json' }
+  }).then(function(response){ return response.json(); }).then(function(data){
+    window.alert(data.message);
+    getCustomer(customerId);
+  }).catch(function(error){ console.error(error); });
+}
+
+function employeeUnfreezeAccount() {
+  var table = document.getElementById('emp_freeze_tbl');
+  var freezeId = null;
+  if(table){
+    for(var i=1; i<table.rows.length; i++){
+      if(table.rows[i].cells[2] && table.rows[i].cells[2].innerHTML === 'active'){
+        freezeId = table.rows[i].cells[3].innerHTML;
+        break;
+      }
+    }
+  }
+  if(!freezeId){
+    window.alert('No active freeze to release');
+    return;
+  }
+  fetch(homeURL+'unfreezeAccount', {
+    method: 'post',
+    body: JSON.stringify({ userid: userid, freeze_id: freezeId }),
+    headers: { 'Content-type': 'application/json' }
+  }).then(function(response){ return response.json(); }).then(function(data){
+    window.alert(data.message);
+    getCustomer($('#customer_id_input').val());
+  }).catch(function(error){ console.error(error); });
+}
+
+function employeeStopPayment() {
+  var customerId = $('#customer_id_input').val();
+  var chequeNo = $('#emp_stop_cheque').val();
+  if(!customerId || !chequeNo){
+    window.alert('Enter customer ID and cheque number');
+    return;
+  }
+  fetch(homeURL+'stopPayment', {
+    method: 'post',
+    body: JSON.stringify({ userid: userid, customer_id: customerId, cheque_no: chequeNo }),
+    headers: { 'Content-type': 'application/json' }
+  }).then(function(response){ return response.json(); }).then(function(data){
+    window.alert(data.message);
+    getCustomer(customerId);
+  }).catch(function(error){ console.error(error); });
 }
 
 function approve_request(userid, xactno) {
@@ -645,6 +758,9 @@ $(document).ready(function() {
         getCustomer($('#customer_id_input').val());
       }
     });
+    $('#emp_freeze_btn').on('click', function(){ employeeFreezeAccount(); });
+    $('#emp_unfreeze_btn').on('click', function(){ employeeUnfreezeAccount(); });
+    $('#emp_stop_btn').on('click', function(){ employeeStopPayment(); });
     $('#modify_customer_account_get_btn').on('click', function(){
       if($('#modify_userid').val() == ''){
         window.alert('No input!');
@@ -656,6 +772,7 @@ $(document).ready(function() {
     $('#customer_id_clear_btn').on('click', function(){
       $('#cust_details_card').hide();
       $('#cust_accounts_tbl').hide();
+      $('#freeze_controls').hide();
     });
     $('#approve_trans_btn').on('click', function(){
       if($('#customer_trans_no').val() == 'select'){

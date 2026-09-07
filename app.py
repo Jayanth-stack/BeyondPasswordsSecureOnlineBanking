@@ -8,6 +8,13 @@ from customer import Customers
 from employee import Employee
 from twilio.base.exceptions import TwilioRestException
 from utility.encrypt import check_encrypted_password
+from utility.freeze import (
+    attach_freeze_routes,
+    build_service as build_freeze_service,
+    enforce_freeze,
+    enforce_stop,
+    own_accounts_from_customer_payload,
+)
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -22,6 +29,37 @@ app.secret_key = os.urandom(24)
 
 CORS(app)
 Bcrypt(app)
+
+freeze_service = build_freeze_service()
+
+
+def _customer_own_accounts(userid):
+    try:
+        return own_accounts_from_customer_payload(Customers().get_all_account(userid))
+    except Exception:
+        return []
+
+
+def _freeze_owner():
+    if session.get('usertype') == 'customer':
+        return session.get('userid')
+    return None
+
+
+def _maybe_freeze(operation, account, owner_userid=None):
+    blocked = enforce_freeze(
+        freeze_service,
+        operation=operation,
+        account=account,
+        userid=owner_userid if owner_userid is not None else _freeze_owner(),
+    )
+    if not blocked:
+        return None
+    body, status = blocked
+    return jsonify(body), status
+
+
+attach_freeze_routes(app, freeze_service, own_accounts_loader=_customer_own_accounts)
 
 account_sid = 'your Account_sid'
 auth_token = 'your Auth_token'
@@ -259,7 +297,8 @@ def get_customer_data():
         response = {
             'Accounts': c.get_all_account(customer_id),
             'Info': c.get_customer_details(customer_id),
-            'FundsRequests': c.get_funds_requests(customer_id)
+            'FundsRequests': c.get_funds_requests(customer_id),
+            'Freezes': freeze_service.snapshot(customer_id),
         }
         return jsonify(response), 200
     except Exception as e:
@@ -358,6 +397,10 @@ def fund_transfers():
         logging.warning(f"Session user ID does not match request user ID.")
         return jsonify({'message': 'User ID mismatch'}), 401
 
+    frozen = _maybe_freeze('transfer', values['fromAccount'])
+    if frozen is not None:
+        return frozen
+
     values['fromAccount'] = int(values['fromAccount'])
     values['toAccount'] = int(values['toAccount'])
     values['amount'] = float(values['amount'])
@@ -391,6 +434,10 @@ def request_funds():
     if values['userid'] != session['userid']:
         return jsonify({'message': 'User ID mismatch'}), 401
 
+    frozen = _maybe_freeze('request', values['fromAccount'])
+    if frozen is not None:
+        return frozen
+
     customer = Customers()
     response = customer.fund_request(values['fromAccount'], values['toAccount'], values['amount'])
     return jsonify({'message': response}), 200
@@ -417,6 +464,10 @@ def deposit_fund():
     if values['userid'] != session['userid']:
         return jsonify({'message': 'User ID mismatch'}), 401
 
+    frozen = _maybe_freeze('deposit', values['account'])
+    if frozen is not None:
+        return frozen
+
     employee = Employee()
     response = employee.add_transaction_deposit(values['account'], values['amount'])
     return jsonify({'message': response}), 200
@@ -442,6 +493,10 @@ def withdraw_fund():
 
     if values['userid'] != session['userid']:
         return jsonify({'message': 'User ID mismatch'}), 401
+
+    frozen = _maybe_freeze('withdraw', values['account'])
+    if frozen is not None:
+        return frozen
 
     customer = Customers()
     response = customer.debit_request(values['account'], values['amount'])
@@ -481,6 +536,9 @@ def approve_request():
         status = emp.get_transaction_status(int(values['transaction_no']))
 
         if from_account != -1 and to_account != -1 and amount != -1 and status != 0:
+            frozen = _maybe_freeze('approve', from_account, owner_userid=values['customer_id'])
+            if frozen is not None:
+                return frozen
             c = Customers()
             response = {
                 'message': c.fund_transfers(from_account, to_account, amount, int(values['transaction_no']))
@@ -522,6 +580,9 @@ def approve_request_employee():
         status = emp.get_transaction_status(values['transaction_no'])
 
         if from_account != -1 and to_account != -1 and amount != -1 and status != 0:
+            frozen = _maybe_freeze('approve', from_account)
+            if frozen is not None:
+                return frozen
             c = Customers()
             result = c.fund_transfers(from_account, to_account, amount, int(values['transaction_no']))
             return jsonify({'message': result}), 200
@@ -615,6 +676,9 @@ def make_cashier_cheque():
 
     # Validate if the user in the request is the same as the one logged in and check session expiration
     if 'userid' in session and session['userid'] == values['userid']:
+        frozen = _maybe_freeze('cheque', values['from_account'])
+        if frozen is not None:
+            return frozen
         # Further checks can be added here to validate the user's permission if needed
         c = Customers()
         try:
@@ -644,6 +708,10 @@ def deposit_cheque():
 
     # Ensure that the session is valid for the requested operation
     if 'userid' in session and session.get('usertype') == 'customer' and session['userid'] == values['userid']:
+        stopped = enforce_stop(freeze_service, cheque_no=values['cheque_no'])
+        if stopped is not None:
+            body, status = stopped
+            return jsonify(body), status
         c = Customers()
         response = {
             'message': c.deposit_check(values['userid'], values['cheque_no'])
@@ -878,7 +946,8 @@ def get_customer():
             c = Customers()
             response = {
                 'Accounts': c.get_all_account(values['customer_id']),
-                'Info': c.get_customer_details(values['customer_id'])
+                'Info': c.get_customer_details(values['customer_id']),
+                'Freezes': freeze_service.snapshot(values['customer_id']),
             }
             return jsonify(response), 200
         except Exception as e:
