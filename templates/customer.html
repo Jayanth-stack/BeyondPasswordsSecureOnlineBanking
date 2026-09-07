@@ -101,6 +101,15 @@
         Service Requests
         </button>
 
+        <button type="button" class="btn btn-primary btn-block"
+        id="account_controls_menu">
+        <span class="glyphicon glyphicon-lock gi-3x"
+        style="color: white" aria-hidden="true">
+        </span>
+        <br />
+        Freeze / Stop-Payment
+        </button>
+
       </div>
 
       <div class="col-sm-9">
@@ -118,6 +127,7 @@
                 <p id="sa_balance">NA</p>
                 <br/>
               </div>
+              <p id="sa_freeze_badge" class="freeze_badge" style="display:none;">FROZEN — outbound blocked</p>
               <button type="button" data-toggle="modal" data-target="#saDepositModal" class="btn btn-primary" style="width:80%;margin-bottom:10px;margin-top:10px;">Deposit Fund</button>
               <button type="button" data-toggle="modal" data-target="#saTransferModal" class="btn btn-primary" style="width:80%;margin-bottom:10px;">Transfer Fund</button>
               <button type="button" id="view_sa_xacts_btn" data-toggle="modal" data-target="#saTransactionsModal" class="btn btn-primary" style="width:80%;margin-bottom:10px;">View Transactions</button>
@@ -135,6 +145,7 @@
                 <p id="ca_balance">NA</p>
                 <br/>
               </div>
+              <p id="ca_freeze_badge" class="freeze_badge" style="display:none;">FROZEN — outbound blocked</p>
               <button type="button" data-toggle="modal" data-target="#caDepositModal" class="btn btn-primary" style="width:80%;margin-bottom:10px;margin-top:10px;">Deposit Fund</button>
               <button type="button" data-toggle="modal" data-target="#caTransferModal" class="btn btn-primary" style="width:80%;margin-bottom:10px;">Transfer Fund</button>
               <button type="button" id="view_ca_xacts_btn" data-toggle="modal" data-target="#caTransactionsModal" class="btn btn-primary" style="width:80%;margin-bottom:10px;">View Transactions</button>
@@ -155,6 +166,7 @@
                 <p style="color: red;">$5000</p>
                 <br/>
               </div>
+              <p id="cc_freeze_badge" class="freeze_badge" style="display:none;">FROZEN — outbound blocked</p>
               <button type="button" data-toggle="modal" data-target="#ccTransferModal" class="btn btn-primary" style="width:80%;margin-bottom:10px;margin-top:10px;">Initiate Transaction</button>
               <button type="button" id="view_cc_xacts_btn" data-toggle="modal" data-target="#ccTransactionsModal" class="btn btn-primary" style="width:80%;margin-bottom:10px;">View Transactions</button>
             </div>
@@ -167,6 +179,55 @@
           <button type="button" data-toggle="modal" data-target="#depCheckModal" class="btn btn-primary btn-block" style="margin-top:10px;margin-bottom:10px;">Deposit Cashier Cheque</button>
           <button type="button" id="viewCheck_btn" data-toggle="modal" data-target="#viewCheckModal" class="btn btn-primary btn-block" style="margin-top:10px;margin-bottom:10px;">View All Cashier Cheques</button>
           <button type="button" data-toggle="modal" data-target="#newAccModal" class="btn btn-primary btn-block" style="margin-top:10px;margin-bottom:10px;">Open New Account</button>
+        </div>
+        <div id="account_controls_pane" class="my_accs_float" style="display:none;">
+          <h4 style="color:white;">Account Freeze</h4>
+          <p style="color:#ffc107;">Freezing blocks transfers, withdrawals, and new cashier cheques. Deposits still work. This is not the same as a bank closing the account.</p>
+          <p id="freeze_status_line" style="color:white;">No accounts are frozen.</p>
+          <select id="freeze_account_select" style="height:30px;margin-right:5px;">
+            <option value="select">Select Account</option>
+          </select>
+          <select id="freeze_reason_select" style="height:30px;margin-right:5px;">
+            <option value="customer">Customer request</option>
+            <option value="lost">Lost / stolen</option>
+          </select>
+          <button type="button" id="freeze_account_btn" class="btn btn-primary" style="margin-right:5px;">Freeze</button>
+          <button type="button" id="unfreeze_account_btn" class="btn btn-primary">Unfreeze</button>
+          <table class="table table-hover table-bordered table-color" id="freeze_tbl" style="margin-top:15px;">
+            <thead>
+              <tr>
+                <th>Account</th>
+                <th>Reason</th>
+                <th>Status</th>
+                <th>Freeze ID</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td colspan="4">None</td></tr>
+            </tbody>
+          </table>
+          <hr>
+          <h4 style="color:white;">Stop-Payment (Cashier Cheque)</h4>
+          <p style="color:#ffc107;">Stops an issued cashier cheque from being deposited. Cancel anytime before it is presented.</p>
+          <input type="text" id="stop_cheque_no" placeholder="Cheque No." pattern="\d*" maxlength="16" oninput="validity.valid||(value='');" style="height:30px;margin-right:5px;"/>
+          <button type="button" id="stop_payment_btn" class="btn btn-primary" style="margin-right:5px;">Stop Payment</button>
+          <button type="button" id="cancel_stop_btn" class="btn btn-primary">Cancel Stop</button>
+          <select id="stop_id_select" style="height:30px;margin-left:5px;">
+            <option value="select">Select Stop ID</option>
+          </select>
+          <table class="table table-hover table-bordered table-color" id="stop_tbl" style="margin-top:15px;">
+            <thead>
+              <tr>
+                <th>Cheque No.</th>
+                <th>Reason</th>
+                <th>Status</th>
+                <th>Stop ID</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td colspan="4">None</td></tr>
+            </tbody>
+          </table>
         </div>
         <div id="no_accounts_pane" style="display:none;">
           <p style="color:white;">You don't have any accounts with us.</p><br>
@@ -352,6 +413,7 @@
                 <label for="sa_request_radio">Request Money</label><br/><br/>
                 <b>&nbsp;&nbsp;&nbsp;</b><input type="text" id= "sa_transfer_acno_input" placeholder="To Account No." pattern="\d*" maxlength="10" oninput="validity.valid||(value='');"/><br/><br/>
                 <b>$</b> <input type="text" id="saTransfer_amt" placeholder="Enter Amount" pattern="\d*" maxlength="6" oninput="validity.valid||(value='');"/>
+                <p class="freeze_hint">Frozen accounts cannot send money. Freeze / Stop-Payment is in the left menu.</p>
               </div>
               <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
@@ -469,6 +531,7 @@
                 <select id="orderCheck_fromAccount">
                   <option value="select">Select your Account</option>
                 </select>
+                <p class="freeze_hint">A frozen source account cannot issue a new cashier cheque. Use Stop-Payment for an already issued cheque.</p>
                 <!-- <input type="text" id="orderCheck_fromAccount" placeholder="Enter Your account No." pattern="[0-9]{10}"/> -->
               </div>
               <div class="modal-footer">
@@ -489,6 +552,7 @@
               </div>
               <div class="modal-body">
                 <input type="text" id="depCheck_no" placeholder="Cashier Cheque ID" pattern="\d*" maxlength="10" oninput="validity.valid||(value='');"/><br/><br/>
+                <p class="freeze_hint">Cheques with an active stop-payment cannot be deposited.</p>
               </div>
               <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>

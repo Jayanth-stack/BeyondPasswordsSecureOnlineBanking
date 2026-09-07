@@ -6,3 +6,17 @@ DB_USER=root
 DB_PASSWORD=root
 DB_PORT=3306
 DB_NAME=bankingapplication
+
+# Account freeze / stop-payment (optional)
+FREEZE_ENABLED=true
+FREEZE_STORE=sqlite
+FREEZE_DB=SystemLogs/freeze.sqlite
+FREEZE_BLOCK_OUTBOUND=true
+FREEZE_BLOCK_INBOUND=false
+FREEZE_CUSTOMER_SELF=true
+FREEZE_CUSTOMER_UNFREEZE=true
+STOP_PAYMENT_ENABLED=true
+STOP_PAYMENT_CUSTOMER=true
+FREEZE_OPERATIONS=transfer,withdraw,cheque,approve,request
+FREEZE_MAX_OPEN=20
+STOP_PAYMENT_MAX_OPEN=50
