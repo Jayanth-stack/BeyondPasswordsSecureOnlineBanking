@@ -226,6 +226,27 @@
                 <tbody>
                 </tbody>
             </table>
+            <div id="cust_schedules_card" style="display:none;margin-top:20px;">
+              <h4 class="header_text" style="color:white;">Scheduled Transfers</h4>
+              <p style="color:#ffc107;">Staff can cancel a customer's calendar instruction. Due runs still go through the existing approval queue.</p>
+              <select id="cust_schedule_id_select" style="height:30px;margin-right:5px;">
+                <option value="select">Select Schedule</option>
+              </select>
+              <button type="button" id="cust_schedule_cancel_btn" class="btn btn-primary">Cancel Schedule</button>
+              <table class="table table-hover table-bordered table-color" id="cust_schedules_tbl" style="margin-top:15px;">
+                <thead>
+                  <tr>
+                    <th>From</th>
+                    <th>To</th>
+                    <th>Amount</th>
+                    <th>Every</th>
+                    <th>Next run</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
         </div>
         <div id="account_details_pane" style="display:none;">
           <label class="details_lbl" for="first_name">First name:</label>

@@ -172,3 +172,13 @@ body {
   /*noinspection CssInvalidFunction*/
   border-color: lighten(var(--success-color), 55%);
 }
+
+.schedule_hint {
+  color: #8a6d3b;
+  margin-top: 10px;
+  font-size: 12px;
+}
+
+#scheduled_transfers_pane .table {
+  background-color: #fff;
+}

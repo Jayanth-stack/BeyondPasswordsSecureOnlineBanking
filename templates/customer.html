@@ -101,6 +101,15 @@
         Service Requests
         </button>
 
+        <button type="button" class="btn btn-primary btn-block"
+        id="scheduled_transfers_menu">
+        <span class="glyphicon glyphicon-time gi-3x"
+        style="color: white" aria-hidden="true">
+        </span>
+        <br />
+        Scheduled Transfers
+        </button>
+
       </div>
 
       <div class="col-sm-9">
@@ -204,6 +213,43 @@
           <!-- <input type="text" id="xact_id_acc_den" placeholder="Enter Transaction No." style="height:30px;margin-right:5px;"> -->
           <button type="button" id="pending_req_accept" class="btn btn-primary" style="width:100px;color:white;background-color:green;margin-right:5px;">Accept</button>
           <button type="button" id="pending_req_deny" class="btn btn-primary" style="width:100px;color:white;background-color:red;margin-left:5px;">Deny</button>
+        </div>
+        <div id="scheduled_transfers_pane" class="my_accs_float" style="display:none;">
+          <h4 style="color:white;">Scheduled Transfers</h4>
+          <p style="color:#ffc107;">One-time or repeating transfers. When due, they enter the same employee-approval queue as an immediate transfer. This is not a hold on a new payee.</p>
+          <p id="schedule_status_line" style="color:white;">No scheduled transfers.</p>
+          <select id="schedule_from_account" style="height:30px;margin-right:5px;">
+            <option value="select">From Account</option>
+          </select>
+          <input type="text" id="schedule_to_account" placeholder="To Account No." pattern="\d*" maxlength="16" oninput="validity.valid||(value='');" style="height:30px;margin-right:5px;"/>
+          <b>$</b> <input type="text" id="schedule_amount" placeholder="Amount" pattern="\d*" maxlength="8" oninput="validity.valid||(value='');" style="height:30px;margin-right:5px;width:90px;"/>
+          <select id="schedule_interval" style="height:30px;margin-right:5px;">
+            <option value="once">Once</option>
+            <option value="daily">Daily</option>
+            <option value="weekly">Weekly</option>
+            <option value="monthly">Monthly</option>
+          </select>
+          <input type="datetime-local" id="schedule_start_at" style="height:30px;margin-right:5px;"/>
+          <button type="button" id="schedule_create_btn" class="btn btn-primary" style="margin-right:5px;">Schedule</button>
+          <select id="schedule_id_select" style="height:30px;margin-right:5px;">
+            <option value="select">Select Schedule</option>
+          </select>
+          <button type="button" id="schedule_pause_btn" class="btn btn-primary" style="margin-right:5px;">Pause</button>
+          <button type="button" id="schedule_resume_btn" class="btn btn-primary" style="margin-right:5px;">Resume</button>
+          <button type="button" id="schedule_cancel_btn" class="btn btn-primary">Cancel</button>
+          <table class="table table-hover table-bordered table-color" id="schedule_tbl" style="margin-top:15px;">
+            <thead>
+              <tr>
+                <th>From</th>
+                <th>To</th>
+                <th>Amount</th>
+                <th>Every</th>
+                <th>Next run</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
         </div>
         <div id="account_details_pane" style="display:none;">
 					<label class="details_lbl" for="first_name">First name:</label>
@@ -352,6 +398,7 @@
                 <label for="sa_request_radio">Request Money</label><br/><br/>
                 <b>&nbsp;&nbsp;&nbsp;</b><input type="text" id= "sa_transfer_acno_input" placeholder="To Account No." pattern="\d*" maxlength="10" oninput="validity.valid||(value='');"/><br/><br/>
                 <b>$</b> <input type="text" id="saTransfer_amt" placeholder="Enter Amount" pattern="\d*" maxlength="6" oninput="validity.valid||(value='');"/>
+                <p class="schedule_hint">Need this on a date, or repeating? Use Scheduled Transfers in the left menu. Immediate send is unchanged.</p>
               </div>
               <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
@@ -377,6 +424,7 @@
                 <label for="ca_request_radio">Request Money</label><br/><br/>
                 <b>&nbsp;&nbsp;&nbsp;</b><input type="text" id= "ca_transfer_acno_input" placeholder="To Account No." pattern="\d*" maxlength="10" oninput="validity.valid||(value='');"/><br/><br/>
                 <b>$</b> <input type="text" id="caTransfer_amt" placeholder="Enter Amount" pattern="\d*" maxlength="6" oninput="validity.valid||(value='');"/>
+                <p class="schedule_hint">Need this on a date, or repeating? Use Scheduled Transfers in the left menu. Immediate send is unchanged.</p>
               </div>
               <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
@@ -398,6 +446,7 @@
               <div class="modal-body">
                 <b>&nbsp;&nbsp;&nbsp;</b><input type="text" id="cc_transfer_acno_input" placeholder="Recipient Account No." pattern="\d*" maxlength="10" oninput="validity.valid||(value='');"/><br/><br/>
                 <b>$</b> <input type="text" id="ccTransfer_amt" placeholder="Payment Amount" pattern="\d*" maxlength="6" oninput="validity.valid||(value='');"/>
+                <p class="schedule_hint">Need this on a date, or repeating? Use Scheduled Transfers in the left menu.</p>
               </div>
               <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>

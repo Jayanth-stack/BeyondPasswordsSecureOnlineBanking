@@ -126,6 +126,8 @@ function appendPrimaryData(data) {
 
   createCheckDropdown();
   fillPendingTransTbl(data);
+  fillScheduleFromAccounts();
+  fillScheduleTbl(data);
 }
 
 function fillPendingTransTbl(data){
@@ -202,6 +204,167 @@ function optionExists(needle, haystack) {
     }
   }
   return optionExists;
+}
+
+function formatScheduleTime(ts) {
+  if (!ts) {
+    return '—';
+  }
+  return new Date(ts * 1000).toLocaleString();
+}
+
+function fillScheduleFromAccounts() {
+  var select = document.querySelector('#schedule_from_account');
+  if (!select) {
+    return;
+  }
+  var accounts = [];
+  if ($('#sa_card').css('display') != 'none' && savings_ac_no) {
+    accounts.push({label: 'Savings - ' + savings_ac_no, value: savings_ac_no});
+  }
+  if ($('#ca_card').css('display') != 'none' && checking_ac_no) {
+    accounts.push({label: 'Checking - ' + checking_ac_no, value: checking_ac_no});
+  }
+  if ($('#cc_card').css('display') != 'none' && cc_no) {
+    accounts.push({label: 'Credit - ' + cc_no, value: cc_no});
+  }
+  for (var i = 0; i < accounts.length; i++) {
+    if (!optionExists(accounts[i].value, select)) {
+      var option = document.createElement('OPTION');
+      option.innerHTML = accounts[i].label;
+      option.value = accounts[i].value;
+      select.options.add(option);
+    }
+  }
+}
+
+function fillScheduleTbl(data) {
+  var table = document.getElementById('schedule_tbl');
+  var selection = document.getElementById('schedule_id_select');
+  if (!table) {
+    return;
+  }
+  var rowCount = table.rows.length;
+  try {
+    for (var i = 1; i < rowCount; i++) {
+      table.deleteRow(i);
+      rowCount--;
+      i--;
+    }
+  } catch (e) {
+    console.error(e);
+  }
+  if (selection) {
+    selection.options.length = 1;
+  }
+  var snap = data && data.Schedules ? data.Schedules : null;
+  var rows = snap && snap.schedules ? snap.schedules : [];
+  var openCount = snap && typeof snap.open_count === 'number' ? snap.open_count : 0;
+  var statusLine = document.getElementById('schedule_status_line');
+  if (statusLine) {
+    statusLine.innerHTML = openCount === 0
+      ? 'No active scheduled transfers.'
+      : (openCount + ' active schedule' + (openCount === 1 ? '' : 's') + '.');
+  }
+  for (var j = 0; j < rows.length; j++) {
+    var item = rows[j];
+    var row = table.insertRow(table.rows.length);
+    row.insertCell(0).innerHTML = item.from_account;
+    row.insertCell(1).innerHTML = item.to_account;
+    row.insertCell(2).innerHTML = '$' + item.amount;
+    row.insertCell(3).innerHTML = item.interval;
+    row.insertCell(4).innerHTML = formatScheduleTime(item.next_run);
+    row.insertCell(5).innerHTML = item.status;
+    if (selection && (item.status === 'active' || item.status === 'paused')) {
+      var opt = document.createElement('OPTION');
+      opt.value = item.schedule_id;
+      opt.innerHTML = item.from_account + ' → ' + item.to_account + ' $' + item.amount + ' (' + item.status + ')';
+      selection.options.add(opt);
+    }
+  }
+}
+
+function scheduleAction(path, extra) {
+  var payload = {userid: userid};
+  for (var key in extra) {
+    if (Object.prototype.hasOwnProperty.call(extra, key)) {
+      payload[key] = extra[key];
+    }
+  }
+  return fetch(homeURL + path, {
+    method: 'post',
+    body: JSON.stringify(payload),
+    headers: {'Content-type': 'application/json'}
+  }).then(function(response) {
+    return response.json().then(function(body) {
+      body._status = response.status;
+      return body;
+    });
+  });
+}
+
+function createScheduledTransfer() {
+  var fromAccount = $('#schedule_from_account').val();
+  var toAccount = $('#schedule_to_account').val();
+  var amount = $('#schedule_amount').val();
+  var interval = $('#schedule_interval').val();
+  var startLocal = $('#schedule_start_at').val();
+  if (!fromAccount || fromAccount === 'select' || !toAccount || !amount) {
+    window.alert('From account, to account, and amount are required.');
+    return;
+  }
+  var extra = {
+    fromAccount: fromAccount,
+    toAccount: toAccount,
+    amount: amount,
+    interval: interval
+  };
+  if (startLocal) {
+    extra.start_at = Math.floor(new Date(startLocal).getTime() / 1000);
+  }
+  scheduleAction('scheduleTransfer', extra).then(function(data) {
+    if (data._status >= 200 && data._status < 300) {
+      window.alert('Transfer scheduled.');
+      fillScheduleTbl(data);
+    } else {
+      window.alert(data.message || data.error || 'Could not schedule transfer');
+    }
+  }).catch(function(error) {
+    console.error(error);
+  });
+}
+
+function selectedScheduleId() {
+  var value = $('#schedule_id_select').val();
+  if (!value || value === 'select') {
+    window.alert('Select a scheduled transfer first.');
+    return null;
+  }
+  return value;
+}
+
+function mutateSchedule(path, verb) {
+  var scheduleId = selectedScheduleId();
+  if (!scheduleId) {
+    return;
+  }
+  scheduleAction(path, {schedule_id: scheduleId}).then(function(data) {
+    if (data._status >= 200 && data._status < 300) {
+      window.alert('Schedule ' + verb + '.');
+      fillScheduleTbl(data);
+    } else {
+      window.alert(data.message || data.error || ('Could not ' + verb + ' schedule'));
+    }
+  }).catch(function(error) {
+    console.error(error);
+  });
+}
+
+function resetDashMenus(active) {
+  var ids = ['service_requests_menu', 'my_accounts_menu', 'pending_transaction_requests_menu', 'scheduled_transfers_menu'];
+  for (var i = 0; i < ids.length; i++) {
+    $('#' + ids[i]).css('background-color', ids[i] === active ? '#FF6600' : 'maroon');
+  }
 }
 
 function logout() {
@@ -851,17 +1014,13 @@ $(document).ready(function() {
       if($('#account_details_pane').css('display')=='none'){
           $('#account_details_pane').show().siblings('div').hide();
       }
-      $('#service_requests_menu').css('background-color','maroon');
-      $('#my_accounts_menu').css('background-color','maroon');
-      $('#pending_transaction_requests_menu').css('background-color','maroon');
+      resetDashMenus('');
     });
     $('#service_requests_menu').on('click', function(){
       if($('#service_requests_pane').css('display')=='none'){
           $('#service_requests_pane').show().siblings('div').hide();
       }
-      $('#service_requests_menu').css('background-color','#FF6600');
-      $('#my_accounts_menu').css('background-color','maroon');
-      $('#pending_transaction_requests_menu').css('background-color','maroon');
+      resetDashMenus('service_requests_menu');
     });
     $('#my_accounts_menu').on('click', function(){
       getUser();
@@ -877,17 +1036,31 @@ $(document).ready(function() {
           $('#my_accs_pane').show().siblings('div').hide();
         }
       }
-      $('#my_accounts_menu').css('background-color','#FF6600');
-      $('#service_requests_menu').css('background-color','maroon');
-      $('#pending_transaction_requests_menu').css('background-color','maroon');
+      resetDashMenus('my_accounts_menu');
     });
     $('#pending_transaction_requests_menu').on('click', function(){
       if($('#pending_transaction_requests_pane').css('display')=='none'){
           $('#pending_transaction_requests_pane').show().siblings('div').hide();
       }
-      $('#pending_transaction_requests_menu').css('background-color','#FF6600');
-      $('#my_accounts_menu').css('background-color','maroon');
-      $('#service_requests_menu').css('background-color','maroon');
+      resetDashMenus('pending_transaction_requests_menu');
+    });
+    $('#scheduled_transfers_menu').on('click', function(){
+      if($('#scheduled_transfers_pane').css('display')=='none'){
+          $('#scheduled_transfers_pane').show().siblings('div').hide();
+      }
+      resetDashMenus('scheduled_transfers_menu');
+    });
+    $('#schedule_create_btn').on('click', function(){
+      createScheduledTransfer();
+    });
+    $('#schedule_pause_btn').on('click', function(){
+      mutateSchedule('pauseSchedule', 'paused');
+    });
+    $('#schedule_resume_btn').on('click', function(){
+      mutateSchedule('resumeSchedule', 'resumed');
+    });
+    $('#schedule_cancel_btn').on('click', function(){
+      mutateSchedule('cancelSchedule', 'cancelled');
     });
     $('#my_accounts_menu').click();
 	  $(".loader-wrapper").delay( 1000 ).fadeOut("slow");
