@@ -11,3 +11,4 @@ __pycache__/
 *.log
 .idea/
 flask_session/
+SystemLogs/*.sqlite

@@ -8,6 +8,11 @@ from customer import Customers
 from employee import Employee
 from twilio.base.exceptions import TwilioRestException
 from utility.encrypt import check_encrypted_password
+from utility.schedule import (
+    attach_schedule_routes,
+    build_service as build_schedule_service,
+    own_accounts_from_customer_payload,
+)
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -22,6 +27,33 @@ app.secret_key = os.urandom(24)
 
 CORS(app)
 Bcrypt(app)
+
+
+def _execute_scheduled_transfer(payload):
+    emp = Employee()
+    return emp.add_transaction(
+        payload['from_account'],
+        payload['to_account'],
+        float(payload['amount']),
+    )
+
+
+def _customer_own_accounts(userid):
+    c = Customers()
+    try:
+        return own_accounts_from_customer_payload(c.get_all_account(userid))
+    except Exception:
+        logging.exception('Failed to load accounts for scheduled-transfer owner check')
+        return []
+
+
+schedule_service = build_schedule_service(executor=_execute_scheduled_transfer)
+attach_schedule_routes(
+    app,
+    schedule_service,
+    own_accounts_loader=_customer_own_accounts,
+    executor=_execute_scheduled_transfer,
+)
 
 account_sid = 'your Account_sid'
 auth_token = 'your Auth_token'
@@ -256,10 +288,15 @@ def get_customer_data():
     customer_id = session['userid']
     c = Customers()
     try:
+        try:
+            schedule_service.run_due(userid=customer_id)
+        except Exception:
+            logging.exception('scheduled transfer due-run failed during loadCustomer')
         response = {
             'Accounts': c.get_all_account(customer_id),
             'Info': c.get_customer_details(customer_id),
-            'FundsRequests': c.get_funds_requests(customer_id)
+            'FundsRequests': c.get_funds_requests(customer_id),
+            'Schedules': schedule_service.snapshot(customer_id),
         }
         return jsonify(response), 200
     except Exception as e:
@@ -876,9 +913,14 @@ def get_customer():
     if session['usertype'] in ['tier1', 'tier2', 'employee']:
         try:
             c = Customers()
+            try:
+                schedule_service.run_due(userid=values['customer_id'])
+            except Exception:
+                logging.exception('scheduled transfer due-run failed during getCustomer')
             response = {
                 'Accounts': c.get_all_account(values['customer_id']),
-                'Info': c.get_customer_details(values['customer_id'])
+                'Info': c.get_customer_details(values['customer_id']),
+                'Schedules': schedule_service.snapshot(values['customer_id']),
             }
             return jsonify(response), 200
         except Exception as e:

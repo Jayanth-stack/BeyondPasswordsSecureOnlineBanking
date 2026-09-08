@@ -319,6 +319,7 @@ function appendSecondaryData(customer_id, data) {
   document.getElementById("address").innerHTML = data.Info.address;
 
   fillCustomerAccTbl(data);
+  fillCustomerScheduleTbl(data);
   if($('#cust_details_card').css('display')=='none'){
     $('#cust_details_card').show();
   }
@@ -376,6 +377,77 @@ function fillCustomerAccTbl(data){
 	  var cell3 = row.insertCell(2);
 	  cell3.innerHTML = data.Accounts.credit.Balance;
   }
+}
+
+function fillCustomerScheduleTbl(data) {
+  var table = document.getElementById('cust_schedules_tbl');
+  var selection = document.getElementById('cust_schedule_id_select');
+  var card = document.getElementById('cust_schedules_card');
+  if (!table) {
+    return;
+  }
+  var rowCount = table.rows.length;
+  try {
+    for (var i = 1; i < rowCount; i++) {
+      table.deleteRow(i);
+      rowCount--;
+      i--;
+    }
+  } catch (e) {
+    console.error(e);
+  }
+  if (selection) {
+    selection.options.length = 1;
+  }
+  var snap = data && data.Schedules ? data.Schedules : null;
+  var rows = snap && snap.schedules ? snap.schedules : [];
+  if (card) {
+    card.style.display = 'block';
+  }
+  table.style.display = 'table';
+  for (var j = 0; j < rows.length; j++) {
+    var item = rows[j];
+    var row = table.insertRow(table.rows.length);
+    row.insertCell(0).innerHTML = item.from_account;
+    row.insertCell(1).innerHTML = item.to_account;
+    row.insertCell(2).innerHTML = '$' + item.amount;
+    row.insertCell(3).innerHTML = item.interval;
+    row.insertCell(4).innerHTML = item.next_run ? new Date(item.next_run * 1000).toLocaleString() : '—';
+    row.insertCell(5).innerHTML = item.status;
+    if (selection && (item.status === 'active' || item.status === 'paused')) {
+      var opt = document.createElement('OPTION');
+      opt.value = item.schedule_id;
+      opt.innerHTML = item.from_account + ' → ' + item.to_account + ' $' + item.amount;
+      selection.options.add(opt);
+    }
+  }
+}
+
+function cancelCustomerSchedule() {
+  var scheduleId = $('#cust_schedule_id_select').val();
+  if (!scheduleId || scheduleId === 'select') {
+    window.alert('Select a scheduled transfer first.');
+    return;
+  }
+  fetch(homeURL + 'cancelSchedule', {
+    method: 'post',
+    body: JSON.stringify({userid: userid, schedule_id: scheduleId}),
+    headers: {'Content-type': 'application/json'}
+  }).then(function(response) {
+    return response.json().then(function(body) {
+      body._status = response.status;
+      return body;
+    });
+  }).then(function(data) {
+    if (data._status >= 200 && data._status < 300) {
+      window.alert('Schedule cancelled.');
+      fillCustomerScheduleTbl(data);
+    } else {
+      window.alert(data.message || data.error || 'Could not cancel schedule');
+    }
+  }).catch(function(error) {
+    console.error(error);
+  });
 }
 
 function approveCustomerReq(userid, request_id) {
@@ -730,6 +802,10 @@ $(document).ready(function() {
     $('#customer_id_clear_btn').on('click', function(){
       $('#cust_details_card').hide();
       $('#cust_accounts_tbl').hide();
+      $('#cust_schedules_card').hide();
+    });
+    $('#cust_schedule_cancel_btn').on('click', function(){
+      cancelCustomerSchedule();
     });
     $('#approve_req_btn').on('click', function(){
       if($('#customer_req_id').val() == 'select'){
