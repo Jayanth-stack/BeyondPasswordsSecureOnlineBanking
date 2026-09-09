@@ -226,6 +226,23 @@
                 <tbody>
                 </tbody>
             </table>
+            <div id="emp_card_lock_box" style="display:none;margin-top:15px;">
+              <h4>Credit Card PIN / Lock</h4>
+              <p>Staff can lock a card for fraud and reset a PIN. Customers cannot self-release a fraud lock.</p>
+              <p id="emp_card_status">No card data.</p>
+              <select id="emp_card_account" style="height:30px;margin-right:5px;">
+                <option value="select">Select Card</option>
+              </select>
+              <select id="emp_card_reason" style="height:30px;margin-right:5px;">
+                <option value="employee">Staff</option>
+                <option value="fraud">Suspected fraud</option>
+                <option value="lost">Lost</option>
+                <option value="stolen">Stolen</option>
+              </select>
+              <button type="button" id="emp_lock_card_btn" class="btn btn-primary">Lock Card</button>
+              <button type="button" id="emp_unlock_card_btn" class="btn btn-primary">Unlock Card</button>
+              <button type="button" id="emp_reset_pin_btn" class="btn btn-primary">Reset PIN</button>
+            </div>
         </div>
         <div id="account_details_pane" style="display:none;">
           <label class="details_lbl" for="first_name">First name:</label>

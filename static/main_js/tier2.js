@@ -242,12 +242,70 @@ function appendSecondaryData(customer_id, data) {
   document.getElementById("address").innerHTML = data.Info.address;
 
   fillCustomerAccTbl(data);
+  fillEmpCardPane(customer_id, data);
   if($('#cust_details_card').css('display')=='none'){
     $('#cust_details_card').show();
   }
   if($('#cust_accounts_tbl').css('display')=='none'){
     $('#cust_details_tbl').show();
   }
+}
+
+function fillEmpCardPane(customer_id, data) {
+  var box = document.getElementById('emp_card_lock_box');
+  if (!box) {
+    return;
+  }
+  window._emp_card_customer = customer_id;
+  var credit = data.Accounts && data.Accounts.credit;
+  var select = document.getElementById('emp_card_account');
+  select.options.length = 1;
+  if (credit && credit !== 'None' && credit.Account != null) {
+    var option = document.createElement('OPTION');
+    option.value = credit.Account;
+    option.innerHTML = 'Credit Card - ' + credit.Account;
+    select.options.add(option);
+    select.value = String(credit.Account);
+    box.style.display = 'block';
+  } else {
+    box.style.display = 'none';
+    return;
+  }
+  var cards = (data.Cards || {});
+  var locked = (cards.locked_accounts || []).map(String);
+  var pinSet = (cards.pin_set_accounts || []).map(String);
+  var acct = String(credit.Account);
+  var status = locked.indexOf(acct) !== -1 ? 'LOCKED' : 'active';
+  var pinState = pinSet.indexOf(acct) !== -1 ? 'PIN set' : 'PIN not set';
+  document.getElementById('emp_card_status').innerHTML = 'Card ' + acct + ' is ' + status + '. ' + pinState + '.';
+}
+
+function empCardRequest(path, extra) {
+  var account = $('#emp_card_account').val();
+  var customer_id = window._emp_card_customer || $('#customer_id_input').val();
+  if (!account || account === 'select' || !customer_id) {
+    window.alert('Select a credit card first.');
+    return;
+  }
+  const payload = Object.assign({
+    userid : userid,
+    customer_id : customer_id,
+    account : account
+  }, extra || {});
+  fetch(homeURL + path, {
+    method : 'post',
+    body : JSON.stringify(payload),
+    headers : {
+      'Content-type' : 'application/json'
+    }
+  }).then(function(response) {
+    return response.json();
+  }).then(function(data) {
+    window.alert(data.message);
+    getCustomer(customer_id);
+  }).catch(function(error) {
+    console.error(error);
+  });
 }
 
 function fillCustomerAccTbl(data){
@@ -656,6 +714,16 @@ $(document).ready(function() {
     $('#customer_id_clear_btn').on('click', function(){
       $('#cust_details_card').hide();
       $('#cust_accounts_tbl').hide();
+      $('#emp_card_lock_box').hide();
+    });
+    $('#emp_lock_card_btn').on('click', function(){
+      empCardRequest('lockCard', {reason: $('#emp_card_reason').val()});
+    });
+    $('#emp_unlock_card_btn').on('click', function(){
+      empCardRequest('unlockCard');
+    });
+    $('#emp_reset_pin_btn').on('click', function(){
+      empCardRequest('resetPin');
     });
     $('#approve_trans_btn').on('click', function(){
       if($('#customer_trans_no').val() == 'select'){

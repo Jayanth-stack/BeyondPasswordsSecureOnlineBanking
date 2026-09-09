@@ -8,6 +8,13 @@ from customer import Customers
 from employee import Employee
 from twilio.base.exceptions import TwilioRestException
 from utility.encrypt import check_encrypted_password
+from utility.card import (
+    attach_card_routes,
+    build_service as build_card_service,
+    credit_accounts_from_customer_payload,
+    enforce_card,
+    normalize_account,
+)
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -22,6 +29,53 @@ app.secret_key = os.urandom(24)
 
 CORS(app)
 Bcrypt(app)
+
+
+def _credit_accounts(userid):
+    try:
+        return credit_accounts_from_customer_payload(Customers().get_all_account(userid))
+    except Exception:
+        return []
+
+
+def _is_credit_account(account, userid=None):
+    try:
+        normalized = normalize_account(account)
+    except Exception:
+        return False
+    if userid:
+        return normalized in _credit_accounts(userid)
+    return False
+
+
+def _cards_snapshot(userid):
+    if not userid:
+        return card_service.snapshot(userid or '')
+    for account in _credit_accounts(userid):
+        card_service.ensure_card(userid=userid, account=account)
+    return card_service.snapshot(userid)
+
+
+def _maybe_card(operation, account, owner_userid=None, pin=None, pin_token=None):
+    blocked = enforce_card(
+        card_service,
+        operation=operation,
+        account=account,
+        userid=owner_userid if owner_userid is not None else (
+            session.get('userid') if session.get('usertype') == 'customer' else None
+        ),
+        actor_type=session.get('usertype') or 'customer',
+        pin=pin,
+        pin_token=pin_token,
+    )
+    if not blocked:
+        return None
+    body, status = blocked
+    return jsonify(body), status
+
+
+card_service = build_card_service(is_credit_loader=_is_credit_account)
+attach_card_routes(app, card_service, own_accounts_loader=_credit_accounts)
 
 account_sid = 'your Account_sid'
 auth_token = 'your Auth_token'
@@ -259,7 +313,8 @@ def get_customer_data():
         response = {
             'Accounts': c.get_all_account(customer_id),
             'Info': c.get_customer_details(customer_id),
-            'FundsRequests': c.get_funds_requests(customer_id)
+            'FundsRequests': c.get_funds_requests(customer_id),
+            'Cards': _cards_snapshot(customer_id),
         }
         return jsonify(response), 200
     except Exception as e:
@@ -365,6 +420,15 @@ def fund_transfers():
     if values['amount'] < 0:
         return jsonify({'message': 'Enter a valid amount'}), 200
 
+    gated = _maybe_card(
+        'transfer',
+        values['fromAccount'],
+        pin=values.get('pin'),
+        pin_token=values.get('pin_token'),
+    )
+    if gated is not None:
+        return gated
+
     employee = Employee()
     transaction_message = employee.add_transaction(values['fromAccount'], values['toAccount'], values['amount'])
     return jsonify({'message': transaction_message}), 200
@@ -443,6 +507,15 @@ def withdraw_fund():
     if values['userid'] != session['userid']:
         return jsonify({'message': 'User ID mismatch'}), 401
 
+    gated = _maybe_card(
+        'withdraw',
+        values['account'],
+        pin=values.get('pin'),
+        pin_token=values.get('pin_token'),
+    )
+    if gated is not None:
+        return gated
+
     customer = Customers()
     response = customer.debit_request(values['account'], values['amount'])
     return jsonify({'message': response}), 200
@@ -481,6 +554,15 @@ def approve_request():
         status = emp.get_transaction_status(int(values['transaction_no']))
 
         if from_account != -1 and to_account != -1 and amount != -1 and status != 0:
+            gated = _maybe_card(
+                'approve',
+                from_account,
+                owner_userid=values['customer_id'],
+                pin=values.get('pin'),
+                pin_token=values.get('pin_token'),
+            )
+            if gated is not None:
+                return gated
             c = Customers()
             response = {
                 'message': c.fund_transfers(from_account, to_account, amount, int(values['transaction_no']))
@@ -523,6 +605,16 @@ def approve_request_employee():
 
         if from_account != -1 and to_account != -1 and amount != -1 and status != 0:
             c = Customers()
+            owner = None
+            try:
+                owner = c.get_customerID_from_account(from_account)
+                if owner == -1:
+                    owner = None
+            except Exception:
+                owner = None
+            gated = _maybe_card('approve', from_account, owner_userid=owner)
+            if gated is not None:
+                return gated
             result = c.fund_transfers(from_account, to_account, amount, int(values['transaction_no']))
             return jsonify({'message': result}), 200
         else:
@@ -615,6 +707,14 @@ def make_cashier_cheque():
 
     # Validate if the user in the request is the same as the one logged in and check session expiration
     if 'userid' in session and session['userid'] == values['userid']:
+        gated = _maybe_card(
+            'cheque',
+            values['from_account'],
+            pin=values.get('pin'),
+            pin_token=values.get('pin_token'),
+        )
+        if gated is not None:
+            return gated
         # Further checks can be added here to validate the user's permission if needed
         c = Customers()
         try:
@@ -878,7 +978,8 @@ def get_customer():
             c = Customers()
             response = {
                 'Accounts': c.get_all_account(values['customer_id']),
-                'Info': c.get_customer_details(values['customer_id'])
+                'Info': c.get_customer_details(values['customer_id']),
+                'Cards': _cards_snapshot(values['customer_id']),
             }
             return jsonify(response), 200
         except Exception as e:
