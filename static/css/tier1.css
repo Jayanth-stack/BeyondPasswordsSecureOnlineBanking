@@ -119,10 +119,11 @@ select {
     display: none; /* Initially hide tables */
 }
 
-/* Custom styles for buttons and inputs for better UX */
-input[type="submit"],
-button {
-    cursor: pointer;
+#emp_card_lock_box {
+    background: #fff;
+    padding: 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
 }
 
 /* Improve visibility on small screens */

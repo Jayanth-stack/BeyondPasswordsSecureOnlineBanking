@@ -101,6 +101,15 @@
         Service Requests
         </button>
 
+        <button type="button" class="btn btn-primary btn-block"
+        id="card_lock_menu">
+        <span class="glyphicon glyphicon-lock gi-3x"
+        style="color: white" aria-hidden="true">
+        </span>
+        <br />
+        Card PIN / Lock
+        </button>
+
       </div>
 
       <div class="col-sm-9">
@@ -154,6 +163,8 @@
                 <h5 class="ac_details_text" style="color: red;">Credit Limit :</h5>
                 <p style="color: red;">$5000</p>
                 <br/>
+                <p id="cc_card_badge" class="card_lock_badge" style="display:none;">CARD LOCKED — charges blocked</p>
+                <p id="cc_pin_badge" class="card_pin_badge" style="display:none;">PIN not set — set a PIN before charging</p>
               </div>
               <button type="button" data-toggle="modal" data-target="#ccTransferModal" class="btn btn-primary" style="width:80%;margin-bottom:10px;margin-top:10px;">Initiate Transaction</button>
               <button type="button" id="view_cc_xacts_btn" data-toggle="modal" data-target="#ccTransactionsModal" class="btn btn-primary" style="width:80%;margin-bottom:10px;">View Transactions</button>
@@ -167,6 +178,24 @@
           <button type="button" data-toggle="modal" data-target="#depCheckModal" class="btn btn-primary btn-block" style="margin-top:10px;margin-bottom:10px;">Deposit Cashier Cheque</button>
           <button type="button" id="viewCheck_btn" data-toggle="modal" data-target="#viewCheckModal" class="btn btn-primary btn-block" style="margin-top:10px;margin-bottom:10px;">View All Cashier Cheques</button>
           <button type="button" data-toggle="modal" data-target="#newAccModal" class="btn btn-primary btn-block" style="margin-top:10px;margin-bottom:10px;">Open New Account</button>
+        </div>
+        <div id="card_lock_pane" class="my_accs_float" style="display:none;">
+          <h4 style="color:white;">Credit Card PIN / Lock</h4>
+          <p style="color:#ffc107;">Locking a card blocks new charges (transfers, cash advances, cashier cheques). Paying the card down still works. This is not an account freeze.</p>
+          <p id="card_status_line" style="color:white;">No credit card on file.</p>
+          <input type="password" id="card_pin_input" placeholder="PIN (4-6 digits)" maxlength="6" pattern="\d*" style="height:30px;margin-right:5px;" oninput="validity.valid||(value='');"/>
+          <input type="password" id="card_new_pin_input" placeholder="New PIN" maxlength="6" pattern="\d*" style="height:30px;margin-right:5px;" oninput="validity.valid||(value='');"/>
+          <br/><br/>
+          <button type="button" id="card_set_pin_btn" class="btn btn-primary" style="margin-right:5px;">Set PIN</button>
+          <button type="button" id="card_change_pin_btn" class="btn btn-primary" style="margin-right:5px;">Change PIN</button>
+          <select id="card_lock_reason" style="height:30px;margin-right:5px;">
+            <option value="lost">Lost</option>
+            <option value="stolen">Stolen</option>
+            <option value="customer">Lock card</option>
+          </select>
+          <button type="button" id="card_lock_btn" class="btn btn-primary" style="margin-right:5px;">Lock Card</button>
+          <button type="button" id="card_unlock_btn" class="btn btn-primary">Unlock Card</button>
+          <p style="color:#ccc;margin-top:10px;">Unlock requires the current PIN. A fraud lock can only be released by bank staff.</p>
         </div>
         <div id="no_accounts_pane" style="display:none;">
           <p style="color:white;">You don't have any accounts with us.</p><br>
@@ -397,7 +426,9 @@
               </div>
               <div class="modal-body">
                 <b>&nbsp;&nbsp;&nbsp;</b><input type="text" id="cc_transfer_acno_input" placeholder="Recipient Account No." pattern="\d*" maxlength="10" oninput="validity.valid||(value='');"/><br/><br/>
-                <b>$</b> <input type="text" id="ccTransfer_amt" placeholder="Payment Amount" pattern="\d*" maxlength="6" oninput="validity.valid||(value='');"/>
+                <b>$</b> <input type="text" id="ccTransfer_amt" placeholder="Payment Amount" pattern="\d*" maxlength="6" oninput="validity.valid||(value='');"/><br/><br/>
+                <input type="password" id="cc_transfer_pin" placeholder="Card PIN" maxlength="6" pattern="\d*" oninput="validity.valid||(value='');"/>
+                <p class="card_lock_hint">Credit-card charges require your PIN. A locked card cannot start a new charge.</p>
               </div>
               <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
@@ -469,6 +500,9 @@
                 <select id="orderCheck_fromAccount">
                   <option value="select">Select your Account</option>
                 </select>
+                <br/><br/>
+                <input type="password" id="orderCheck_pin" placeholder="Card PIN (credit only)" maxlength="6" pattern="\d*" oninput="validity.valid||(value='');"/>
+                <p class="card_lock_hint">A locked credit card cannot issue a cashier cheque. Checking and savings skip the PIN.</p>
                 <!-- <input type="text" id="orderCheck_fromAccount" placeholder="Enter Your account No." pattern="[0-9]{10}"/> -->
               </div>
               <div class="modal-footer">

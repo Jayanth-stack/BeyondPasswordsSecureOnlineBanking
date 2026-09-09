@@ -165,10 +165,20 @@ body {
   border-color: lighten(var(--error-color), 55%);
 }
 
-.alert-success {
-  color: var(--success-color);
-  /*noinspection CssInvalidFunction*/
-  background-color: lighten(var(--success-color), 55%);
-  /*noinspection CssInvalidFunction*/
-  border-color: lighten(var(--success-color), 55%);
+.card_lock_badge {
+  color: #dc3545;
+  font-weight: 700;
+  margin-top: 6px;
+}
+
+.card_pin_badge {
+  color: #ffc107;
+  font-weight: 600;
+  margin-top: 6px;
+}
+
+.card_lock_hint {
+  color: #6c757d;
+  font-size: 12px;
+  margin-top: 8px;
 }

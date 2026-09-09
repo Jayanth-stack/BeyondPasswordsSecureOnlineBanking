@@ -126,6 +126,63 @@ function appendPrimaryData(data) {
 
   createCheckDropdown();
   fillPendingTransTbl(data);
+  fillCardPane(data);
+}
+
+function fillCardPane(data) {
+  var cards = (data && data.Cards) || {};
+  var locked = (cards.locked_accounts || []).map(String);
+  var pinSet = (cards.pin_set_accounts || []).map(String);
+  var cc = cc_no != null ? String(cc_no) : '';
+  if (cc && locked.indexOf(cc) !== -1) {
+    $('#cc_card_badge').show();
+  } else {
+    $('#cc_card_badge').hide();
+  }
+  if (cc && pinSet.indexOf(cc) === -1 && $('#cc_card').css('display') !== 'none') {
+    $('#cc_pin_badge').show();
+  } else {
+    $('#cc_pin_badge').hide();
+  }
+  var line = document.getElementById('card_status_line');
+  if (!line) {
+    return;
+  }
+  if (!cc || $('#cc_card').css('display') === 'none') {
+    line.innerHTML = 'No credit card on file.';
+    return;
+  }
+  var status = locked.indexOf(cc) !== -1 ? 'LOCKED' : 'active';
+  var pinState = pinSet.indexOf(cc) !== -1 ? 'PIN set' : 'PIN not set';
+  var reason = '';
+  if (cards.cards && cards.cards.length) {
+    reason = cards.cards[0].lock_reason ? (' — ' + cards.cards[0].lock_reason) : '';
+  }
+  line.innerHTML = 'Card ' + cc + ' is ' + status + reason + '. ' + pinState + '.';
+}
+
+function cardRequest(path, extra) {
+  const payload = Object.assign({
+    userid : userid,
+    account : cc_no
+  }, extra || {});
+  fetch(homeURL + path, {
+    method : 'post',
+    body : JSON.stringify(payload),
+    headers : {
+      'Content-type' : 'application/json'
+    }
+  }).then(function(response) {
+    return response.json().then(function(data) {
+      data._status = response.status;
+      return data;
+    });
+  }).then(function(data) {
+    window.alert(data.message);
+    getUser();
+  }).catch(function(error) {
+    console.error(error);
+  });
 }
 
 function fillPendingTransTbl(data){
@@ -317,7 +374,7 @@ function verify_otp(otp){
       else if(otpModal_source == 'ccTransfer'){
         $('#otpModal_close').click();
         $('#otpModal_input').val('');
-        fund_transfer(userid, cc_no, $('#cc_transfer_acno_input').val(), $('#ccTransfer_amt').val());
+        fund_transfer(userid, cc_no, $('#cc_transfer_acno_input').val(), $('#ccTransfer_amt').val(), $('#cc_transfer_pin').val());
       }
       else if(otpModal_source == 'approveTransfer'){
         $('#otpModal_close').click();
@@ -368,7 +425,7 @@ function deposit(userid, account, amount) {
   });
 }
 
-function fund_transfer(userid, fromAccount, toAccount, amount) {
+function fund_transfer(userid, fromAccount, toAccount, amount, pin) {
   console.log("fund transfer called");
 
   const fundTransferData = {
@@ -377,6 +434,9 @@ function fund_transfer(userid, fromAccount, toAccount, amount) {
     toAccount : toAccount,
     amount : amount
   };
+  if (pin) {
+    fundTransferData.pin = pin;
+  }
 
   fetch(homeURL+'fundTransfer', {
     method : 'post',
@@ -579,7 +639,7 @@ function getCCXacts(userid, acno) {
   });
 }
 
-function order_check(userid, toAccount, fromAccount, amount) {
+function order_check(userid, toAccount, fromAccount, amount, pin) {
   console.log("getcashiercheck called");
 
   const orderCheckData = {
@@ -588,6 +648,9 @@ function order_check(userid, toAccount, fromAccount, amount) {
     from_account : fromAccount,
     amount : amount
   };
+  if (pin) {
+    orderCheckData.pin = pin;
+  }
 
   fetch(homeURL+'getCashierCheque', {
     method : 'post',
@@ -854,6 +917,7 @@ $(document).ready(function() {
       $('#service_requests_menu').css('background-color','maroon');
       $('#my_accounts_menu').css('background-color','maroon');
       $('#pending_transaction_requests_menu').css('background-color','maroon');
+      $('#card_lock_menu').css('background-color','maroon');
     });
     $('#service_requests_menu').on('click', function(){
       if($('#service_requests_pane').css('display')=='none'){
@@ -861,6 +925,16 @@ $(document).ready(function() {
       }
       $('#service_requests_menu').css('background-color','#FF6600');
       $('#my_accounts_menu').css('background-color','maroon');
+      $('#pending_transaction_requests_menu').css('background-color','maroon');
+      $('#card_lock_menu').css('background-color','maroon');
+    });
+    $('#card_lock_menu').on('click', function(){
+      if($('#card_lock_pane').css('display')=='none'){
+          $('#card_lock_pane').show().siblings('div').hide();
+      }
+      $('#card_lock_menu').css('background-color','#FF6600');
+      $('#my_accounts_menu').css('background-color','maroon');
+      $('#service_requests_menu').css('background-color','maroon');
       $('#pending_transaction_requests_menu').css('background-color','maroon');
     });
     $('#my_accounts_menu').on('click', function(){
@@ -880,6 +954,7 @@ $(document).ready(function() {
       $('#my_accounts_menu').css('background-color','#FF6600');
       $('#service_requests_menu').css('background-color','maroon');
       $('#pending_transaction_requests_menu').css('background-color','maroon');
+      $('#card_lock_menu').css('background-color','maroon');
     });
     $('#pending_transaction_requests_menu').on('click', function(){
       if($('#pending_transaction_requests_pane').css('display')=='none'){
@@ -888,6 +963,26 @@ $(document).ready(function() {
       $('#pending_transaction_requests_menu').css('background-color','#FF6600');
       $('#my_accounts_menu').css('background-color','maroon');
       $('#service_requests_menu').css('background-color','maroon');
+      $('#card_lock_menu').css('background-color','maroon');
+    });
+    $('#card_set_pin_btn').on('click', function(){
+      if(!cc_no || $('#cc_card').css('display')=='none'){
+        alert('No credit card on file.');
+        return;
+      }
+      cardRequest('setPin', {pin: $('#card_pin_input').val()});
+    });
+    $('#card_change_pin_btn').on('click', function(){
+      cardRequest('changePin', {
+        current_pin: $('#card_pin_input').val(),
+        new_pin: $('#card_new_pin_input').val()
+      });
+    });
+    $('#card_lock_btn').on('click', function(){
+      cardRequest('lockCard', {reason: $('#card_lock_reason').val()});
+    });
+    $('#card_unlock_btn').on('click', function(){
+      cardRequest('unlockCard', {pin: $('#card_pin_input').val()});
     });
     $('#my_accounts_menu').click();
 	  $(".loader-wrapper").delay( 1000 ).fadeOut("slow");
@@ -1009,11 +1104,10 @@ $(document).ready(function() {
     });
     $('#ccTransfer_btn').on('click', function(){
       console.log("transfer function");
-      if($('#ccTransfer_amt').val() == '' || $('#ccTransfer_account').val() == ''){
+      if($('#ccTransfer_amt').val() == '' || $('#cc_transfer_acno_input').val() == '' || $('#cc_transfer_pin').val() == ''){
         alert('Empty Field detected!');
       }
       else {
-        //fund_transfer(userid, cc_no, $('#ccTransfer_account').val(), $('#ccTransfer_amt').val());
         otpModal_source = 'ccTransfer';
         send_otp();
       }
@@ -1056,7 +1150,7 @@ $(document).ready(function() {
         alert('Empty Field detected!');
       }
       else {
-        order_check(userid, $('#orderCheck_toAccount').val(), $('#orderCheck_fromAccount').val(), $('#orderCheck_amt').val());
+        order_check(userid, $('#orderCheck_toAccount').val(), $('#orderCheck_fromAccount').val(), $('#orderCheck_amt').val(), $('#orderCheck_pin').val());
         $('#orderCheck_close').click();
       }
     });
