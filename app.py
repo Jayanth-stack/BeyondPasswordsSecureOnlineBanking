@@ -1159,7 +1159,7 @@ def deactivate_employee():
 
         # Deactivate employee and handle success/failure
         emp = Employee()
-        response = emp.deactivate_employee(data['emp_id'])
+        response = emp.deactivate_employee(data['userid'], data['emp_id'])
         return jsonify({'message': response}), 200
 
     except Exception as e:
