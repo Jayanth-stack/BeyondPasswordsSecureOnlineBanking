@@ -9,5 +9,8 @@ __pycache__/
 *.pyd
 .Python
 *.log
+SystemLogs/*.sqlite
+SystemLogs/*.sqlite-wal
+SystemLogs/*.sqlite-shm
 .idea/
 flask_session/

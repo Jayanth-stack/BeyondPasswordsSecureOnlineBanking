@@ -319,12 +319,68 @@ function appendSecondaryData(customer_id, data) {
   document.getElementById("address").innerHTML = data.Info.address;
 
   fillCustomerAccTbl(data);
+  fillCreditLimitStaff(customer_id, data);
   if($('#cust_details_card').css('display')=='none'){
     $('#cust_details_card').show();
   }
   if($('#cust_accounts_tbl').css('display')=='none'){
     $('#cust_details_tbl').show();
   }
+}
+
+function fillCreditLimitStaff(customer_id, data) {
+  window._clCustomerId = customer_id;
+  var limits = data.CreditLimits || {};
+  var facilities = limits.facilities || [];
+  var facility = facilities.length ? facilities[0] : null;
+  var table = document.getElementById('cl_staff_requests_tbl');
+  if (table) {
+    while (table.rows.length > 1) {
+      table.deleteRow(1);
+    }
+  }
+  if (!facility) {
+    $('#credit_limit_staff_pane').hide();
+    return;
+  }
+  window._clAccount = facility.account;
+  document.getElementById('cl_staff_account').innerHTML = facility.account;
+  document.getElementById('cl_staff_limit').innerHTML = '$' + facility.effective_limit;
+  document.getElementById('cl_staff_available').innerHTML = facility.available == null ? 'NA' : ('$' + facility.available);
+  var requests = limits.requests || [];
+  for (var i = 0; i < requests.length; i++) {
+    var req = requests[i];
+    var row = table.insertRow(table.rows.length);
+    row.insertCell(0).innerHTML = '$' + req.requested_limit;
+    row.insertCell(1).innerHTML = req.status;
+    var cell = row.insertCell(2);
+    if (req.status === 'pending') {
+      cell.innerHTML = '<button type="button" class="btn btn-primary cl-approve" data-id="'+req.request_id+'">Approve</button> <button type="button" class="btn btn-primary cl-deny" data-id="'+req.request_id+'">Deny</button>';
+    } else {
+      cell.innerHTML = '';
+    }
+  }
+  $('#credit_limit_staff_pane').show();
+}
+
+function staffCreditPost(path, payload) {
+  payload.userid = userid;
+  payload.customer_id = window._clCustomerId;
+  payload.account = window._clAccount;
+  fetch(homeURL+path, {
+    method : 'post',
+    body : JSON.stringify(payload),
+    headers : { 'Content-type' : 'application/json' }
+  }).then(function(response) {
+    return response.json();
+  }).then(function(data) {
+    window.alert(data.message || data.error);
+    if (window._clCustomerId) {
+      getCustomer(window._clCustomerId);
+    }
+  }).catch(function(error) {
+    console.error(error);
+  });
 }
 
 function fillCustomerAccTbl(data){
@@ -730,6 +786,30 @@ $(document).ready(function() {
     $('#customer_id_clear_btn').on('click', function(){
       $('#cust_details_card').hide();
       $('#cust_accounts_tbl').hide();
+      $('#credit_limit_staff_pane').hide();
+    });
+    $('#cl_staff_set_btn').on('click', function(){
+      if(!$('#cl_staff_limit_input').val()) {
+        window.alert('No input!');
+      } else {
+        staffCreditPost('setCreditLimit', {limit: $('#cl_staff_limit_input').val()});
+      }
+    });
+    $('#cl_staff_temp_btn').on('click', function(){
+      if(!$('#cl_staff_temp_input').val()) {
+        window.alert('No input!');
+      } else {
+        staffCreditPost('grantTempCreditIncrease', {amount: $('#cl_staff_temp_input').val(), seconds: 30*24*3600});
+      }
+    });
+    $('#cl_staff_temp_revoke_btn').on('click', function(){
+      staffCreditPost('revokeTempCreditIncrease', {});
+    });
+    $('#cl_staff_requests_tbl').on('click', '.cl-approve', function(){
+      staffCreditPost('decideCreditLimitRequest', {request_id: $(this).data('id'), decision: 'approve'});
+    });
+    $('#cl_staff_requests_tbl').on('click', '.cl-deny', function(){
+      staffCreditPost('decideCreditLimitRequest', {request_id: $(this).data('id'), decision: 'deny'});
     });
     $('#approve_req_btn').on('click', function(){
       if($('#customer_req_id').val() == 'select'){

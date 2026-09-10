@@ -241,6 +241,28 @@
                 <p id="address">XXX</p>
                 <br />
               </div>
+              <div id="credit_limit_staff_pane" class="credit-limit-pane" style="display:none;margin-top:15px;">
+                <h4 class="header_text">Credit Limit</h4>
+                <hr class="header_divider" />
+                <p>Account: <span id="cl_staff_account">NA</span></p>
+                <p>Limit: <span id="cl_staff_limit">NA</span> &nbsp; Available: <span id="cl_staff_available">NA</span></p>
+                <input type="text" id="cl_staff_limit_input" placeholder="New limit" pattern="\d*" maxlength="6" oninput="validity.valid||(value='');"/>
+                <button type="button" id="cl_staff_set_btn" class="btn btn-primary" style="margin:8px;">Set Limit</button>
+                <br/>
+                <input type="text" id="cl_staff_temp_input" placeholder="Temp increase $" pattern="\d*" maxlength="6" oninput="validity.valid||(value='');"/>
+                <button type="button" id="cl_staff_temp_btn" class="btn btn-primary" style="margin:8px;">Grant 30-day Increase</button>
+                <button type="button" id="cl_staff_temp_revoke_btn" class="btn btn-primary" style="margin:8px;">Revoke Temp</button>
+                <table class="table table-hover table-bordered table-color" id="cl_staff_requests_tbl">
+                  <thead>
+                    <tr>
+                      <th>Requested</th>
+                      <th>Status</th>
+                      <th>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody></tbody>
+                </table>
+              </div>
             </div>
             <br /><br />
             <table

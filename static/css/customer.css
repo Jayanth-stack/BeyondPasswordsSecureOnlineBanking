@@ -172,3 +172,12 @@ body {
   /*noinspection CssInvalidFunction*/
   border-color: lighten(var(--success-color), 55%);
 }
+
+.credit-limit-pane {
+  background-color: var(--light-color);
+  border: 1px solid var(--secondary-color);
+  border-radius: 0.25rem;
+  padding: 16px;
+  margin-bottom: 15px;
+  color: var(--text-color);
+}

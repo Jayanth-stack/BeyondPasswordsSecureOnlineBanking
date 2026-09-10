@@ -10,6 +10,7 @@ import os
 from dotenv import load_dotenv
 import uuid
 from utility.crypto_receipt import generate_receipt, generate_nonce, current_timestamp
+from utility.credit_limit import charge_allowed
 
 load_dotenv()
 
@@ -225,7 +226,7 @@ class Customers:
                 if result[0][1] != 1:
                     print('Sender\'s Account not active')
                     return 'Sender\'s Account not active'
-                if result[0][2] == 'credit' and float(result[0][0]) - amount < -5000.0:
+                if result[0][2] == 'credit' and not charge_allowed(account1, amount, result[0][0], result[0][2]):
                     print('Insufficient Balance')
                     print(transaction_no)
                     if transaction_no != -1:
@@ -315,7 +316,7 @@ class Customers:
             if result[0][1] != 1:
                 print('Account not active')
                 return 'Account not active'
-            if result[0][2] == 'credit' and float(result[0][0]) - amount < -5000.0:
+            if result[0][2] == 'credit' and not charge_allowed(account, amount, result[0][0], result[0][2]):
                 print('Insufficient Balance')
                 # print(transaction_no)
                 return 'Insufficient Balance in Credit Card'
@@ -478,6 +479,20 @@ class Customers:
             # print('Account doesn\'t exists')
             return 0
         return 1
+
+    #################        FUNCTION TO GET ACCOUNT TYPE/BALANCE (CREDIT-LIMIT POLICY)  #################
+    def get_account_state(self, account_no):
+        query = """
+            SELECT account_type, balance, customer_id FROM Accounts WHERE account_no=%d;""" % (int(account_no))
+        cursor.execute(query)
+        result = cursor.fetchall()
+        if not result:
+            return None
+        return {
+            'account_type': result[0][0],
+            'balance': result[0][1],
+            'customer_id': result[0][2],
+        }
 
     #################        FUNCTION TO GET CUSTOMER'S ALL ACCOUNTS                     #################
     def get_all_account(self, customer_id):
