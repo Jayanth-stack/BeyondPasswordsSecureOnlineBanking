@@ -126,6 +126,89 @@ function appendPrimaryData(data) {
 
   createCheckDropdown();
   fillPendingTransTbl(data);
+  fillCreditLimit(data);
+}
+
+function creditFacility(data) {
+  var limits = data.CreditLimits || {};
+  var facilities = limits.facilities || [];
+  if (!facilities.length) {
+    return null;
+  }
+  for (var i = 0; i < facilities.length; i++) {
+    if (String(facilities[i].account) === String(cc_no)) {
+      return facilities[i];
+    }
+  }
+  return facilities[0];
+}
+
+function moneyLabel(value) {
+  if (value === null || value === undefined || value === '') {
+    return 'NA';
+  }
+  return '$' + value;
+}
+
+function fillCreditLimit(data) {
+  var facility = creditFacility(data);
+  var table = document.getElementById('cl_requests_tbl');
+  if (table) {
+    while (table.rows.length > 1) {
+      table.deleteRow(1);
+    }
+  }
+  if (!facility) {
+    $('#credit_limit_pane').hide();
+    return;
+  }
+  document.getElementById("cc_limit").innerHTML = moneyLabel(facility.effective_limit);
+  document.getElementById("cc_available").innerHTML = moneyLabel(facility.available);
+  document.getElementById("cl_limit").innerHTML = moneyLabel(facility.effective_limit);
+  document.getElementById("cl_utilized").innerHTML = moneyLabel(facility.utilized);
+  document.getElementById("cl_reserved").innerHTML = moneyLabel(facility.reserved);
+  document.getElementById("cl_available").innerHTML = moneyLabel(facility.available);
+  document.getElementById("ccTransfer_available").innerHTML = moneyLabel(facility.available);
+  document.getElementById("ccLimit_current").innerHTML = moneyLabel(facility.effective_limit);
+  if (facility.temp_increase && Number(facility.temp_increase) > 0) {
+    document.getElementById("cl_temp").innerHTML = moneyLabel(facility.temp_increase);
+    $('#cl_temp_row').show();
+  } else {
+    $('#cl_temp_row').hide();
+  }
+  var requests = (data.CreditLimits && data.CreditLimits.requests) || [];
+  for (var i = 0; i < requests.length; i++) {
+    var row = table.insertRow(table.rows.length);
+    row.insertCell(0).innerHTML = moneyLabel(requests[i].requested_limit);
+    row.insertCell(1).innerHTML = requests[i].status;
+    row.insertCell(2).innerHTML = requests[i].reason || '';
+  }
+  $('#credit_limit_pane').show();
+}
+
+function requestCreditLimitIncrease(requested, reason) {
+  fetch(homeURL+'requestCreditLimitIncrease', {
+    method : 'post',
+    body : JSON.stringify({
+      userid : userid,
+      account : cc_no,
+      requested_limit : requested,
+      reason : reason
+    }),
+    headers : {
+      'Content-type' : 'application/json'
+    }
+  }).then(function(response) {
+    return response.json().then(function(body) {
+      body.status = response.status;
+      return body;
+    });
+  }).then(function (data) {
+    window.alert(data.message || data.error);
+    getUser();
+  }).catch(function(error){
+    console.error(error);
+  });
 }
 
 function fillPendingTransTbl(data){
@@ -1120,6 +1203,15 @@ $(document).ready(function() {
         "elementHandlers" : specialElementHandlers
       });
       doc.save(cc_no+'-Transactions.pdf');
+    });
+    $('#ccLimit_btn').on('click', function(){
+      if($('#ccLimit_requested').val() == '') {
+        window.alert("Empty Input!");
+      }
+      else {
+        requestCreditLimitIncrease($('#ccLimit_requested').val(), $('#ccLimit_reason').val());
+        $('#ccLimit_close').click();
+      }
     });
     $('#changePW_btn').on('click', function(){
       if($('#changePW_oldPW').val() == '' || $('#changePW_newPW').val() == '' || $('#changePW_confirmPW').val() == '') {

@@ -160,3 +160,10 @@ body {
   -webkit-animation: spin 2s linear infinite; /* Safari */
   animation: spin 2s linear infinite;
 }
+
+.credit-limit-pane {
+  background-color: #ffffff;
+  padding: 16px;
+  margin-top: 10px;
+  color: var(--text-color);
+}

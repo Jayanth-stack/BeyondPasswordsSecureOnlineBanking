@@ -8,6 +8,15 @@ from customer import Customers
 from employee import Employee
 from twilio.base.exceptions import TwilioRestException
 from utility.encrypt import check_encrypted_password
+from utility.credit_limit import (
+    attach_credit_limit_routes,
+    balances_from_customer_payload,
+    build_service as build_credit_limit_service,
+    credit_accounts_from_customer_payload,
+    enforce_credit_limit,
+    normalize_account,
+    set_service as set_credit_limit_service,
+)
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -22,6 +31,80 @@ app.secret_key = os.urandom(24)
 
 CORS(app)
 Bcrypt(app)
+
+
+def _account_payload(userid):
+    try:
+        return Customers().get_all_account(userid)
+    except Exception:
+        return {}
+
+
+def _credit_accounts(userid):
+    return credit_accounts_from_customer_payload(_account_payload(userid))
+
+
+def _is_credit_account(account, userid=None):
+    try:
+        normalized = normalize_account(account)
+    except Exception:
+        return False
+    if userid:
+        return normalized in _credit_accounts(userid)
+    return False
+
+
+def _account_state(account):
+    try:
+        return Customers().get_account_state(account)
+    except Exception:
+        return None
+
+
+def _credit_snapshot(userid):
+    if not userid:
+        return credit_limit_service.snapshot(userid or '')
+    accounts = _account_payload(userid)
+    for account in credit_accounts_from_customer_payload(accounts):
+        credit_limit_service.ensure_facility(userid=userid, account=account)
+    return credit_limit_service.snapshot(userid, balances=balances_from_customer_payload(accounts))
+
+
+def _maybe_limit(operation, account, amount, owner_userid=None, reserve=False, consume=False):
+    state = _account_state(account)
+    account_type = state.get('account_type') if state else None
+    balance = state.get('balance') if state else None
+    owner = owner_userid
+    if owner is None:
+        owner = session.get('userid') if session.get('usertype') == 'customer' else None
+    if owner is None and state:
+        owner = state.get('customer_id')
+    if consume:
+        credit_limit_service.capture_matching(account, amount)
+    blocked = enforce_credit_limit(
+        credit_limit_service,
+        operation=operation,
+        account=account,
+        amount=amount,
+        balance=balance,
+        account_type=account_type,
+        userid=owner,
+        reserve=reserve,
+    )
+    if not blocked:
+        return None
+    body, status = blocked
+    return jsonify(body), status
+
+
+credit_limit_service = build_credit_limit_service(
+    is_credit_loader=_is_credit_account,
+    balance_loader=lambda account: (
+        (lambda state: (state['account_type'], state['balance']) if state else None)(_account_state(account))
+    ),
+)
+set_credit_limit_service(credit_limit_service)
+attach_credit_limit_routes(app, credit_limit_service, own_accounts_loader=_credit_accounts)
 
 account_sid = 'your Account_sid'
 auth_token = 'your Auth_token'
@@ -259,7 +342,8 @@ def get_customer_data():
         response = {
             'Accounts': c.get_all_account(customer_id),
             'Info': c.get_customer_details(customer_id),
-            'FundsRequests': c.get_funds_requests(customer_id)
+            'FundsRequests': c.get_funds_requests(customer_id),
+            'CreditLimits': _credit_snapshot(customer_id),
         }
         return jsonify(response), 200
     except Exception as e:
@@ -365,6 +449,10 @@ def fund_transfers():
     if values['amount'] < 0:
         return jsonify({'message': 'Enter a valid amount'}), 200
 
+    gated = _maybe_limit('transfer', values['fromAccount'], values['amount'], reserve=True)
+    if gated is not None:
+        return gated
+
     employee = Employee()
     transaction_message = employee.add_transaction(values['fromAccount'], values['toAccount'], values['amount'])
     return jsonify({'message': transaction_message}), 200
@@ -443,6 +531,10 @@ def withdraw_fund():
     if values['userid'] != session['userid']:
         return jsonify({'message': 'User ID mismatch'}), 401
 
+    gated = _maybe_limit('withdraw', values['account'], values['amount'])
+    if gated is not None:
+        return gated
+
     customer = Customers()
     response = customer.debit_request(values['account'], values['amount'])
     return jsonify({'message': response}), 200
@@ -481,6 +573,15 @@ def approve_request():
         status = emp.get_transaction_status(int(values['transaction_no']))
 
         if from_account != -1 and to_account != -1 and amount != -1 and status != 0:
+            gated = _maybe_limit(
+                'approve',
+                from_account,
+                amount,
+                owner_userid=values['customer_id'],
+                consume=True,
+            )
+            if gated is not None:
+                return gated
             c = Customers()
             response = {
                 'message': c.fund_transfers(from_account, to_account, amount, int(values['transaction_no']))
@@ -523,6 +624,16 @@ def approve_request_employee():
 
         if from_account != -1 and to_account != -1 and amount != -1 and status != 0:
             c = Customers()
+            owner = None
+            try:
+                owner = c.get_customerID_from_account(from_account)
+                if owner == -1:
+                    owner = None
+            except Exception:
+                owner = None
+            gated = _maybe_limit('approve', from_account, amount, owner_userid=owner, consume=True)
+            if gated is not None:
+                return gated
             result = c.fund_transfers(from_account, to_account, amount, int(values['transaction_no']))
             return jsonify({'message': result}), 200
         else:
@@ -553,6 +664,13 @@ def deny_request():
         return jsonify(response), 400
 
     if values['userid'] in session:
+        try:
+            emp = Employee()
+            from_account = emp.get_fromAccount_of_transaction(values['transaction_no'])
+            amount = emp.get_amount_of_transaction(values['transaction_no'])
+            credit_limit_service.void_matching(from_account, amount, 'transfer')
+        except Exception:
+            pass
         c = Customers()
         response = {
             'message': c.deny_funds_requested(values['transaction_no'])
@@ -615,6 +733,15 @@ def make_cashier_cheque():
 
     # Validate if the user in the request is the same as the one logged in and check session expiration
     if 'userid' in session and session['userid'] == values['userid']:
+        gated = _maybe_limit(
+            'cheque',
+            values['from_account'],
+            values['amount'],
+            owner_userid=values['userid'],
+            reserve=True,
+        )
+        if gated is not None:
+            return gated
         # Further checks can be added here to validate the user's permission if needed
         c = Customers()
         try:
@@ -878,7 +1005,8 @@ def get_customer():
             c = Customers()
             response = {
                 'Accounts': c.get_all_account(values['customer_id']),
-                'Info': c.get_customer_details(values['customer_id'])
+                'Info': c.get_customer_details(values['customer_id']),
+                'CreditLimits': _credit_snapshot(values['customer_id']),
             }
             return jsonify(response), 200
         except Exception as e:

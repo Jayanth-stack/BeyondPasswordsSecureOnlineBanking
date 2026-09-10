@@ -137,3 +137,10 @@ button {
         margin: 10px 0;
     }
 }
+
+.credit-limit-pane {
+    background-color: #ffffff;
+    padding: 16px;
+    margin-top: 10px;
+    box-shadow: 0 0 5px rgba(0,0,0,0.1);
+}
