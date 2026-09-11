@@ -117,6 +117,12 @@
                 <h5 class="ac_details_text">Available Balance :</h5>
                 <p id="sa_balance">NA</p>
                 <br/>
+                <h5 class="ac_details_text">Overdraft :</h5>
+                <p id="sa_overdraft">Not enrolled</p>
+                <br/>
+                <h5 class="ac_details_text">Available to spend :</h5>
+                <p id="sa_available">NA</p>
+                <br/>
               </div>
               <button type="button" data-toggle="modal" data-target="#saDepositModal" class="btn btn-primary" style="width:80%;margin-bottom:10px;margin-top:10px;">Deposit Fund</button>
               <button type="button" data-toggle="modal" data-target="#saTransferModal" class="btn btn-primary" style="width:80%;margin-bottom:10px;">Transfer Fund</button>
@@ -133,6 +139,12 @@
                 <br/>
                 <h5 class="ac_details_text">Available Balance :</h5>
                 <p id="ca_balance">NA</p>
+                <br/>
+                <h5 class="ac_details_text">Overdraft :</h5>
+                <p id="ca_overdraft">Not enrolled</p>
+                <br/>
+                <h5 class="ac_details_text">Available to spend :</h5>
+                <p id="ca_available">NA</p>
                 <br/>
               </div>
               <button type="button" data-toggle="modal" data-target="#caDepositModal" class="btn btn-primary" style="width:80%;margin-bottom:10px;margin-top:10px;">Deposit Fund</button>
@@ -158,6 +170,34 @@
               <button type="button" data-toggle="modal" data-target="#ccTransferModal" class="btn btn-primary" style="width:80%;margin-bottom:10px;margin-top:10px;">Initiate Transaction</button>
               <button type="button" id="view_cc_xacts_btn" data-toggle="modal" data-target="#ccTransactionsModal" class="btn btn-primary" style="width:80%;margin-bottom:10px;">View Transactions</button>
             </div>
+          </div>
+          <div id="overdraft_pane" class="overdraft-pane">
+            <h4 class="account_type_text">Overdraft Protection</h4>
+            <hr class="header_divider" />
+            <p>Opt-in coverage for checking and savings. Unenrolled accounts still hard-stop at $0.</p>
+            <p>Fee: <span id="od_fee">$0.00</span> &nbsp; Courtesy: <span id="od_courtesy">$5.00</span></p>
+            <table class="table table-hover table-bordered table-color" id="od_facilities_tbl">
+              <thead>
+                <tr>
+                  <th>Account</th>
+                  <th>Limit</th>
+                  <th>Available</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+            <button type="button" data-toggle="modal" data-target="#odRequestModal" class="btn btn-primary" style="width:80%;margin-bottom:10px;">Request Overdraft</button>
+            <table class="table table-hover table-bordered table-color" id="od_requests_tbl">
+              <thead>
+                <tr>
+                  <th>Requested</th>
+                  <th>Status</th>
+                  <th>Reason</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
           </div>
         </div>
         <div id="service_requests_pane" class="my_accs_float" style="display:none;">
@@ -351,6 +391,7 @@
                 <b>&nbsp;&nbsp;&nbsp;</b><input type="radio" id="sa_request_radio" name="satransfer" value="sa_request_radio">
                 <label for="sa_request_radio">Request Money</label><br/><br/>
                 <b>&nbsp;&nbsp;&nbsp;</b><input type="text" id= "sa_transfer_acno_input" placeholder="To Account No." pattern="\d*" maxlength="10" oninput="validity.valid||(value='');"/><br/><br/>
+                <p>Available to spend: <span id="saTransfer_available">NA</span></p>
                 <b>$</b> <input type="text" id="saTransfer_amt" placeholder="Enter Amount" pattern="\d*" maxlength="6" oninput="validity.valid||(value='');"/>
               </div>
               <div class="modal-footer">
@@ -376,6 +417,7 @@
                 <b>&nbsp;&nbsp;&nbsp;</b><input type="radio" id="ca_request_radio" name="catransfer" value="sa_request_radio">
                 <label for="ca_request_radio">Request Money</label><br/><br/>
                 <b>&nbsp;&nbsp;&nbsp;</b><input type="text" id= "ca_transfer_acno_input" placeholder="To Account No." pattern="\d*" maxlength="10" oninput="validity.valid||(value='');"/><br/><br/>
+                <p>Available to spend: <span id="caTransfer_available">NA</span></p>
                 <b>$</b> <input type="text" id="caTransfer_amt" placeholder="Enter Amount" pattern="\d*" maxlength="6" oninput="validity.valid||(value='');"/>
               </div>
               <div class="modal-footer">
@@ -402,6 +444,29 @@
               <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
                 <button type="button" id="ccTransfer_btn" class="btn btn-primary">Submit</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal fade" id="odRequestModal" tabindex="-1" role="dialog" aria-labelledby="exampleModalCenterTitle" aria-hidden="true">
+          <div class="modal-dialog modal-dialog-centered" role="document">
+            <div class="modal-content">
+              <div class="modal-header">
+                <h4 class="account_type_text" style="display:inline-block">Request Overdraft Protection</h4>
+                <button type="button" class="close" id="odRequest_close" data-dismiss="modal" aria-label="Close">
+                  <span aria-hidden="true">&times;</span>
+                </button>
+              </div>
+              <div class="modal-body">
+                <select id="odRequest_account">
+                  <option value="select">Select Account</option>
+                </select><br/><br/>
+                <b>$</b> <input type="text" id="odRequest_limit" placeholder="Requested overdraft" pattern="\d*" maxlength="6" oninput="validity.valid||(value='');"/><br/><br/>
+                <input type="text" id="odRequest_reason" placeholder="Reason" maxlength="120"/>
+              </div>
+              <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                <button type="button" id="odRequest_btn" class="btn btn-primary">Submit</button>
               </div>
             </div>
           </div>

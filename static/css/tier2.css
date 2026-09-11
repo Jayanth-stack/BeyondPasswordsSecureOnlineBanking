@@ -160,3 +160,8 @@ body {
   -webkit-animation: spin 2s linear infinite; /* Safari */
   animation: spin 2s linear infinite;
 }
+
+.overdraft-staff-pane {
+  margin-top: 16px;
+  padding: 12px;
+}
