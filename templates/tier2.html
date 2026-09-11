@@ -258,6 +258,30 @@
               </thead>
               <tbody></tbody>
             </table>
+            <div class="cust_details_card overdraft-staff-pane" id="overdraft_staff_pane" style="display:none;">
+              <h4 class="header_text">Overdraft Protection</h4>
+              <hr class="header_divider" />
+              <p id="od_staff_summary">No deposit accounts.</p>
+              <select id="od_staff_account" style="height:30px;">
+                <option value="select">Select Account</option>
+              </select><br>
+              <input type="text" id="od_staff_limit" placeholder="Limit" pattern="\d*" maxlength="6" oninput="validity.valid||(value='');"/><br>
+              <button type="button" id="od_staff_set_btn" class="btn btn-primary" style="width:50%;margin-bottom:10px;margin-top:10px;">Set Overdraft</button><br>
+              <button type="button" id="od_staff_revoke_btn" class="btn btn-primary" style="width:50%;margin-bottom:10px;">Revoke</button><br>
+              <input type="text" id="od_staff_temp" placeholder="Temp increase" pattern="\d*" maxlength="6" oninput="validity.valid||(value='');"/><br>
+              <button type="button" id="od_staff_temp_btn" class="btn btn-primary" style="width:50%;margin-bottom:10px;">Grant Temp</button>
+              <table class="table table-hover table-bordered table-color" id="od_staff_requests_tbl">
+                <thead>
+                  <tr>
+                    <th>Request</th>
+                    <th>Limit</th>
+                    <th>Status</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
           </div>
 
           <div id="account_details_pane" style="display: none">

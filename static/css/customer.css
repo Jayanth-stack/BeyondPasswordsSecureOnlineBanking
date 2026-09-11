@@ -172,3 +172,11 @@ body {
   /*noinspection CssInvalidFunction*/
   border-color: lighten(var(--success-color), 55%);
 }
+
+.overdraft-pane {
+  background-color: var(--light-color);
+  border: 1px solid var(--secondary-color);
+  border-radius: 0.25rem;
+  padding: 16px;
+  margin-top: 12px;
+}

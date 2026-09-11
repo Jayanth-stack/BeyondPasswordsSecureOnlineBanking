@@ -12,6 +12,7 @@ document.addEventListener("contextmenu", function(e){
 const homeURL = 'http://127.0.0.1:5000/';
 
 var userid, usertype, firstname, midname, lastname, email, contact, dob, ssn, address;
+var lastLookedUpCustomerId;
 
 function getUser() {
   console.log("gettier2 called");
@@ -242,12 +243,106 @@ function appendSecondaryData(customer_id, data) {
   document.getElementById("address").innerHTML = data.Info.address;
 
   fillCustomerAccTbl(data);
+  fillOverdraftStaff(customer_id, data);
   if($('#cust_details_card').css('display')=='none'){
     $('#cust_details_card').show();
   }
   if($('#cust_accounts_tbl').css('display')=='none'){
     $('#cust_details_tbl').show();
   }
+}
+
+function fillOverdraftStaff(customer_id, data) {
+  lastLookedUpCustomerId = customer_id;
+  var pane = document.getElementById('overdraft_staff_pane');
+  if (!pane) return;
+  pane.style.display = 'block';
+  var snap = data.Overdrafts || {facilities: [], requests: []};
+  var summary = document.getElementById('od_staff_summary');
+  if (summary) {
+    if (!snap.facilities || snap.facilities.length === 0) {
+      summary.innerHTML = 'No deposit accounts / not enrolled.';
+    } else {
+      summary.innerHTML = snap.facilities.map(function(item) {
+        return item.account + ': $' + item.effective_limit + (item.enrolled ? ' enrolled' : ' not enrolled') +
+          (item.available != null ? (' / avail $' + item.available) : '');
+      }).join('<br/>');
+    }
+  }
+  var select = document.getElementById('od_staff_account');
+  if (select) {
+    while (select.options.length > 1) select.remove(1);
+    var accounts = [];
+    if (data.Accounts && data.Accounts.savings && data.Accounts.savings !== 'None') {
+      accounts.push(data.Accounts.savings.Account);
+    }
+    if (data.Accounts && data.Accounts.checkin && data.Accounts.checkin !== 'None') {
+      accounts.push(data.Accounts.checkin.Account);
+    }
+    for (var i = 0; i < accounts.length; i++) {
+      var opt = document.createElement('option');
+      opt.value = accounts[i];
+      opt.text = accounts[i];
+      select.add(opt);
+    }
+  }
+  var reqTable = document.getElementById('od_staff_requests_tbl');
+  if (reqTable) {
+    while (reqTable.rows.length > 1) reqTable.deleteRow(1);
+    for (var j = 0; j < (snap.requests || []).length; j++) {
+      var req = snap.requests[j];
+      var row = reqTable.insertRow(reqTable.rows.length);
+      row.insertCell(0).innerHTML = req.request_id.slice(0, 8);
+      row.insertCell(1).innerHTML = '$' + req.requested_limit;
+      row.insertCell(2).innerHTML = req.status;
+      var cell = row.insertCell(3);
+      if (req.status === 'pending') {
+        cell.innerHTML = '<button type="button" class="btn btn-primary od-approve" data-id="'+req.request_id+'">Approve</button> ' +
+          '<button type="button" class="btn btn-primary od-deny" data-id="'+req.request_id+'">Deny</button>';
+      }
+    }
+    $(reqTable).off('click', '.od-approve').on('click', '.od-approve', function() {
+      decideOverdraft($(this).data('id'), 'approve');
+    });
+    $(reqTable).off('click', '.od-deny').on('click', '.od-deny', function() {
+      decideOverdraft($(this).data('id'), 'deny');
+    });
+  }
+}
+
+function staffOverdraftPost(path, extra) {
+  var payload = Object.assign({
+    userid: userid,
+    customer_id: lastLookedUpCustomerId,
+    account: $('#od_staff_account').val()
+  }, extra || {});
+  fetch(homeURL + path, {
+    method: 'post',
+    body: JSON.stringify(payload),
+    headers: {'Content-type': 'application/json'}
+  }).then(function(response) {
+    return response.json().then(function(body) { return {status: response.status, body: body}; });
+  }).then(function(result) {
+    window.alert(result.body.message || result.body.error || 'Done');
+    if (lastLookedUpCustomerId) getCustomer(lastLookedUpCustomerId);
+  }).catch(function(error) {
+    console.error(error);
+  });
+}
+
+function decideOverdraft(requestId, decision) {
+  fetch(homeURL + 'decideOverdraftRequest', {
+    method: 'post',
+    body: JSON.stringify({userid: userid, request_id: requestId, decision: decision}),
+    headers: {'Content-type': 'application/json'}
+  }).then(function(response) {
+    return response.json();
+  }).then(function(data) {
+    window.alert(data.message || data.error || 'Done');
+    if (lastLookedUpCustomerId) getCustomer(lastLookedUpCustomerId);
+  }).catch(function(error) {
+    console.error(error);
+  });
 }
 
 function fillCustomerAccTbl(data){
@@ -656,6 +751,28 @@ $(document).ready(function() {
     $('#customer_id_clear_btn').on('click', function(){
       $('#cust_details_card').hide();
       $('#cust_accounts_tbl').hide();
+      $('#overdraft_staff_pane').hide();
+    });
+    $('#od_staff_set_btn').on('click', function(){
+      if($('#od_staff_account').val() == 'select' || $('#od_staff_limit').val() == ''){
+        window.alert('No input!');
+      } else {
+        staffOverdraftPost('setOverdraft', {limit: $('#od_staff_limit').val()});
+      }
+    });
+    $('#od_staff_revoke_btn').on('click', function(){
+      if($('#od_staff_account').val() == 'select'){
+        window.alert('No input!');
+      } else {
+        staffOverdraftPost('revokeOverdraft', {});
+      }
+    });
+    $('#od_staff_temp_btn').on('click', function(){
+      if($('#od_staff_account').val() == 'select' || $('#od_staff_temp').val() == ''){
+        window.alert('No input!');
+      } else {
+        staffOverdraftPost('grantTempOverdraft', {amount: $('#od_staff_temp').val()});
+      }
     });
     $('#approve_trans_btn').on('click', function(){
       if($('#customer_trans_no').val() == 'select'){

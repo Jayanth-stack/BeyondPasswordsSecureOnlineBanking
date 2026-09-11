@@ -4,6 +4,7 @@ import phonenumbers
 
 # from employee import Employee
 from utility.encrypt import encrypt, encrypt_ssn, check_encrypted_password
+from utility.overdraft import debit_allowed
 from datetime import datetime
 from mysql import connector as mysql    
 import os
@@ -231,7 +232,7 @@ class Customers:
                     if transaction_no != -1:
                         self.deny_funds_requested(transaction_no)
                     return 'Insufficient Balance in Credit Card'
-                if result[0][0] < amount and result[0][2] != 'credit':
+                if result[0][2] != 'credit' and not debit_allowed(account1, amount, result[0][0], result[0][2]):
                     print('Insufficient Balance')
                     return 'Insufficient Balance'
             else:
@@ -319,7 +320,7 @@ class Customers:
                 print('Insufficient Balance')
                 # print(transaction_no)
                 return 'Insufficient Balance in Credit Card'
-            if result[0][0] < amount and result[0][2] != 'credit':
+            if result[0][2] != 'credit' and not debit_allowed(account, amount, result[0][0], result[0][2]):
                 print('Insufficient Balance')
                 return 'Insufficient Balance'
         else:
@@ -478,6 +479,23 @@ class Customers:
             # print('Account doesn\'t exists')
             return 0
         return 1
+
+    #################        FUNCTION TO GET ACCOUNT TYPE/BALANCE (OVERDRAFT POLICY)  #################
+    def get_account_state(self, account_no):
+        try:
+            query = """
+                SELECT account_type, balance, customer_id FROM Accounts WHERE account_no=%d;""" % (int(account_no))
+        except (TypeError, ValueError):
+            return None
+        cursor.execute(query)
+        result = cursor.fetchall()
+        if not result:
+            return None
+        return {
+            'account_type': result[0][0],
+            'balance': result[0][1],
+            'customer_id': result[0][2],
+        }
 
     #################        FUNCTION TO GET CUSTOMER'S ALL ACCOUNTS                     #################
     def get_all_account(self, customer_id):

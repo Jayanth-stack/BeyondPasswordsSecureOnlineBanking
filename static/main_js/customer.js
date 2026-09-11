@@ -13,6 +13,7 @@ const homeURL = 'http://127.0.0.1:5000/';
 
 
 var userid, usertype, first_name, savings_ac_no, savings_ac_no_masked, savings_ac_bal, checking_ac_no, checking_ac_no_masked, checking_ac_bal, cc_no, cc_no_masked, cc_bal;
+var savings_ac_available, checking_ac_available;
 var midname, lastname, email, contact, dob, ssn, ssn_masked, address;
 var otpModal_source;
 
@@ -126,6 +127,107 @@ function appendPrimaryData(data) {
 
   createCheckDropdown();
   fillPendingTransTbl(data);
+  fillOverdraft(data);
+}
+
+function overdraftForAccount(data, accountNo) {
+  var snap = data.Overdrafts;
+  if (!snap || !snap.facilities) {
+    return null;
+  }
+  var target = String(accountNo);
+  for (var i = 0; i < snap.facilities.length; i++) {
+    if (String(snap.facilities[i].account) === target) {
+      return snap.facilities[i];
+    }
+  }
+  return null;
+}
+
+function fillOverdraft(data) {
+  var snap = data.Overdrafts || {facilities: [], requests: [], policy: {}};
+  if (snap.policy) {
+    document.getElementById('od_fee').innerHTML = '$' + (snap.policy.fee || '0.00');
+    document.getElementById('od_courtesy').innerHTML = '$' + (snap.policy.courtesy || '0.00');
+  }
+  var saOd = overdraftForAccount(data, savings_ac_no);
+  var caOd = overdraftForAccount(data, checking_ac_no);
+  savings_ac_available = saOd && saOd.available != null ? parseFloat(saOd.available) : parseFloat(savings_ac_bal);
+  checking_ac_available = caOd && caOd.available != null ? parseFloat(caOd.available) : parseFloat(checking_ac_bal);
+  document.getElementById('sa_overdraft').innerHTML = saOd && saOd.enrolled ? ('$' + saOd.effective_limit) : 'Not enrolled';
+  document.getElementById('sa_available').innerHTML = isNaN(savings_ac_available) ? 'NA' : savings_ac_available;
+  document.getElementById('ca_overdraft').innerHTML = caOd && caOd.enrolled ? ('$' + caOd.effective_limit) : 'Not enrolled';
+  document.getElementById('ca_available').innerHTML = isNaN(checking_ac_available) ? 'NA' : checking_ac_available;
+  var saAvailEl = document.getElementById('saTransfer_available');
+  var caAvailEl = document.getElementById('caTransfer_available');
+  if (saAvailEl) saAvailEl.innerHTML = isNaN(savings_ac_available) ? 'NA' : ('$' + savings_ac_available);
+  if (caAvailEl) caAvailEl.innerHTML = isNaN(checking_ac_available) ? 'NA' : ('$' + checking_ac_available);
+
+  var table = document.getElementById('od_facilities_tbl');
+  if (table) {
+    while (table.rows.length > 1) {
+      table.deleteRow(1);
+    }
+    for (var i = 0; i < (snap.facilities || []).length; i++) {
+      var row = table.insertRow(table.rows.length);
+      row.insertCell(0).innerHTML = snap.facilities[i].account;
+      row.insertCell(1).innerHTML = '$' + snap.facilities[i].effective_limit;
+      row.insertCell(2).innerHTML = '$' + (snap.facilities[i].available || '0.00');
+      row.insertCell(3).innerHTML = snap.facilities[i].enrolled ? 'Enrolled' : 'Not enrolled';
+    }
+  }
+  var reqTable = document.getElementById('od_requests_tbl');
+  if (reqTable) {
+    while (reqTable.rows.length > 1) {
+      reqTable.deleteRow(1);
+    }
+    for (var j = 0; j < (snap.requests || []).length; j++) {
+      var r = reqTable.insertRow(reqTable.rows.length);
+      r.insertCell(0).innerHTML = '$' + snap.requests[j].requested_limit;
+      r.insertCell(1).innerHTML = snap.requests[j].status;
+      r.insertCell(2).innerHTML = snap.requests[j].reason || '';
+    }
+  }
+  var select = document.getElementById('odRequest_account');
+  if (select) {
+    while (select.options.length > 1) {
+      select.remove(1);
+    }
+    if (savings_ac_no && savings_ac_no !== 'NA') {
+      var opt1 = document.createElement('option');
+      opt1.value = savings_ac_no;
+      opt1.text = 'Savings ' + savings_ac_no;
+      select.add(opt1);
+    }
+    if (checking_ac_no && checking_ac_no !== 'NA') {
+      var opt2 = document.createElement('option');
+      opt2.value = checking_ac_no;
+      opt2.text = 'Checking ' + checking_ac_no;
+      select.add(opt2);
+    }
+  }
+}
+
+function requestOverdraft(account, limit, reason) {
+  fetch(homeURL + 'requestOverdraft', {
+    method: 'post',
+    body: JSON.stringify({
+      userid: userid,
+      account: account,
+      requested_limit: limit,
+      reason: reason
+    }),
+    headers: {'Content-type': 'application/json'}
+  }).then(function(response) {
+    return response.json().then(function(body) {
+      return {status: response.status, body: body};
+    });
+  }).then(function(result) {
+    window.alert(result.body.message || result.body.error || 'Done');
+    getUser();
+  }).catch(function(error) {
+    console.error(error);
+  });
 }
 
 function fillPendingTransTbl(data){
@@ -970,8 +1072,8 @@ $(document).ready(function() {
       }
       else {
         if($('#sa_send_radio').is(':checked')) {
-          if($('#saTransfer_amt').val() > savings_ac_bal){
-            alert('You can not send more than you have silly!');
+          if($('#saTransfer_amt').val() > savings_ac_available){
+            alert('You can not send more than available funds (balance + overdraft)!');
           }
           else {
             otpModal_source = 'saTransfer';
@@ -992,8 +1094,8 @@ $(document).ready(function() {
       }
       else {
         if($('#ca_send_radio').is(':checked')) {
-          if($('#caTransfer_amt').val() > checking_ac_bal){
-            alert('You can not send more than you have silly!');
+          if($('#caTransfer_amt').val() > checking_ac_available){
+            alert('You can not send more than available funds (balance + overdraft)!');
           }
           else {
             otpModal_source = 'caTransfer';
@@ -1138,6 +1240,15 @@ $(document).ready(function() {
             window.alert("Re-entered password doesn't match new password!");
           }
         }
+      }
+    });
+    $('#odRequest_btn').on('click', function(){
+      if($('#odRequest_account').val() == 'select' || $('#odRequest_limit').val() == ''){
+        window.alert('Empty Input!');
+      }
+      else {
+        requestOverdraft($('#odRequest_account').val(), $('#odRequest_limit').val(), $('#odRequest_reason').val());
+        $('#odRequest_close').click();
       }
     });
     $('#key_1').on('click', function(){
