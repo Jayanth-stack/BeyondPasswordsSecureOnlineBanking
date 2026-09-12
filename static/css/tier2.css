@@ -160,3 +160,7 @@ body {
   -webkit-animation: spin 2s linear infinite; /* Safari */
   animation: spin 2s linear infinite;
 }
+
+.interest-staff-pane {
+  margin-top: 20px;
+}

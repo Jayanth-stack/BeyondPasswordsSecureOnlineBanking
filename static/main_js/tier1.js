@@ -319,12 +319,108 @@ function appendSecondaryData(customer_id, data) {
   document.getElementById("address").innerHTML = data.Info.address;
 
   fillCustomerAccTbl(data);
+  fillInterestStaff(customer_id, data);
   if($('#cust_details_card').css('display')=='none'){
     $('#cust_details_card').show();
   }
   if($('#cust_accounts_tbl').css('display')=='none'){
     $('#cust_details_tbl').show();
   }
+}
+
+function fillInterestStaff(customer_id, data) {
+  window._interestCustomerId = customer_id;
+  var pane = document.getElementById('interest_staff_pane');
+  if (!pane) {
+    return;
+  }
+  var snap = data.Interest || {accounts: [], requests: []};
+  var select = document.getElementById('int_staff_account');
+  select.innerHTML = '<option value="select">Select Savings Account</option>';
+  var summary = 'No savings account.';
+  if (data.Accounts && data.Accounts.savings && data.Accounts.savings !== 'None') {
+    var option = document.createElement('option');
+    option.value = data.Accounts.savings.Account;
+    option.innerHTML = 'Savings - ' + data.Accounts.savings.Account;
+    select.appendChild(option);
+    var acct = (snap.accounts || []).find(function(item) {
+      return String(item.account) === String(data.Accounts.savings.Account);
+    });
+    summary = acct
+      ? ('APY ' + acct.effective_apy + '% · accrued $' + acct.accrued + ' · YTD $' + acct.ytd_posted)
+      : 'Savings not enrolled (0% APY).';
+  }
+  document.getElementById('int_staff_summary').innerHTML = summary;
+  var rows = '';
+  var requests = snap.requests || [];
+  for (var i = 0; i < requests.length; i++) {
+    var req = requests[i];
+    var actions = req.status === 'pending'
+      ? '<button type="button" class="btn btn-primary int-approve" data-id="' + req.request_id + '">Approve</button> ' +
+        '<button type="button" class="btn btn-primary int-deny" data-id="' + req.request_id + '">Deny</button>'
+      : '';
+    rows += '<tr><td>' + req.request_id.slice(0, 8) + '</td><td>' + req.requested_apy +
+      '%</td><td>' + req.status + '</td><td>' + actions + '</td></tr>';
+  }
+  var body = document.getElementById('int_staff_requests_tbl').getElementsByTagName('tbody')[0];
+  body.innerHTML = rows;
+  $('#int_staff_requests_tbl .int-approve').off('click').on('click', function() {
+    decideApy($(this).data('id'), 'approve');
+  });
+  $('#int_staff_requests_tbl .int-deny').off('click').on('click', function() {
+    decideApy($(this).data('id'), 'deny');
+  });
+  $(pane).show();
+}
+
+function staffInterestPost(path, extra) {
+  var account = $('#int_staff_account').val();
+  if (account === 'select') {
+    window.alert('Select a savings account');
+    return;
+  }
+  var payload = Object.assign({
+    userid: userid,
+    customer_id: window._interestCustomerId,
+    account: account
+  }, extra || {});
+  fetch(homeURL + path, {
+    method: 'post',
+    body: JSON.stringify(payload),
+    headers: {'Content-type': 'application/json'}
+  }).then(function(response) {
+    return response.json().then(function(data) {
+      return {ok: response.ok, data: data};
+    });
+  }).then(function(result) {
+    window.alert(result.data.message || (result.ok ? 'Done' : 'Failed'));
+    if (window._interestCustomerId) {
+      getCustomer(window._interestCustomerId);
+    }
+  }).catch(function(error) {
+    console.error(error);
+  });
+}
+
+function decideApy(requestId, decision) {
+  fetch(homeURL + 'decideApyRequest', {
+    method: 'post',
+    body: JSON.stringify({
+      userid: userid,
+      request_id: requestId,
+      decision: decision
+    }),
+    headers: {'Content-type': 'application/json'}
+  }).then(function(response) {
+    return response.json();
+  }).then(function(data) {
+    window.alert(data.message);
+    if (window._interestCustomerId) {
+      getCustomer(window._interestCustomerId);
+    }
+  }).catch(function(error) {
+    console.error(error);
+  });
 }
 
 function fillCustomerAccTbl(data){
@@ -730,6 +826,29 @@ $(document).ready(function() {
     $('#customer_id_clear_btn').on('click', function(){
       $('#cust_details_card').hide();
       $('#cust_accounts_tbl').hide();
+      $('#interest_staff_pane').hide();
+    });
+    $('#int_staff_set_btn').on('click', function(){
+      if($('#int_staff_apy').val() == ''){
+        window.alert('No APY entered!');
+      }
+      else {
+        staffInterestPost('setApy', {apy: $('#int_staff_apy').val()});
+      }
+    });
+    $('#int_staff_revoke_btn').on('click', function(){
+      staffInterestPost('revokeApy', {});
+    });
+    $('#int_staff_promo_btn').on('click', function(){
+      if($('#int_staff_promo').val() == ''){
+        window.alert('No promo APY entered!');
+      }
+      else {
+        staffInterestPost('grantPromoApy', {apy: $('#int_staff_promo').val()});
+      }
+    });
+    $('#int_staff_post_btn').on('click', function(){
+      staffInterestPost('postDueInterest', {});
     });
     $('#approve_req_btn').on('click', function(){
       if($('#customer_req_id').val() == 'select'){

@@ -11,6 +11,12 @@ from dotenv import load_dotenv
 import uuid
 from utility.crypto_receipt import generate_receipt, generate_nonce, current_timestamp
 
+try:
+    from utility.interest import observe_interest
+except Exception:  # pragma: no cover - fail-open if the capability is absent
+    def observe_interest(*args, **kwargs):
+        return None
+
 load_dotenv()
 
 
@@ -277,6 +283,8 @@ class Customers:
                 "timestamp": getdate(),
                 "nonce": generate_nonce()
             }
+            observe_interest(account1)
+            observe_interest(account2)
             return generate_receipt(receipt_data)
         except Exception as e:
             db.rollback()
@@ -339,6 +347,7 @@ class Customers:
         try:
             db.commit()
             print('Amount Debited')
+            observe_interest(account)
             return 'Amount Debited'
         except Exception as e:
             db.rollback()
@@ -346,7 +355,7 @@ class Customers:
             return 'Cannot Debit funds:'
 
     #################        FUNCTION TO CREDIT FUNDS                     #################
-    def credit_request(self, account, amount):
+    def credit_request(self, account, amount, remark=None):
         query = """ 
                 Select active from Accounts where account_no = %d; 
             """ % (int(account))
@@ -366,7 +375,8 @@ class Customers:
             """ % (float(amount), int(account))
         cursor.execute(query)
 
-        str1 = '$' + str(amount) + ' direct deposited  ' + ' on ' + getdate() + ',<br>'
+        history = remark if remark else 'direct deposited'
+        str1 = '$' + str(amount) + ' ' + history + '  ' + ' on ' + getdate() + ',<br>'
         print(str1)
         query = """ 
                 UPDATE Accounts SET transaction_history=concat('%s', transaction_history) where account_no = %d; 
@@ -377,6 +387,7 @@ class Customers:
             db.commit()
             # result = cursor.fetchall()
             print('Amount Credited')
+            observe_interest(account)
             return 'Success'
         except Exception as e:
             db.rollback()
@@ -478,6 +489,22 @@ class Customers:
             # print('Account doesn\'t exists')
             return 0
         return 1
+
+    def get_account_state(self, account_no):
+        try:
+            query = """
+                SELECT account_type, balance, customer_id FROM Accounts WHERE account_no=%d;""" % (int(account_no))
+        except (TypeError, ValueError):
+            return None
+        cursor.execute(query)
+        result = cursor.fetchall()
+        if not result:
+            return None
+        return {
+            'account_type': result[0][0],
+            'balance': result[0][1],
+            'customer_id': result[0][2],
+        }
 
     #################        FUNCTION TO GET CUSTOMER'S ALL ACCOUNTS                     #################
     def get_all_account(self, customer_id):
