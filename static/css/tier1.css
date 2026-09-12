@@ -119,6 +119,10 @@ select {
     display: none; /* Initially hide tables */
 }
 
+.interest-staff-pane {
+    margin-top: 20px;
+}
+
 /* Custom styles for buttons and inputs for better UX */
 input[type="submit"],
 button {

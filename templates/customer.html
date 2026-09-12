@@ -117,6 +117,15 @@
                 <h5 class="ac_details_text">Available Balance :</h5>
                 <p id="sa_balance">NA</p>
                 <br/>
+                <h5 class="ac_details_text">APY :</h5>
+                <p id="sa_apy">0.00%</p>
+                <br/>
+                <h5 class="ac_details_text">Accrued interest :</h5>
+                <p id="sa_accrued">$0.00</p>
+                <br/>
+                <h5 class="ac_details_text">Interest YTD :</h5>
+                <p id="sa_interest_ytd">$0.00</p>
+                <br/>
               </div>
               <button type="button" data-toggle="modal" data-target="#saDepositModal" class="btn btn-primary" style="width:80%;margin-bottom:10px;margin-top:10px;">Deposit Fund</button>
               <button type="button" data-toggle="modal" data-target="#saTransferModal" class="btn btn-primary" style="width:80%;margin-bottom:10px;">Transfer Fund</button>
@@ -158,6 +167,44 @@
               <button type="button" data-toggle="modal" data-target="#ccTransferModal" class="btn btn-primary" style="width:80%;margin-bottom:10px;margin-top:10px;">Initiate Transaction</button>
               <button type="button" id="view_cc_xacts_btn" data-toggle="modal" data-target="#ccTransactionsModal" class="btn btn-primary" style="width:80%;margin-bottom:10px;">View Transactions</button>
             </div>
+          </div>
+          <div id="interest_pane" class="interest-pane">
+            <h4 class="account_type_text">Savings Interest</h4>
+            <hr class="header_divider" />
+            <p>Daily-balance APY on savings. Checking and credit do not earn yield. Default is 0% until staff enrolls the account.</p>
+            <p>Product range: <span id="int_min_apy">0.01%</span> – <span id="int_max_apy">10.00%</span></p>
+            <table class="table table-hover table-bordered table-color" id="int_accounts_tbl">
+              <thead>
+                <tr>
+                  <th>Account</th>
+                  <th>APY</th>
+                  <th>Accrued</th>
+                  <th>YTD</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+            <button type="button" data-toggle="modal" data-target="#intRequestModal" class="btn btn-primary" style="width:80%;margin-bottom:10px;">Request APY Change</button>
+            <table class="table table-hover table-bordered table-color" id="int_requests_tbl">
+              <thead>
+                <tr>
+                  <th>Requested APY</th>
+                  <th>Status</th>
+                  <th>Reason</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+            <table class="table table-hover table-bordered table-color" id="int_postings_tbl">
+              <thead>
+                <tr>
+                  <th>Period</th>
+                  <th>Amount</th>
+                  <th>APY</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
           </div>
         </div>
         <div id="service_requests_pane" class="my_accs_float" style="display:none;">
@@ -533,6 +580,29 @@
               </div>
               <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal fade" id="intRequestModal" tabindex="-1" role="dialog" aria-labelledby="exampleModalCenterTitle" aria-hidden="true">
+          <div class="modal-dialog modal-dialog-centered" role="document">
+            <div class="modal-content">
+              <div class="modal-header">
+                <h4 class="account_type_text" style="display:inline-block">Request APY Change</h4>
+                <button type="button" class="close" id="intRequest_close" data-dismiss="modal" aria-label="Close">
+                  <span aria-hidden="true">&times;</span>
+                </button>
+              </div>
+              <div class="modal-body">
+                <select id="intRequest_account">
+                  <option value="select">Select savings account</option>
+                </select><br/><br/>
+                <input type="text" id="intRequest_apy" placeholder="Requested APY %" maxlength="6"/><br/><br/>
+                <input type="text" id="intRequest_reason" placeholder="Reason (optional)" maxlength="80"/>
+              </div>
+              <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                <button type="button" id="intRequest_btn" class="btn btn-primary">Submit</button>
               </div>
             </div>
           </div>

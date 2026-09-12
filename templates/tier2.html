@@ -258,6 +258,31 @@
               </thead>
               <tbody></tbody>
             </table>
+            <div class="cust_details_card interest-staff-pane" id="interest_staff_pane" style="display:none;">
+              <h4 class="header_text">Savings Interest / APY</h4>
+              <hr class="header_divider" />
+              <p id="int_staff_summary">No savings account.</p>
+              <select id="int_staff_account" style="height:30px;">
+                <option value="select">Select Savings Account</option>
+              </select><br>
+              <input type="text" id="int_staff_apy" placeholder="APY %" maxlength="6"/><br>
+              <button type="button" id="int_staff_set_btn" class="btn btn-primary" style="width:50%;margin-bottom:10px;margin-top:10px;">Set APY</button><br>
+              <button type="button" id="int_staff_revoke_btn" class="btn btn-primary" style="width:50%;margin-bottom:10px;">Revoke</button><br>
+              <input type="text" id="int_staff_promo" placeholder="Promo APY bump" maxlength="6"/><br>
+              <button type="button" id="int_staff_promo_btn" class="btn btn-primary" style="width:50%;margin-bottom:10px;">Grant Promo</button><br>
+              <button type="button" id="int_staff_post_btn" class="btn btn-primary" style="width:50%;margin-bottom:10px;">Post Due Interest</button>
+              <table class="table table-hover table-bordered table-color" id="int_staff_requests_tbl">
+                <thead>
+                  <tr>
+                    <th>Request</th>
+                    <th>APY</th>
+                    <th>Status</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
           </div>
 
           <div id="account_details_pane" style="display: none">

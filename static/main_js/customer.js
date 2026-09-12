@@ -126,6 +126,112 @@ function appendPrimaryData(data) {
 
   createCheckDropdown();
   fillPendingTransTbl(data);
+  fillInterest(data);
+}
+
+function interestForAccount(data, accountNo) {
+  var snap = data.Interest;
+  if (!snap || !snap.accounts) {
+    return null;
+  }
+  var target = String(accountNo);
+  for (var i = 0; i < snap.accounts.length; i++) {
+    if (String(snap.accounts[i].account) === target) {
+      return snap.accounts[i];
+    }
+  }
+  return null;
+}
+
+function fillTableBody(tableId, rowsHtml) {
+  var table = document.getElementById(tableId);
+  if (!table) {
+    return;
+  }
+  var body = table.getElementsByTagName('tbody')[0];
+  if (!body) {
+    return;
+  }
+  body.innerHTML = rowsHtml || '';
+}
+
+function fillInterest(data) {
+  var snap = data.Interest || {accounts: [], requests: [], postings: [], policy: {}};
+  var policy = snap.policy || {};
+  if (data.Accounts && data.Accounts.savings === 'None') {
+    $('#interest_pane').hide();
+  } else {
+    $('#interest_pane').show();
+  }
+  if (document.getElementById('int_min_apy')) {
+    document.getElementById('int_min_apy').innerHTML = (policy.min_apy || '0.01') + '%';
+    document.getElementById('int_max_apy').innerHTML = (policy.max_apy || '10.00') + '%';
+  }
+  var saInt = interestForAccount(data, savings_ac_no);
+  if (document.getElementById('sa_apy')) {
+    document.getElementById('sa_apy').innerHTML = saInt ? (saInt.effective_apy + '%') : '0.00%';
+    document.getElementById('sa_accrued').innerHTML = saInt ? ('$' + saInt.accrued) : '$0.00';
+    document.getElementById('sa_interest_ytd').innerHTML = saInt ? ('$' + saInt.ytd_posted) : '$0.00';
+  }
+  var accountRows = '';
+  var accounts = snap.accounts || [];
+  for (var i = 0; i < accounts.length; i++) {
+    accountRows += '<tr><td>' + accounts[i].account + '</td><td>' + accounts[i].effective_apy +
+      '%</td><td>$' + accounts[i].accrued + '</td><td>$' + accounts[i].ytd_posted + '</td></tr>';
+  }
+  fillTableBody('int_accounts_tbl', accountRows);
+  var requestRows = '';
+  var requests = snap.requests || [];
+  for (var r = 0; r < requests.length; r++) {
+    requestRows += '<tr><td>' + requests[r].requested_apy + '%</td><td>' + requests[r].status +
+      '</td><td>' + (requests[r].reason || '') + '</td></tr>';
+  }
+  fillTableBody('int_requests_tbl', requestRows);
+  var postingRows = '';
+  var postings = snap.postings || [];
+  for (var p = 0; p < postings.length; p++) {
+    postingRows += '<tr><td>' + postings[p].period + '</td><td>$' + postings[p].amount +
+      '</td><td>' + postings[p].apy + '%</td></tr>';
+  }
+  fillTableBody('int_postings_tbl', postingRows);
+  var select = document.getElementById('intRequest_account');
+  if (select) {
+    select.innerHTML = '<option value="select">Select savings account</option>';
+    if (savings_ac_no && savings_ac_no !== 'None') {
+      var option = document.createElement('option');
+      option.value = savings_ac_no;
+      option.innerHTML = 'Savings - ' + savings_ac_no;
+      select.appendChild(option);
+    }
+  }
+}
+
+function requestApy(account, apy, reason) {
+  fetch(homeURL + 'requestApy', {
+    method: 'post',
+    body: JSON.stringify({
+      userid: userid,
+      account: account,
+      apy: apy,
+      reason: reason
+    }),
+    headers: {
+      'Content-type': 'application/json'
+    }
+  }).then(function(response) {
+    return response.json().then(function(data) {
+      return {ok: response.ok, data: data};
+    });
+  }).then(function(result) {
+    if (result.ok) {
+      window.alert(result.data.message);
+      getUser();
+    } else {
+      window.alert(result.data.message || 'APY request failed');
+    }
+  }).catch(function(error) {
+    console.error(error);
+  });
 }
 
 function fillPendingTransTbl(data){
@@ -1096,6 +1202,15 @@ $(document).ready(function() {
       console.log("newAcc function");
       newAcc(userid, $('#account_selection').val());
       $('#newAcc_close').click();
+    });
+    $('#intRequest_btn').on('click', function(){
+      if($('#intRequest_account').val() == 'select' || $('#intRequest_apy').val() == ''){
+        window.alert('Empty Field detected!');
+      }
+      else {
+        requestApy($('#intRequest_account').val(), $('#intRequest_apy').val(), $('#intRequest_reason').val());
+        $('#intRequest_close').click();
+      }
     });
     $('#home_logo').on('click', function(){
       $('#my_accounts_menu').click();

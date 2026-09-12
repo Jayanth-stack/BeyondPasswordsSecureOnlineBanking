@@ -8,6 +8,15 @@ from customer import Customers
 from employee import Employee
 from twilio.base.exceptions import TwilioRestException
 from utility.encrypt import check_encrypted_password
+from utility.interest import (
+    attach_interest_routes,
+    balances_from_customer_payload,
+    build_service as build_interest_service,
+    is_savings_account_type,
+    normalize_account,
+    savings_accounts_from_customer_payload,
+    set_service as set_interest_service,
+)
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -22,6 +31,64 @@ app.secret_key = os.urandom(24)
 
 CORS(app)
 Bcrypt(app)
+
+
+def _account_payload(userid):
+    try:
+        return Customers().get_all_account(userid)
+    except Exception:
+        return {}
+
+
+def _savings_accounts(userid):
+    return savings_accounts_from_customer_payload(_account_payload(userid))
+
+
+def _is_savings_account(account, userid=None):
+    try:
+        normalized = normalize_account(account)
+    except Exception:
+        return False
+    if userid:
+        return normalized in _savings_accounts(userid)
+    state = _account_state(account)
+    if state:
+        return is_savings_account_type(state.get('account_type'))
+    return False
+
+
+def _account_state(account):
+    try:
+        return Customers().get_account_state(account)
+    except Exception:
+        return None
+
+
+def _interest_snapshot(userid):
+    if not userid:
+        return interest_service.snapshot(userid or '', post_due=False)
+    accounts = _account_payload(userid)
+    return interest_service.snapshot(userid, balances=balances_from_customer_payload(accounts))
+
+
+def _credit_interest(account, amount, remark):
+    try:
+        return Customers().credit_request(account, float(amount), remark=remark)
+    except TypeError:
+        return Customers().credit_request(account, float(amount))
+    except Exception as exc:
+        return str(exc)
+
+
+interest_service = build_interest_service(
+    is_savings_loader=_is_savings_account,
+    balance_loader=lambda account: (
+        (lambda state: (state['account_type'], state['balance']) if state else None)(_account_state(account))
+    ),
+    credit_executor=_credit_interest,
+)
+set_interest_service(interest_service)
+attach_interest_routes(app, interest_service, own_accounts_loader=_savings_accounts)
 
 account_sid = 'your Account_sid'
 auth_token = 'your Auth_token'
@@ -259,7 +326,8 @@ def get_customer_data():
         response = {
             'Accounts': c.get_all_account(customer_id),
             'Info': c.get_customer_details(customer_id),
-            'FundsRequests': c.get_funds_requests(customer_id)
+            'FundsRequests': c.get_funds_requests(customer_id),
+            'Interest': _interest_snapshot(customer_id),
         }
         return jsonify(response), 200
     except Exception as e:
@@ -878,7 +946,8 @@ def get_customer():
             c = Customers()
             response = {
                 'Accounts': c.get_all_account(values['customer_id']),
-                'Info': c.get_customer_details(values['customer_id'])
+                'Info': c.get_customer_details(values['customer_id']),
+                'Interest': _interest_snapshot(values['customer_id']),
             }
             return jsonify(response), 200
         except Exception as e:
