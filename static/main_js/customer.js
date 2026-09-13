@@ -126,6 +126,7 @@ function appendPrimaryData(data) {
 
   createCheckDropdown();
   fillPendingTransTbl(data);
+  renderStatements(data.Statements);
 }
 
 function fillPendingTransTbl(data){
@@ -502,6 +503,257 @@ function deny_request(userid, xactno) {
   });
 }
 
+function escapeHtml(value) {
+  return String(value == null ? '' : value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function resetMenuColors() {
+  $('#service_requests_menu').css('background-color','maroon');
+  $('#my_accounts_menu').css('background-color','maroon');
+  $('#pending_transaction_requests_menu').css('background-color','maroon');
+  $('#statements_menu').css('background-color','maroon');
+}
+
+function showStatementsPane(accountNo) {
+  if (accountNo) {
+    $('#stmt_account').val(String(accountNo));
+  }
+  if($('#statements_pane').css('display')=='none'){
+    $('#statements_pane').show().siblings('div').hide();
+  }
+  resetMenuColors();
+  $('#statements_menu').css('background-color','#FF6600');
+}
+
+function fillStatementAccounts(snapshot) {
+  var select = document.getElementById('stmt_account');
+  if (!select) {
+    return;
+  }
+  var current = select.value;
+  select.innerHTML = '<option value="">Select account</option>';
+  var accounts = (snapshot && snapshot.accounts) ? snapshot.accounts : {};
+  Object.keys(accounts).forEach(function(account) {
+    var option = document.createElement('option');
+    option.value = account;
+    option.textContent = account;
+    select.appendChild(option);
+  });
+  if (!Object.keys(accounts).length) {
+    [savings_ac_no, checking_ac_no, cc_no].forEach(function(account) {
+      if (account && account !== 'None' && account !== undefined) {
+        var option = document.createElement('option');
+        option.value = account;
+        option.textContent = account;
+        select.appendChild(option);
+      }
+    });
+  }
+  if (current) {
+    select.value = current;
+  }
+  fillStatementPeriods();
+}
+
+function fillStatementPeriods() {
+  var account = $('#stmt_account').val();
+  var select = document.getElementById('stmt_period');
+  if (!select) {
+    return;
+  }
+  var periods = [];
+  if (window.statementSnapshot && window.statementSnapshot.accounts && window.statementSnapshot.accounts[account]) {
+    periods = window.statementSnapshot.accounts[account].available_periods || [];
+  }
+  select.innerHTML = '';
+  if (!periods.length) {
+    var option = document.createElement('option');
+    option.value = '';
+    option.textContent = 'Previous month';
+    select.appendChild(option);
+    return;
+  }
+  periods.slice().reverse().forEach(function(period) {
+    var option = document.createElement('option');
+    option.value = period;
+    option.textContent = period;
+    select.appendChild(option);
+  });
+}
+
+function renderStatements(snapshot) {
+  window.statementSnapshot = snapshot || {statements: [], requests: [], accounts: {}};
+  fillStatementAccounts(window.statementSnapshot);
+  var body = document.querySelector('#statements_tbl tbody');
+  if (body) {
+    body.innerHTML = '';
+    (window.statementSnapshot.statements || []).forEach(function(item) {
+      var row = body.insertRow(-1);
+      row.insertCell(0).innerHTML = escapeHtml(item.kind + ' ' + item.period + (item.interim ? ' (interim)' : ''));
+      row.insertCell(1).innerHTML = escapeHtml(item.account);
+      row.insertCell(2).innerHTML = escapeHtml(item.opening_balance);
+      row.insertCell(3).innerHTML = escapeHtml(item.closing_balance);
+      row.insertCell(4).innerHTML = escapeHtml(item.credits);
+      row.insertCell(5).innerHTML = escapeHtml(item.debits);
+      var action = row.insertCell(6);
+      var button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'btn btn-primary btn-sm';
+      button.textContent = 'View';
+      button.setAttribute('data-statement-id', item.statement_id);
+      button.addEventListener('click', function() {
+        viewStatement(item.statement_id);
+      });
+      action.appendChild(button);
+    });
+  }
+  var reqBody = document.querySelector('#statement_requests_tbl tbody');
+  if (reqBody) {
+    reqBody.innerHTML = '';
+    (window.statementSnapshot.requests || []).forEach(function(item) {
+      var row = reqBody.insertRow(-1);
+      row.insertCell(0).innerHTML = escapeHtml(item.request_id.slice(0, 8));
+      row.insertCell(1).innerHTML = escapeHtml(item.account);
+      row.insertCell(2).innerHTML = escapeHtml(item.delivery);
+      row.insertCell(3).innerHTML = escapeHtml(item.status);
+    });
+  }
+}
+
+function statementPeriodPayload() {
+  var kind = $('#stmt_kind').val() || 'monthly';
+  var payload = {
+    userid: userid,
+    account: $('#stmt_account').val(),
+    kind: kind
+  };
+  if (kind === 'custom') {
+    payload.start = $('#stmt_start').val();
+    payload.end = $('#stmt_end').val();
+  } else if ($('#stmt_period').val()) {
+    payload.period = $('#stmt_period').val();
+  }
+  return payload;
+}
+
+function generateStatement() {
+  var payload = statementPeriodPayload();
+  if (!payload.account) {
+    window.alert('Select an account');
+    return;
+  }
+  fetch(homeURL + 'generateStatement', {
+    method: 'post',
+    body: JSON.stringify(payload),
+    headers: {'Content-type': 'application/json'}
+  }).then(function(response) {
+    return response.json().then(function(data) {
+      return {ok: response.ok, data: data};
+    });
+  }).then(function(result) {
+    if (!result.ok) {
+      window.alert(result.data.message || result.data.error || 'Could not generate statement');
+      return;
+    }
+    renderStatements(result.data.Statements);
+    if (result.data.statement) {
+      showStatementView(result.data.statement);
+    }
+  }).catch(function(error) {
+    console.error(error);
+  });
+}
+
+function requestOfficialStatement() {
+  var payload = statementPeriodPayload();
+  payload.delivery = $('#stmt_delivery').val() || 'mail';
+  if (!payload.account) {
+    window.alert('Select an account');
+    return;
+  }
+  fetch(homeURL + 'requestStatement', {
+    method: 'post',
+    body: JSON.stringify(payload),
+    headers: {'Content-type': 'application/json'}
+  }).then(function(response) {
+    return response.json().then(function(data) {
+      return {ok: response.ok, data: data};
+    });
+  }).then(function(result) {
+    window.alert(result.data.message || result.data.error || 'Request submitted');
+    if (result.data.Statements) {
+      renderStatements(result.data.Statements);
+    }
+  }).catch(function(error) {
+    console.error(error);
+  });
+}
+
+function viewStatement(statementId) {
+  fetch(homeURL + 'getStatement', {
+    method: 'post',
+    body: JSON.stringify({userid: userid, statement_id: statementId}),
+    headers: {'Content-type': 'application/json'}
+  }).then(function(response) {
+    return response.json();
+  }).then(function(data) {
+    if (!data.statement) {
+      window.alert(data.message || 'Statement not found');
+      return;
+    }
+    showStatementView(data.statement);
+  }).catch(function(error) {
+    console.error(error);
+  });
+}
+
+function showStatementView(statement) {
+  window.currentStatement = statement;
+  var summary = document.getElementById('statement_view_summary');
+  if (summary) {
+    summary.innerHTML =
+      '<p><b>Account</b> ' + escapeHtml(statement.account) +
+      ' &nbsp; <b>Period</b> ' + escapeHtml(statement.kind + ' ' + statement.period) +
+      (statement.interim ? ' (interim)' : '') + '</p>' +
+      '<p><b>Opening</b> $' + escapeHtml(statement.opening_balance) +
+      ' &nbsp; <b>Closing</b> $' + escapeHtml(statement.closing_balance) +
+      ' &nbsp; <b>Credits</b> $' + escapeHtml(statement.credits) +
+      ' &nbsp; <b>Debits</b> $' + escapeHtml(statement.debits) + '</p>';
+  }
+  var body = document.querySelector('#statement_lines_tbl tbody');
+  if (body) {
+    body.innerHTML = '';
+    (statement.entries || []).forEach(function(item) {
+      var row = body.insertRow(-1);
+      var when = item.posted_at ? new Date(item.posted_at * 1000).toISOString().slice(0, 10) : '';
+      row.insertCell(0).innerHTML = escapeHtml(when);
+      row.insertCell(1).innerHTML = escapeHtml(item.kind);
+      row.insertCell(2).innerHTML = escapeHtml(item.description || item.counterparty || '');
+      row.insertCell(3).innerHTML = escapeHtml((item.direction === 'debit' ? '-' : '') + item.amount);
+      row.insertCell(4).innerHTML = escapeHtml(item.balance);
+    });
+  }
+  $('#statementViewModal').modal('show');
+}
+
+function downloadCurrentStatement() {
+  if (!window.currentStatement) {
+    return;
+  }
+  var doc = new jsPDF();
+  doc.fromHTML($('#statement_view_summary')[0], 15, 15, {
+    "elementHandlers": {"#editor": function() { return true; }}
+  });
+  doc.fromHTML($('#statement_lines_tbl')[0], 15, 45, {
+    "elementHandlers": {"#editor": function() { return true; }}
+  });
+  doc.save(window.currentStatement.account + '-' + window.currentStatement.period + '-statement.pdf');
+}
+
 function getSavingXacts(userid, acno) {
   console.log("savings transactions called");
 
@@ -851,17 +1103,14 @@ $(document).ready(function() {
       if($('#account_details_pane').css('display')=='none'){
           $('#account_details_pane').show().siblings('div').hide();
       }
-      $('#service_requests_menu').css('background-color','maroon');
-      $('#my_accounts_menu').css('background-color','maroon');
-      $('#pending_transaction_requests_menu').css('background-color','maroon');
+      resetMenuColors();
     });
     $('#service_requests_menu').on('click', function(){
       if($('#service_requests_pane').css('display')=='none'){
           $('#service_requests_pane').show().siblings('div').hide();
       }
+      resetMenuColors();
       $('#service_requests_menu').css('background-color','#FF6600');
-      $('#my_accounts_menu').css('background-color','maroon');
-      $('#pending_transaction_requests_menu').css('background-color','maroon');
     });
     $('#my_accounts_menu').on('click', function(){
       getUser();
@@ -877,17 +1126,37 @@ $(document).ready(function() {
           $('#my_accs_pane').show().siblings('div').hide();
         }
       }
+      resetMenuColors();
       $('#my_accounts_menu').css('background-color','#FF6600');
-      $('#service_requests_menu').css('background-color','maroon');
-      $('#pending_transaction_requests_menu').css('background-color','maroon');
     });
     $('#pending_transaction_requests_menu').on('click', function(){
       if($('#pending_transaction_requests_pane').css('display')=='none'){
           $('#pending_transaction_requests_pane').show().siblings('div').hide();
       }
+      resetMenuColors();
       $('#pending_transaction_requests_menu').css('background-color','#FF6600');
-      $('#my_accounts_menu').css('background-color','maroon');
-      $('#service_requests_menu').css('background-color','maroon');
+    });
+    $('#statements_menu').on('click', function(){
+      showStatementsPane();
+    });
+    $('#stmt_generate_btn').on('click', generateStatement);
+    $('#stmt_request_btn').on('click', requestOfficialStatement);
+    $('#stmt_download_btn').on('click', downloadCurrentStatement);
+    $('#stmt_account').on('change', fillStatementPeriods);
+    $('#stmt_kind').on('change', function(){
+      var custom = $(this).val() === 'custom';
+      $('#stmt_start').toggle(custom);
+      $('#stmt_end').toggle(custom);
+      $('#stmt_period').toggle(!custom);
+    });
+    $('#view_sa_stmt_btn').on('click', function(){
+      showStatementsPane(savings_ac_no);
+    });
+    $('#view_ca_stmt_btn').on('click', function(){
+      showStatementsPane(checking_ac_no);
+    });
+    $('#view_cc_stmt_btn').on('click', function(){
+      showStatementsPane(cc_no);
     });
     $('#my_accounts_menu').click();
 	  $(".loader-wrapper").delay( 1000 ).fadeOut("slow");

@@ -258,6 +258,42 @@
               </thead>
               <tbody></tbody>
             </table>
+            <div id="staff_statements_card" class="cust_details_card" style="display:none;margin-top:20px;">
+              <h4 class="header_text">Statements</h4>
+              <hr class="header_divider" />
+              <input type="text" id="staff_stmt_account" placeholder="Account number" style="height:30px;margin-right:5px;"/>
+              <select id="staff_stmt_kind" style="height:30px;margin-right:5px;">
+                <option value="monthly">Monthly</option>
+                <option value="ytd">Year to date</option>
+              </select>
+              <input type="text" id="staff_stmt_period" placeholder="yyyy-mm" style="height:30px;margin-right:5px;"/>
+              <button type="button" id="staff_stmt_generate_btn" class="btn btn-primary">Generate</button>
+              <table class="table table-hover table-bordered table-color" id="staff_statements_tbl">
+                <thead>
+                  <tr>
+                    <th>Period</th>
+                    <th>Account</th>
+                    <th>Opening</th>
+                    <th>Closing</th>
+                    <th>Lines</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+              <h5>Official copy requests</h5>
+              <table class="table table-hover table-bordered table-color" id="staff_statement_requests_tbl">
+                <thead>
+                  <tr>
+                    <th>Request</th>
+                    <th>Account</th>
+                    <th>Delivery</th>
+                    <th>Status</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
           </div>
 
           <div id="account_details_pane" style="display: none">

@@ -242,12 +242,90 @@ function appendSecondaryData(customer_id, data) {
   document.getElementById("address").innerHTML = data.Info.address;
 
   fillCustomerAccTbl(data);
+  renderStaffStatements(data.Statements || {statements: [], requests: []});
   if($('#cust_details_card').css('display')=='none'){
     $('#cust_details_card').show();
   }
   if($('#cust_accounts_tbl').css('display')=='none'){
     $('#cust_details_tbl').show();
   }
+  $('#staff_statements_card').show();
+}
+
+function renderStaffStatements(snapshot) {
+  window.staffStatementSnapshot = snapshot || {statements: [], requests: []};
+  var body = document.querySelector('#staff_statements_tbl tbody');
+  if (body) {
+    body.innerHTML = '';
+    (window.staffStatementSnapshot.statements || []).forEach(function(item) {
+      var row = body.insertRow(-1);
+      row.insertCell(0).textContent = item.kind + ' ' + item.period;
+      row.insertCell(1).textContent = item.account;
+      row.insertCell(2).textContent = item.opening_balance;
+      row.insertCell(3).textContent = item.closing_balance;
+      row.insertCell(4).textContent = String(item.entry_count);
+    });
+  }
+  var reqBody = document.querySelector('#staff_statement_requests_tbl tbody');
+  if (reqBody) {
+    reqBody.innerHTML = '';
+    (window.staffStatementSnapshot.requests || []).forEach(function(item) {
+      var row = reqBody.insertRow(-1);
+      row.insertCell(0).textContent = item.request_id.slice(0, 8);
+      row.insertCell(1).textContent = item.account;
+      row.insertCell(2).textContent = item.delivery;
+      row.insertCell(3).textContent = item.status;
+      var action = row.insertCell(4);
+      if (item.status === 'pending') {
+        var approve = document.createElement('button');
+        approve.type = 'button';
+        approve.className = 'btn btn-primary btn-sm';
+        approve.textContent = 'Fulfill';
+        approve.addEventListener('click', function() { decideStatementRequest(item.request_id, 'approve'); });
+        var deny = document.createElement('button');
+        deny.type = 'button';
+        deny.className = 'btn btn-primary btn-sm';
+        deny.textContent = 'Deny';
+        deny.style.marginLeft = '4px';
+        deny.addEventListener('click', function() { decideStatementRequest(item.request_id, 'deny'); });
+        action.appendChild(approve);
+        action.appendChild(deny);
+      }
+    });
+  }
+}
+
+function staffGenerateStatement() {
+  var customerId = document.getElementById('customer_id').innerHTML;
+  fetch(homeURL + 'generateStatement', {
+    method: 'post',
+    body: JSON.stringify({
+      userid: userid,
+      customer_id: customerId,
+      account: $('#staff_stmt_account').val(),
+      kind: $('#staff_stmt_kind').val() || 'monthly',
+      period: $('#staff_stmt_period').val()
+    }),
+    headers: {'Content-type': 'application/json'}
+  }).then(function(response) { return response.json(); }).then(function(data) {
+    window.alert(data.message || data.error || 'Done');
+    if (data.Statements) {
+      renderStaffStatements(data.Statements);
+    }
+  }).catch(function(error) { console.error(error); });
+}
+
+function decideStatementRequest(requestId, decision) {
+  fetch(homeURL + 'decideStatementRequest', {
+    method: 'post',
+    body: JSON.stringify({userid: userid, request_id: requestId, decision: decision}),
+    headers: {'Content-type': 'application/json'}
+  }).then(function(response) { return response.json(); }).then(function(data) {
+    window.alert(data.message || data.error || 'Done');
+    if (data.Statements) {
+      renderStaffStatements(data.Statements);
+    }
+  }).catch(function(error) { console.error(error); });
 }
 
 function fillCustomerAccTbl(data){
@@ -637,6 +715,7 @@ $(document).ready(function() {
       console.log("updateInfo function");
       updateInfo(userid, $('#account_email_id').val(), $('#account_contact_no').val(), $('#account_address').val());
     });
+    $('#staff_stmt_generate_btn').on('click', staffGenerateStatement);
     $('#customer_id_input_btn').on('click', function(){
       if($('#customer_id_input').val() == ''){
         window.alert('No input!');
