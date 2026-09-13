@@ -8,6 +8,13 @@ from customer import Customers
 from employee import Employee
 from twilio.base.exceptions import TwilioRestException
 from utility.encrypt import check_encrypted_password
+from utility.statement import (
+    accounts_from_customer_payload,
+    attach_statement_routes,
+    build_service as build_statement_service,
+    get_service as get_statement_service,
+    set_service as set_statement_service,
+)
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -259,7 +266,8 @@ def get_customer_data():
         response = {
             'Accounts': c.get_all_account(customer_id),
             'Info': c.get_customer_details(customer_id),
-            'FundsRequests': c.get_funds_requests(customer_id)
+            'FundsRequests': c.get_funds_requests(customer_id),
+            'Statements': _statement_snapshot(customer_id),
         }
         return jsonify(response), 200
     except Exception as e:
@@ -878,7 +886,8 @@ def get_customer():
             c = Customers()
             response = {
                 'Accounts': c.get_all_account(values['customer_id']),
-                'Info': c.get_customer_details(values['customer_id'])
+                'Info': c.get_customer_details(values['customer_id']),
+                'Statements': _statement_snapshot(values['customer_id']),
             }
             return jsonify(response), 200
         except Exception as e:
@@ -1288,6 +1297,27 @@ def get_system_logs():
         logging.error(f'An error occurred when trying to send the log file: {str(e)}')
         return jsonify({'message': 'Failed to retrieve system logs', 'error': str(e)}), 500
 
+
+def _statement_own_accounts(userid):
+    try:
+        return accounts_from_customer_payload(Customers().get_all_account(userid))
+    except Exception:
+        return []
+
+
+def _statement_snapshot(userid):
+    service = get_statement_service()
+    if service is None:
+        return {'statements': [], 'requests': [], 'accounts': {}}
+    try:
+        return service.snapshot(userid)
+    except Exception:
+        return {'statements': [], 'requests': [], 'accounts': {}}
+
+
+statement_service = build_statement_service()
+set_statement_service(statement_service)
+attach_statement_routes(app, statement_service, own_accounts_loader=_statement_own_accounts)
 
 app.config['SESSION_COOKIE_SECURE'] = True
 app.config['SESSION_COOKIE_HTTPONLY'] = True

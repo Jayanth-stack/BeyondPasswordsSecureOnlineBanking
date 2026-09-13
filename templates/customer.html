@@ -101,6 +101,15 @@
         Service Requests
         </button>
 
+        <button type="button" class="btn btn-primary btn-block"
+        id="statements_menu">
+        <span class="glyphicon glyphicon-file gi-3x"
+        style="color: white" aria-hidden="true">
+        </span>
+        <br />
+        Statements
+        </button>
+
       </div>
 
       <div class="col-sm-9">
@@ -121,6 +130,7 @@
               <button type="button" data-toggle="modal" data-target="#saDepositModal" class="btn btn-primary" style="width:80%;margin-bottom:10px;margin-top:10px;">Deposit Fund</button>
               <button type="button" data-toggle="modal" data-target="#saTransferModal" class="btn btn-primary" style="width:80%;margin-bottom:10px;">Transfer Fund</button>
               <button type="button" id="view_sa_xacts_btn" data-toggle="modal" data-target="#saTransactionsModal" class="btn btn-primary" style="width:80%;margin-bottom:10px;">View Transactions</button>
+              <button type="button" id="view_sa_stmt_btn" class="btn btn-primary" style="width:80%;margin-bottom:10px;">Statements</button>
             </div>
           </div>
           <div class="account_cards" id="ca_card">
@@ -138,6 +148,7 @@
               <button type="button" data-toggle="modal" data-target="#caDepositModal" class="btn btn-primary" style="width:80%;margin-bottom:10px;margin-top:10px;">Deposit Fund</button>
               <button type="button" data-toggle="modal" data-target="#caTransferModal" class="btn btn-primary" style="width:80%;margin-bottom:10px;">Transfer Fund</button>
               <button type="button" id="view_ca_xacts_btn" data-toggle="modal" data-target="#caTransactionsModal" class="btn btn-primary" style="width:80%;margin-bottom:10px;">View Transactions</button>
+              <button type="button" id="view_ca_stmt_btn" class="btn btn-primary" style="width:80%;margin-bottom:10px;">Statements</button>
             </div>
           </div>
           <div class="account_cards" id="cc_card">
@@ -157,6 +168,7 @@
               </div>
               <button type="button" data-toggle="modal" data-target="#ccTransferModal" class="btn btn-primary" style="width:80%;margin-bottom:10px;margin-top:10px;">Initiate Transaction</button>
               <button type="button" id="view_cc_xacts_btn" data-toggle="modal" data-target="#ccTransactionsModal" class="btn btn-primary" style="width:80%;margin-bottom:10px;">View Transactions</button>
+              <button type="button" id="view_cc_stmt_btn" class="btn btn-primary" style="width:80%;margin-bottom:10px;">Statements</button>
             </div>
           </div>
         </div>
@@ -204,6 +216,85 @@
           <!-- <input type="text" id="xact_id_acc_den" placeholder="Enter Transaction No." style="height:30px;margin-right:5px;"> -->
           <button type="button" id="pending_req_accept" class="btn btn-primary" style="width:100px;color:white;background-color:green;margin-right:5px;">Accept</button>
           <button type="button" id="pending_req_deny" class="btn btn-primary" style="width:100px;color:white;background-color:red;margin-left:5px;">Deny</button>
+        </div>
+        <div id="statements_pane" class="my_accs_float" style="display:none;">
+          <h4 class="account_type_text" style="color:white;">Account Statements</h4>
+          <p style="color:#f4f4f4;">Generate a period statement from the structured journal. Existing transaction history is unchanged.</p>
+          <select id="stmt_account" style="height:30px;margin-right:5px;margin-bottom:8px;">
+            <option value="">Select account</option>
+          </select>
+          <select id="stmt_kind" style="height:30px;margin-right:5px;margin-bottom:8px;">
+            <option value="monthly">Monthly</option>
+            <option value="ytd">Year to date</option>
+            <option value="custom">Custom range</option>
+          </select>
+          <select id="stmt_period" style="height:30px;margin-right:5px;margin-bottom:8px;"></select>
+          <input type="date" id="stmt_start" style="display:none;height:30px;margin-right:5px;margin-bottom:8px;"/>
+          <input type="date" id="stmt_end" style="display:none;height:30px;margin-right:5px;margin-bottom:8px;"/>
+          <button type="button" id="stmt_generate_btn" class="btn btn-primary" style="margin-bottom:8px;">Generate</button>
+          <button type="button" id="stmt_request_btn" class="btn btn-primary" style="margin-bottom:8px;">Request official copy</button>
+          <select id="stmt_delivery" style="height:30px;margin-bottom:8px;">
+            <option value="mail">Mail</option>
+            <option value="branch">Branch pickup</option>
+            <option value="electronic">Electronic</option>
+          </select>
+          <table class="table table-hover table-bordered table-color" id="statements_tbl">
+            <thead>
+              <tr>
+                <th>Period</th>
+                <th>Account</th>
+                <th>Opening</th>
+                <th>Closing</th>
+                <th>Credits</th>
+                <th>Debits</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+          <h5 style="color:white;">Official copy requests</h5>
+          <table class="table table-hover table-bordered table-color" id="statement_requests_tbl">
+            <thead>
+              <tr>
+                <th>Request</th>
+                <th>Account</th>
+                <th>Delivery</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <div class="modal fade" id="statementViewModal" tabindex="-1" role="dialog" aria-hidden="true">
+          <div class="modal-dialog modal-lg" role="document">
+            <div class="modal-content">
+              <div class="modal-header">
+                <h4 class="account_type_text" style="display:inline-block">Statement</h4>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                  <span aria-hidden="true">&times;</span>
+                </button>
+              </div>
+              <div class="modal-body">
+                <div id="statement_view_summary"></div>
+                <table class="table table-hover table-bordered" id="statement_lines_tbl">
+                  <thead>
+                    <tr>
+                      <th>Date</th>
+                      <th>Kind</th>
+                      <th>Description</th>
+                      <th>Amount</th>
+                      <th>Balance</th>
+                    </tr>
+                  </thead>
+                  <tbody></tbody>
+                </table>
+              </div>
+              <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                <button type="button" id="stmt_download_btn" class="btn btn-primary">Download PDF</button>
+              </div>
+            </div>
+          </div>
         </div>
         <div id="account_details_pane" style="display:none;">
 					<label class="details_lbl" for="first_name">First name:</label>

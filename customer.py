@@ -10,6 +10,7 @@ import os
 from dotenv import load_dotenv
 import uuid
 from utility.crypto_receipt import generate_receipt, generate_nonce, current_timestamp
+from utility.statement import observe_movement
 
 load_dotenv()
 
@@ -29,6 +30,24 @@ cursor = db.cursor()
 def getdate():
     now = datetime.now()
     return now.strftime("%d/%m/%Y %H:%M:%S")
+
+
+def _observe_account(account, amount, kind, direction, **kwargs):
+    try:
+        query = """
+            SELECT balance, customer_id FROM Accounts WHERE account_no = %d;
+        """ % (int(account))
+        cursor.execute(query)
+        row = cursor.fetchone()
+        if row is None:
+            observe_movement(account, amount, kind, direction=direction, **kwargs)
+            return
+        observe_movement(
+            account, amount, kind, direction=direction,
+            balance=row[0], userid=row[1], **kwargs
+        )
+    except Exception:
+        return
 
 
 def format_phone_number(phone):
@@ -113,6 +132,23 @@ class Customers:
             db.commit()
             # result = cursor.fetchall()
             print('New account opened')
+            try:
+                cursor.execute(
+                    """
+                    SELECT account_no, balance FROM Accounts
+                    WHERE customer_id='%s' and account_type='%s';
+                    """ % (customer_id, account_type)
+                )
+                opened = cursor.fetchone()
+                if opened:
+                    observe_movement(
+                        opened[0], 250, 'open', direction='credit',
+                        userid=customer_id, balance=opened[1],
+                        description='new account bonus',
+                        source_id='open:%s:%s' % (customer_id, account_type),
+                    )
+            except Exception:
+                pass
             return "Done"
         except Exception as e:
             db.rollback()
@@ -201,8 +237,9 @@ class Customers:
             """ % (transaction_no)
         cursor.execute(query)
         result = cursor.fetchall()
+        is_deposit = bool(result and result[0][0] == 1)
         # IF DEPOSIT
-        if (result[0][0] == 1):
+        if is_deposit:
             query = """ 
                     UPDATE Accounts SET balance=balance + %f where account_no = %d; 
                 """ % (amount, account2)
@@ -277,6 +314,27 @@ class Customers:
                 "timestamp": getdate(),
                 "nonce": generate_nonce()
             }
+            try:
+                source = 'xfer:%s:%s:%s:%s' % (account1, account2, amount, transaction_no)
+                if is_deposit:
+                    _observe_account(
+                        account2, amount, 'deposit', 'credit',
+                        counterparty=account1, description='deposit',
+                        source_id=source + ':deposit',
+                    )
+                else:
+                    _observe_account(
+                        account1, amount, 'transfer_out', 'debit',
+                        counterparty=account2, description='transfer out',
+                        source_id=source + ':out',
+                    )
+                    _observe_account(
+                        account2, amount, 'transfer_in', 'credit',
+                        counterparty=account1, description='transfer in',
+                        source_id=source + ':in',
+                    )
+            except Exception:
+                pass
             return generate_receipt(receipt_data)
         except Exception as e:
             db.rollback()
@@ -339,6 +397,10 @@ class Customers:
         try:
             db.commit()
             print('Amount Debited')
+            _observe_account(
+                account, amount, 'withdraw', 'debit',
+                description='withdrawal',
+            )
             return 'Amount Debited'
         except Exception as e:
             db.rollback()
@@ -377,6 +439,10 @@ class Customers:
             db.commit()
             # result = cursor.fetchall()
             print('Amount Credited')
+            _observe_account(
+                account, amount, 'credit', 'credit',
+                description='direct deposit',
+            )
             return 'Success'
         except Exception as e:
             db.rollback()
