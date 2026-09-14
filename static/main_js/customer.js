@@ -126,6 +126,7 @@ function appendPrimaryData(data) {
 
   createCheckDropdown();
   fillPendingTransTbl(data);
+  renderSpending(data.Spending);
 }
 
 function fillPendingTransTbl(data){
@@ -166,6 +167,141 @@ function fillPendingTransTbl(data){
       selection.options.add(option);
     }
   }
+}
+
+function spendingEscape(value) {
+  return String(value == null ? '' : value)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function spendingPost(path, payload, onOk) {
+  payload = payload || {};
+  payload.userid = userid;
+  fetch(homeURL + path, {
+    method: 'post',
+    body: JSON.stringify(payload),
+    headers: {'Content-type': 'application/json'}
+  }).then(function(response) {
+    return response.json().then(function(data) {
+      return {ok: response.ok, status: response.status, data: data};
+    });
+  }).then(function(result) {
+    if (!result.ok) {
+      window.alert(result.data.message || result.data.error || 'Request failed');
+      return;
+    }
+    if (result.data.Spending) {
+      renderSpending(result.data.Spending);
+    }
+    if (onOk) {
+      onOk(result.data);
+    }
+  }).catch(function(error) {
+    console.error(error);
+  });
+}
+
+function fillSpendingCategorySelect(selectEl, snapshot, selected) {
+  if (!selectEl) {
+    return;
+  }
+  selectEl.innerHTML = '';
+  (snapshot.categories || []).forEach(function(item) {
+    var option = document.createElement('OPTION');
+    option.value = item.category_id;
+    option.innerHTML = item.label;
+    if (selected && selected === item.category_id) {
+      option.selected = true;
+    }
+    selectEl.options.add(option);
+  });
+}
+
+function renderSpending(snapshot) {
+  window.spendingSnapshot = snapshot || {
+    period: '', categories: [], movements: [], breakdown: [], budgets: [],
+    totals: {debit: '0.00', credit: '0.00', uncategorized_debit: '0.00'}
+  };
+  var snap = window.spendingSnapshot;
+  var periodLabel = document.getElementById('spending_period_label');
+  if (!periodLabel) {
+    return;
+  }
+  periodLabel.innerHTML = spendingEscape(snap.period || '-');
+  document.getElementById('spending_debit_total').innerHTML = spendingEscape((snap.totals || {}).debit || '0.00');
+  document.getElementById('spending_uncat_total').innerHTML = spendingEscape((snap.totals || {}).uncategorized_debit || '0.00');
+  fillSpendingCategorySelect(document.getElementById('spending_budget_category'), snap);
+  fillSpendingCategorySelect(document.getElementById('spending_merchant_category'), snap);
+
+  var bars = document.getElementById('spending_bars');
+  bars.innerHTML = '';
+  var maxDebit = 0;
+  (snap.breakdown || []).forEach(function(row) {
+    maxDebit = Math.max(maxDebit, Number(row.debit || 0));
+  });
+  (snap.breakdown || []).forEach(function(row) {
+    var wrap = document.createElement('div');
+    wrap.className = 'spending_bar_row';
+    var pct = maxDebit ? Math.round((Number(row.debit || 0) / maxDebit) * 100) : 0;
+    wrap.innerHTML = '<span>' + spendingEscape(row.label) + '</span>' +
+      '<div class="spending_bar"><div class="spending_bar_fill" style="width:' + pct + '%"></div></div>' +
+      '<span>$' + spendingEscape(row.debit) + '</span>';
+    bars.appendChild(wrap);
+  });
+
+  var budgetBody = document.querySelector('#spending_budgets_tbl tbody');
+  budgetBody.innerHTML = '';
+  (snap.budgets || []).forEach(function(row) {
+    var tr = document.createElement('tr');
+    tr.innerHTML = '<td>' + spendingEscape(row.label) + '</td>' +
+      '<td>$' + spendingEscape(row.limit) + '</td>' +
+      '<td>$' + spendingEscape(row.spent) + '</td>' +
+      '<td>$' + spendingEscape(row.remaining) + '</td>' +
+      '<td class="spending-status-' + spendingEscape(row.status) + '">' + spendingEscape(row.status) + '</td>';
+    budgetBody.appendChild(tr);
+  });
+
+  var moveBody = document.querySelector('#spending_movements_tbl tbody');
+  moveBody.innerHTML = '';
+  (snap.movements || []).forEach(function(item) {
+    var tr = document.createElement('tr');
+    var when = item.posted_at ? new Date(item.posted_at * 1000).toISOString().slice(0, 10) : '';
+    var sign = item.direction === 'debit' ? '-' : '+';
+    var select = document.createElement('select');
+    select.setAttribute('data-movement-id', item.movement_id);
+    (snap.categories || []).forEach(function(cat) {
+      var option = document.createElement('OPTION');
+      option.value = cat.category_id;
+      option.innerHTML = cat.label;
+      if (cat.category_id === item.category_id) {
+        option.selected = true;
+      }
+      select.options.add(option);
+    });
+    select.onchange = function() {
+      spendingPost('categorizeMovement', {
+        movement_id: item.movement_id,
+        category_id: select.value
+      });
+    };
+    tr.insertCell(0).innerHTML = spendingEscape(when);
+    tr.insertCell(1).innerHTML = spendingEscape(item.account);
+    tr.insertCell(2).innerHTML = sign + '$' + spendingEscape(item.amount);
+    tr.insertCell(3).innerHTML = spendingEscape(item.category_id);
+    tr.insertCell(4).appendChild(select);
+    moveBody.appendChild(tr);
+  });
+}
+
+function showSpendingPane() {
+  if ($('#spending_pane').css('display') == 'none') {
+    $('#spending_pane').show().siblings('div').hide();
+  }
+  $('#spending_menu').css('background-color', '#FF6600');
+  $('#my_accounts_menu').css('background-color', 'maroon');
+  $('#service_requests_menu').css('background-color', 'maroon');
+  $('#pending_transaction_requests_menu').css('background-color', 'maroon');
 }
 
 function createCheckDropdown() {
@@ -854,6 +990,7 @@ $(document).ready(function() {
       $('#service_requests_menu').css('background-color','maroon');
       $('#my_accounts_menu').css('background-color','maroon');
       $('#pending_transaction_requests_menu').css('background-color','maroon');
+      $('#spending_menu').css('background-color','maroon');
     });
     $('#service_requests_menu').on('click', function(){
       if($('#service_requests_pane').css('display')=='none'){
@@ -862,6 +999,7 @@ $(document).ready(function() {
       $('#service_requests_menu').css('background-color','#FF6600');
       $('#my_accounts_menu').css('background-color','maroon');
       $('#pending_transaction_requests_menu').css('background-color','maroon');
+      $('#spending_menu').css('background-color','maroon');
     });
     $('#my_accounts_menu').on('click', function(){
       getUser();
@@ -880,6 +1018,7 @@ $(document).ready(function() {
       $('#my_accounts_menu').css('background-color','#FF6600');
       $('#service_requests_menu').css('background-color','maroon');
       $('#pending_transaction_requests_menu').css('background-color','maroon');
+      $('#spending_menu').css('background-color','maroon');
     });
     $('#pending_transaction_requests_menu').on('click', function(){
       if($('#pending_transaction_requests_pane').css('display')=='none'){
@@ -888,6 +1027,33 @@ $(document).ready(function() {
       $('#pending_transaction_requests_menu').css('background-color','#FF6600');
       $('#my_accounts_menu').css('background-color','maroon');
       $('#service_requests_menu').css('background-color','maroon');
+      $('#spending_menu').css('background-color','maroon');
+    });
+    $('#spending_menu').on('click', function(){
+      showSpendingPane();
+    });
+    $('#spending_set_budget_btn').on('click', function(){
+      spendingPost('setBudget', {
+        category_id: document.getElementById('spending_budget_category').value,
+        amount: document.getElementById('spending_budget_amount').value
+      });
+    });
+    $('#spending_clear_budget_btn').on('click', function(){
+      spendingPost('clearBudget', {
+        category_id: document.getElementById('spending_budget_category').value
+      });
+    });
+    $('#spending_create_category_btn').on('click', function(){
+      spendingPost('createCategory', {
+        label: document.getElementById('spending_new_category').value,
+        keyword: document.getElementById('spending_new_keyword').value
+      });
+    });
+    $('#spending_set_merchant_btn').on('click', function(){
+      spendingPost('setMerchantTag', {
+        merchant: document.getElementById('spending_merchant_name').value,
+        category_id: document.getElementById('spending_merchant_category').value
+      });
     });
     $('#my_accounts_menu').click();
 	  $(".loader-wrapper").delay( 1000 ).fadeOut("slow");

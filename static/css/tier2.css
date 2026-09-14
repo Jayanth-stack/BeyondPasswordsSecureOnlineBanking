@@ -160,3 +160,8 @@ body {
   -webkit-animation: spin 2s linear infinite; /* Safari */
   animation: spin 2s linear infinite;
 }
+
+#cust_spending_card {
+  margin-top: 20px;
+  padding: 12px;
+}

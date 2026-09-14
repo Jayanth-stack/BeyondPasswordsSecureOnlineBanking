@@ -101,6 +101,15 @@
         Service Requests
         </button>
 
+        <button type="button" class="btn btn-primary btn-block"
+        id="spending_menu">
+        <span class="glyphicon glyphicon-tags gi-3x"
+        style="color: white" aria-hidden="true">
+        </span>
+        <br />
+        Spending
+        </button>
+
       </div>
 
       <div class="col-sm-9">
@@ -167,6 +176,42 @@
           <button type="button" data-toggle="modal" data-target="#depCheckModal" class="btn btn-primary btn-block" style="margin-top:10px;margin-bottom:10px;">Deposit Cashier Cheque</button>
           <button type="button" id="viewCheck_btn" data-toggle="modal" data-target="#viewCheckModal" class="btn btn-primary btn-block" style="margin-top:10px;margin-bottom:10px;">View All Cashier Cheques</button>
           <button type="button" data-toggle="modal" data-target="#newAccModal" class="btn btn-primary btn-block" style="margin-top:10px;margin-bottom:10px;">Open New Account</button>
+        </div>
+        <div id="spending_pane" class="my_accs_float" style="display:none;">
+          <h4 class="account_type_text" style="color:white;">Spending &amp; Budgets</h4>
+          <p style="color:#f4f4f4;">Movements are auto-tagged from merchant tags and keywords. Recategorize anything the rules miss. Existing transaction history is unchanged.</p>
+          <p style="color:#f4f4f4;">Period: <span id="spending_period_label">-</span> &nbsp; Debits: $<span id="spending_debit_total">0.00</span> &nbsp; Uncategorized: $<span id="spending_uncat_total">0.00</span></p>
+          <h5 style="color:white;">Category spend</h5>
+          <div id="spending_bars"></div>
+          <h5 style="color:white;">Monthly budgets</h5>
+          <table class="table table-hover table-bordered table-color" id="spending_budgets_tbl">
+            <thead>
+              <tr><th>Category</th><th>Limit</th><th>Spent</th><th>Left</th><th>Status</th></tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+          <select id="spending_budget_category"></select>
+          <input type="text" id="spending_budget_amount" placeholder="Monthly limit" pattern="\d*" maxlength="8" style="height:30px;width:140px;"/>
+          <button type="button" id="spending_set_budget_btn" class="btn btn-primary">Set Budget</button>
+          <button type="button" id="spending_clear_budget_btn" class="btn btn-primary">Clear</button>
+          <hr>
+          <h5 style="color:white;">Custom category</h5>
+          <input type="text" id="spending_new_category" placeholder="Label e.g. Pets" maxlength="40" style="height:30px;"/>
+          <input type="text" id="spending_new_keyword" placeholder="Optional keyword" maxlength="40" style="height:30px;"/>
+          <button type="button" id="spending_create_category_btn" class="btn btn-primary">Add Category</button>
+          <hr>
+          <h5 style="color:white;">Merchant tag</h5>
+          <input type="text" id="spending_merchant_name" placeholder="Merchant or account" maxlength="40" style="height:30px;"/>
+          <select id="spending_merchant_category"></select>
+          <button type="button" id="spending_set_merchant_btn" class="btn btn-primary">Save Tag</button>
+          <hr>
+          <h5 style="color:white;">Recent movements</h5>
+          <table class="table table-hover table-bordered table-color" id="spending_movements_tbl">
+            <thead>
+              <tr><th>When</th><th>Account</th><th>Amount</th><th>Category</th><th>Retag</th></tr>
+            </thead>
+            <tbody></tbody>
+          </table>
         </div>
         <div id="no_accounts_pane" style="display:none;">
           <p style="color:white;">You don't have any accounts with us.</p><br>

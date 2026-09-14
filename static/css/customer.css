@@ -172,3 +172,32 @@ body {
   /*noinspection CssInvalidFunction*/
   border-color: lighten(var(--success-color), 55%);
 }
+
+.spending_bar_row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #f4f4f4;
+  margin-bottom: 6px;
+}
+
+.spending_bar_row span:first-child {
+  width: 140px;
+}
+
+.spending_bar {
+  flex: 1;
+  height: 10px;
+  background: #5a5a5a;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.spending_bar_fill {
+  height: 100%;
+  background: #ffc107;
+}
+
+.spending-status-ok { color: #28a745; font-weight: bold; }
+.spending-status-warning { color: #ffc107; font-weight: bold; }
+.spending-status-exceeded { color: #dc3545; font-weight: bold; }
