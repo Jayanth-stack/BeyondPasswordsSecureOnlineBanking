@@ -119,6 +119,11 @@ select {
     display: none; /* Initially hide tables */
 }
 
+#cust_spending_card {
+    margin-top: 20px;
+    padding: 12px;
+}
+
 /* Custom styles for buttons and inputs for better UX */
 input[type="submit"],
 button {

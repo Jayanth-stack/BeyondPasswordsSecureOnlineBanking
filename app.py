@@ -8,6 +8,13 @@ from customer import Customers
 from employee import Employee
 from twilio.base.exceptions import TwilioRestException
 from utility.encrypt import check_encrypted_password
+from utility.category import (
+    accounts_from_customer_payload,
+    attach_category_routes,
+    build_service as build_category_service,
+    get_service as get_category_service,
+    set_service as set_category_service,
+)
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -259,7 +266,8 @@ def get_customer_data():
         response = {
             'Accounts': c.get_all_account(customer_id),
             'Info': c.get_customer_details(customer_id),
-            'FundsRequests': c.get_funds_requests(customer_id)
+            'FundsRequests': c.get_funds_requests(customer_id),
+            'Spending': _category_snapshot(customer_id),
         }
         return jsonify(response), 200
     except Exception as e:
@@ -878,7 +886,8 @@ def get_customer():
             c = Customers()
             response = {
                 'Accounts': c.get_all_account(values['customer_id']),
-                'Info': c.get_customer_details(values['customer_id'])
+                'Info': c.get_customer_details(values['customer_id']),
+                'Spending': _category_snapshot(values['customer_id']),
             }
             return jsonify(response), 200
         except Exception as e:
@@ -1287,6 +1296,36 @@ def get_system_logs():
     except Exception as e:
         logging.error(f'An error occurred when trying to send the log file: {str(e)}')
         return jsonify({'message': 'Failed to retrieve system logs', 'error': str(e)}), 500
+
+
+def _category_own_accounts(userid):
+    try:
+        return accounts_from_customer_payload(Customers().get_all_account(userid))
+    except Exception:
+        return []
+
+
+def _category_snapshot(userid):
+    service = get_category_service()
+    if service is None:
+        return {
+            'period': '', 'categories': [], 'merchants': [], 'rules': [],
+            'movements': [], 'breakdown': [], 'budgets': [],
+            'totals': {'debit': '0.00', 'credit': '0.00', 'uncategorized_debit': '0.00'},
+        }
+    try:
+        return service.snapshot(userid)
+    except Exception:
+        return {
+            'period': '', 'categories': [], 'merchants': [], 'rules': [],
+            'movements': [], 'breakdown': [], 'budgets': [],
+            'totals': {'debit': '0.00', 'credit': '0.00', 'uncategorized_debit': '0.00'},
+        }
+
+
+category_service = build_category_service()
+set_category_service(category_service)
+attach_category_routes(app, category_service, own_accounts_loader=_category_own_accounts)
 
 
 app.config['SESSION_COOKIE_SECURE'] = True

@@ -242,12 +242,89 @@ function appendSecondaryData(customer_id, data) {
   document.getElementById("address").innerHTML = data.Info.address;
 
   fillCustomerAccTbl(data);
+  renderStaffSpending(customer_id, data.Spending);
   if($('#cust_details_card').css('display')=='none'){
     $('#cust_details_card').show();
   }
   if($('#cust_accounts_tbl').css('display')=='none'){
     $('#cust_details_tbl').show();
   }
+  $('#cust_spending_card').show();
+}
+
+function staffSpendingEscape(value) {
+  return String(value == null ? '' : value)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function renderStaffSpending(customerId, snapshot) {
+  window.staffCustomerId = customerId;
+  var snap = snapshot || {period: '', categories: [], movements: [], budgets: [], totals: {debit: '0.00'}};
+  window.staffSpending = snap;
+  var periodEl = document.getElementById('staff_spending_period');
+  if (!periodEl) {
+    return;
+  }
+  periodEl.innerHTML = staffSpendingEscape(snap.period || '-');
+  document.getElementById('staff_spending_debit').innerHTML = staffSpendingEscape((snap.totals || {}).debit || '0.00');
+  var select = document.getElementById('staff_budget_category');
+  select.innerHTML = '';
+  (snap.categories || []).forEach(function(item) {
+    var option = document.createElement('OPTION');
+    option.value = item.category_id;
+    option.innerHTML = item.label;
+    select.options.add(option);
+  });
+  var budgetBody = document.querySelector('#staff_spending_budgets_tbl tbody');
+  budgetBody.innerHTML = '';
+  (snap.budgets || []).forEach(function(row) {
+    var tr = document.createElement('tr');
+    tr.innerHTML = '<td>' + staffSpendingEscape(row.label) + '</td>' +
+      '<td>$' + staffSpendingEscape(row.limit) + '</td>' +
+      '<td>$' + staffSpendingEscape(row.spent) + '</td>' +
+      '<td>' + staffSpendingEscape(row.status) + '</td>';
+    budgetBody.appendChild(tr);
+  });
+  var moveBody = document.querySelector('#staff_spending_movements_tbl tbody');
+  moveBody.innerHTML = '';
+  (snap.movements || []).forEach(function(item) {
+    var tr = document.createElement('tr');
+    var sign = item.direction === 'debit' ? '-' : '+';
+    var catSelect = document.createElement('select');
+    (snap.categories || []).forEach(function(cat) {
+      var option = document.createElement('OPTION');
+      option.value = cat.category_id;
+      option.innerHTML = cat.label;
+      if (cat.category_id === item.category_id) {
+        option.selected = true;
+      }
+      catSelect.options.add(option);
+    });
+    catSelect.onchange = function() {
+      fetch(homeURL + 'categorizeMovement', {
+        method: 'post',
+        body: JSON.stringify({
+          userid: userid,
+          customer_id: window.staffCustomerId,
+          movement_id: item.movement_id,
+          category_id: catSelect.value
+        }),
+        headers: {'Content-type': 'application/json'}
+      }).then(function(response) { return response.json(); }).then(function(data) {
+        if (data.Spending) {
+          renderStaffSpending(window.staffCustomerId, data.Spending);
+        } else if (data.message) {
+          window.alert(data.message);
+        }
+      });
+    };
+    tr.insertCell(0).innerHTML = staffSpendingEscape(item.account);
+    tr.insertCell(1).innerHTML = sign + '$' + staffSpendingEscape(item.amount);
+    tr.insertCell(2).innerHTML = staffSpendingEscape(item.category_id);
+    tr.insertCell(3).appendChild(catSelect);
+    moveBody.appendChild(tr);
+  });
 }
 
 function fillCustomerAccTbl(data){
@@ -656,6 +733,29 @@ $(document).ready(function() {
     $('#customer_id_clear_btn').on('click', function(){
       $('#cust_details_card').hide();
       $('#cust_accounts_tbl').hide();
+      $('#cust_spending_card').hide();
+    });
+    $('#staff_set_budget_btn').on('click', function(){
+      if (!window.staffCustomerId) {
+        window.alert('Search a customer first');
+        return;
+      }
+      fetch(homeURL + 'setBudget', {
+        method: 'post',
+        body: JSON.stringify({
+          userid: userid,
+          customer_id: window.staffCustomerId,
+          category_id: document.getElementById('staff_budget_category').value,
+          amount: document.getElementById('staff_budget_amount').value
+        }),
+        headers: {'Content-type': 'application/json'}
+      }).then(function(response) { return response.json(); }).then(function(data) {
+        if (data.Spending) {
+          renderStaffSpending(window.staffCustomerId, data.Spending);
+        } else {
+          window.alert(data.message || data.error || 'Could not set budget');
+        }
+      });
     });
     $('#approve_trans_btn').on('click', function(){
       if($('#customer_trans_no').val() == 'select'){

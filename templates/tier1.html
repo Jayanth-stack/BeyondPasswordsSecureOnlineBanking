@@ -226,6 +226,27 @@
                 <tbody>
                 </tbody>
             </table>
+            <div class="cust_details_card" id="cust_spending_card" style="display:none;margin-top:20px;">
+              <h4 class="header_text">Customer Spending</h4>
+              <hr class="header_divider" />
+              <p>Period: <span id="staff_spending_period">-</span> &nbsp; Debits: $<span id="staff_spending_debit">0.00</span></p>
+              <table class="table table-hover table-bordered table-color" id="staff_spending_budgets_tbl">
+                <thead>
+                  <tr><th>Category</th><th>Limit</th><th>Spent</th><th>Status</th></tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+              <select id="staff_budget_category"></select>
+              <input type="text" id="staff_budget_amount" placeholder="Monthly limit" style="height:30px;width:140px;"/>
+              <button type="button" id="staff_set_budget_btn" class="btn btn-primary">Set Budget</button>
+              <hr>
+              <table class="table table-hover table-bordered table-color" id="staff_spending_movements_tbl">
+                <thead>
+                  <tr><th>Account</th><th>Amount</th><th>Category</th><th>Retag</th></tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
         </div>
         <div id="account_details_pane" style="display:none;">
           <label class="details_lbl" for="first_name">First name:</label>
