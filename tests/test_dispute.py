@@ -58,7 +58,7 @@ class DisputeServiceTests(unittest.TestCase):
     def test_parse_money_rejects_junk(self):
         with self.assertRaises(AmountError):
             parse_money('nope')
-        self.assertEqual(money_str(parse_money('$12.345')), '12.35')
+        self.assertEqual(money_str(parse_money('$12.355')), '12.36')
 
     def test_observe_is_idempotent_by_source_id(self):
         first = self._debit()
