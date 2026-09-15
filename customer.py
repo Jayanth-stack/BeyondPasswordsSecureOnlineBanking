@@ -10,6 +10,7 @@ import os
 from dotenv import load_dotenv
 import uuid
 from utility.crypto_receipt import generate_receipt, generate_nonce, current_timestamp
+from utility.dispute import observe_movement, observe_transfer
 
 load_dotenv()
 
@@ -29,6 +30,45 @@ cursor = db.cursor()
 def getdate():
     now = datetime.now()
     return now.strftime("%d/%m/%Y %H:%M:%S")
+
+
+def _customer_id_for_account(account):
+    try:
+        query = """
+            SELECT customer_id FROM Accounts WHERE account_no = %d;
+        """ % (int(account))
+        cursor.execute(query)
+        row = cursor.fetchone()
+        if row:
+            return row[0]
+    except Exception:
+        return None
+    return None
+
+
+def _observe_account(account, amount, kind, direction, **kwargs):
+    try:
+        observe_movement(
+            account, amount, kind, direction=direction,
+            userid=kwargs.pop('userid', None) or _customer_id_for_account(account),
+            **kwargs
+        )
+    except Exception:
+        return
+
+
+def _observe_transfer(account1, account2, amount, transaction_no, is_deposit=False):
+    try:
+        source = 'xfer:%s:%s:%s:%s' % (account1, account2, amount, transaction_no)
+        observe_transfer(
+            account1, account2, amount,
+            from_userid=None if is_deposit else _customer_id_for_account(account1),
+            to_userid=_customer_id_for_account(account2),
+            source_id=source,
+            deposit=bool(is_deposit),
+        )
+    except Exception:
+        return
 
 
 def format_phone_number(phone):
@@ -113,6 +153,21 @@ class Customers:
             db.commit()
             # result = cursor.fetchall()
             print('New account opened')
+            try:
+                query = """
+                    SELECT account_no FROM Accounts WHERE customer_id='%s' AND account_type='%s';
+                """ % (customer_id, account_type)
+                cursor.execute(query)
+                opened = cursor.fetchone()
+                if opened:
+                    _observe_account(
+                        opened[0], 250, 'open', 'credit',
+                        userid=customer_id,
+                        description='new account bonus',
+                        source_id='open:%s:%s' % (customer_id, account_type),
+                    )
+            except Exception:
+                pass
             return "Done"
         except Exception as e:
             db.rollback()
@@ -195,6 +250,7 @@ class Customers:
         print(amount, account1, account2)
 
         db.commit()  # REQUIRED DO NOT DELETE
+        is_deposit = False
         # CHECK IF THE "TRANSFER" IS A DEPOSIT
         query = """ 
                 Select deposit from Transactions WHERE transaction_no = %d; 
@@ -203,6 +259,7 @@ class Customers:
         result = cursor.fetchall()
         # IF DEPOSIT
         if (result[0][0] == 1):
+            is_deposit = True
             query = """ 
                     UPDATE Accounts SET balance=balance + %f where account_no = %d; 
                 """ % (amount, account2)
@@ -277,6 +334,7 @@ class Customers:
                 "timestamp": getdate(),
                 "nonce": generate_nonce()
             }
+            _observe_transfer(account1, account2, amount, transaction_no, is_deposit=is_deposit)
             return generate_receipt(receipt_data)
         except Exception as e:
             db.rollback()
@@ -301,7 +359,7 @@ class Customers:
             return 'Try Again later'
 
     #################        FUNCTION TO DEBIT FUNDS                     #################
-    def debit_request(self, account, amount):
+    def debit_request(self, account, amount, remark=None):
         account = int(account)
         amount = float(amount)
         query = """ 
@@ -331,7 +389,7 @@ class Customers:
             """ % (float(amount), int(account))
         cursor.execute(query)
 
-        str1 = '$' + str(amount) + ' debited  ' + ' on ' + getdate() + ',<br>'
+        str1 = '$' + str(amount) + ' ' + (remark or 'debited') + '  ' + ' on ' + getdate() + ',<br>'
         query = """ 
                 UPDATE Accounts SET transaction_history=concat('%s', transaction_history) where account_no = %d; 
             """ % (str1, int(account))
@@ -339,6 +397,11 @@ class Customers:
         try:
             db.commit()
             print('Amount Debited')
+            _observe_account(
+                account, amount, 'withdraw', 'debit',
+                description=remark or 'withdrawal',
+                source_id='wd:%s:%s:%s' % (account, amount, getdate()),
+            )
             return 'Amount Debited'
         except Exception as e:
             db.rollback()
@@ -346,7 +409,7 @@ class Customers:
             return 'Cannot Debit funds:'
 
     #################        FUNCTION TO CREDIT FUNDS                     #################
-    def credit_request(self, account, amount):
+    def credit_request(self, account, amount, remark=None):
         query = """ 
                 Select active from Accounts where account_no = %d; 
             """ % (int(account))
@@ -366,7 +429,7 @@ class Customers:
             """ % (float(amount), int(account))
         cursor.execute(query)
 
-        str1 = '$' + str(amount) + ' direct deposited  ' + ' on ' + getdate() + ',<br>'
+        str1 = '$' + str(amount) + ' ' + (remark or 'direct deposited') + '  ' + ' on ' + getdate() + ',<br>'
         print(str1)
         query = """ 
                 UPDATE Accounts SET transaction_history=concat('%s', transaction_history) where account_no = %d; 
@@ -377,6 +440,11 @@ class Customers:
             db.commit()
             # result = cursor.fetchall()
             print('Amount Credited')
+            _observe_account(
+                account, amount, 'credit', 'credit',
+                description=remark or 'direct deposit',
+                source_id='cr:%s:%s:%s' % (account, amount, getdate()),
+            )
             return 'Success'
         except Exception as e:
             db.rollback()

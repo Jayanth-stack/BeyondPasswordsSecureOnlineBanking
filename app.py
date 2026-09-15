@@ -8,6 +8,13 @@ from customer import Customers
 from employee import Employee
 from twilio.base.exceptions import TwilioRestException
 from utility.encrypt import check_encrypted_password
+from utility.dispute import (
+    attach_dispute_routes,
+    build_service as build_dispute_service,
+    get_service as get_dispute_service,
+    own_accounts_from_customer_payload,
+    set_service as set_dispute_service,
+)
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -259,7 +266,8 @@ def get_customer_data():
         response = {
             'Accounts': c.get_all_account(customer_id),
             'Info': c.get_customer_details(customer_id),
-            'FundsRequests': c.get_funds_requests(customer_id)
+            'FundsRequests': c.get_funds_requests(customer_id),
+            'Disputes': _dispute_snapshot(customer_id),
         }
         return jsonify(response), 200
     except Exception as e:
@@ -878,7 +886,8 @@ def get_customer():
             c = Customers()
             response = {
                 'Accounts': c.get_all_account(values['customer_id']),
-                'Info': c.get_customer_details(values['customer_id'])
+                'Info': c.get_customer_details(values['customer_id']),
+                'Disputes': _dispute_snapshot(values['customer_id']),
             }
             return jsonify(response), 200
         except Exception as e:
@@ -1288,6 +1297,43 @@ def get_system_logs():
         logging.error(f'An error occurred when trying to send the log file: {str(e)}')
         return jsonify({'message': 'Failed to retrieve system logs', 'error': str(e)}), 500
 
+
+def _dispute_own_accounts(userid):
+    try:
+        return own_accounts_from_customer_payload(Customers().get_all_account(userid))
+    except Exception:
+        return []
+
+
+def _dispute_snapshot(userid):
+    service = get_dispute_service()
+    if service is None:
+        return {'enabled': False, 'disputes': [], 'challengeable': [], 'open_count': 0, 'provisional_total': '0.00'}
+    try:
+        return service.snapshot(userid)
+    except Exception:
+        return {'enabled': False, 'disputes': [], 'challengeable': [], 'open_count': 0, 'provisional_total': '0.00'}
+
+
+def _dispute_credit(account, amount, remark):
+    try:
+        result = Customers().credit_request(account, amount, remark=remark)
+        return result == 'Success'
+    except Exception:
+        return False
+
+
+def _dispute_debit(account, amount, remark):
+    try:
+        result = Customers().debit_request(account, amount, remark=remark)
+        return result == 'Amount Debited'
+    except Exception:
+        return False
+
+
+dispute_service = build_dispute_service(credit_fn=_dispute_credit, debit_fn=_dispute_debit)
+set_dispute_service(dispute_service)
+attach_dispute_routes(app, dispute_service, own_accounts_loader=_dispute_own_accounts)
 
 app.config['SESSION_COOKIE_SECURE'] = True
 app.config['SESSION_COOKIE_HTTPONLY'] = True

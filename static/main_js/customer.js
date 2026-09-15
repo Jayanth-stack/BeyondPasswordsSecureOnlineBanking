@@ -126,6 +126,7 @@ function appendPrimaryData(data) {
 
   createCheckDropdown();
   fillPendingTransTbl(data);
+  fillDisputes(data);
 }
 
 function fillPendingTransTbl(data){
@@ -166,6 +167,77 @@ function fillPendingTransTbl(data){
       selection.options.add(option);
     }
   }
+}
+
+function fillDisputes(data) {
+  var snapshot = data.Disputes || {};
+  var rows = snapshot.disputes || [];
+  var challengeable = snapshot.challengeable || [];
+  var summary = document.getElementById('disputes_summary');
+  if (summary) {
+    summary.innerHTML = 'Open disputes: ' + (snapshot.open_count || 0) +
+      ' &middot; Provisional credit: $' + (snapshot.provisional_total || '0.00');
+  }
+  var table = document.getElementById('disputes_tbl');
+  if (!table) {
+    return;
+  }
+  var body = table.getElementsByTagName('tbody')[0];
+  body.innerHTML = '';
+  var selection = document.getElementById('dispute_id_select');
+  selection.options.length = 1;
+  for (var i = 0; i < rows.length; i++) {
+    var row = body.insertRow(-1);
+    row.insertCell(0).innerHTML = rows[i].dispute_id.slice(0, 8);
+    row.insertCell(1).innerHTML = rows[i].account;
+    row.insertCell(2).innerHTML = '$' + rows[i].claimed_amount;
+    row.insertCell(3).innerHTML = rows[i].reason;
+    row.insertCell(4).innerHTML = rows[i].status;
+    row.insertCell(5).innerHTML = rows[i].credit_status +
+      (rows[i].credited_amount && rows[i].credit_status !== 'none' ? ' $' + rows[i].credited_amount : '');
+    if (rows[i].open) {
+      var option = document.createElement('OPTION');
+      option.value = rows[i].dispute_id;
+      option.innerHTML = rows[i].dispute_id.slice(0, 8) + ' / ' + rows[i].status;
+      selection.options.add(option);
+    }
+  }
+  var sources = document.getElementById('dispute_source_id');
+  sources.options.length = 1;
+  for (var j = 0; j < challengeable.length; j++) {
+    var src = document.createElement('OPTION');
+    src.value = challengeable[j].source_id;
+    src.innerHTML = challengeable[j].kind + ' $' + challengeable[j].amount +
+      ' acct ' + challengeable[j].account;
+    sources.options.add(src);
+  }
+}
+
+function postDispute(path, payload, okMessage) {
+  payload.userid = userid;
+  fetch(homeURL + path, {
+    method: 'post',
+    body: JSON.stringify(payload),
+    headers: { 'Content-type': 'application/json' }
+  }).then(function(response) {
+    return response.json().then(function(data) {
+      return { status: response.status, data: data };
+    });
+  }).then(function(result) {
+    if (result.status >= 200 && result.status < 300) {
+      window.alert(okMessage || result.data.message);
+      if (result.data.Disputes) {
+        fillDisputes({ Disputes: result.data.Disputes });
+      } else {
+        getUser();
+      }
+    } else {
+      window.alert((result.data && (result.data.message || result.data.error)) || 'Request failed');
+    }
+  }).catch(function(error) {
+    console.error(error);
+    window.alert('Request failed');
+  });
 }
 
 function createCheckDropdown() {
@@ -854,6 +926,7 @@ $(document).ready(function() {
       $('#service_requests_menu').css('background-color','maroon');
       $('#my_accounts_menu').css('background-color','maroon');
       $('#pending_transaction_requests_menu').css('background-color','maroon');
+      $('#disputes_menu').css('background-color','maroon');
     });
     $('#service_requests_menu').on('click', function(){
       if($('#service_requests_pane').css('display')=='none'){
@@ -862,6 +935,7 @@ $(document).ready(function() {
       $('#service_requests_menu').css('background-color','#FF6600');
       $('#my_accounts_menu').css('background-color','maroon');
       $('#pending_transaction_requests_menu').css('background-color','maroon');
+      $('#disputes_menu').css('background-color','maroon');
     });
     $('#my_accounts_menu').on('click', function(){
       getUser();
@@ -880,6 +954,7 @@ $(document).ready(function() {
       $('#my_accounts_menu').css('background-color','#FF6600');
       $('#service_requests_menu').css('background-color','maroon');
       $('#pending_transaction_requests_menu').css('background-color','maroon');
+      $('#disputes_menu').css('background-color','maroon');
     });
     $('#pending_transaction_requests_menu').on('click', function(){
       if($('#pending_transaction_requests_pane').css('display')=='none'){
@@ -888,6 +963,36 @@ $(document).ready(function() {
       $('#pending_transaction_requests_menu').css('background-color','#FF6600');
       $('#my_accounts_menu').css('background-color','maroon');
       $('#service_requests_menu').css('background-color','maroon');
+      $('#disputes_menu').css('background-color','maroon');
+    });
+    $('#disputes_menu').on('click', function(){
+      if($('#disputes_pane').css('display')=='none'){
+          $('#disputes_pane').show().siblings('div').hide();
+      }
+      $('#disputes_menu').css('background-color','#FF6600');
+      $('#my_accounts_menu').css('background-color','maroon');
+      $('#service_requests_menu').css('background-color','maroon');
+      $('#pending_transaction_requests_menu').css('background-color','maroon');
+    });
+    $('#file_dispute_btn').on('click', function(){
+      if($('#dispute_source_id').val() == 'select'){
+        window.alert('Select a posted debit');
+        return;
+      }
+      postDispute('openDispute', {
+        source_id: $('#dispute_source_id').val(),
+        reason: $('#dispute_reason').val(),
+        evidence: $('#dispute_evidence').val()
+      }, 'Dispute opened');
+    });
+    $('#withdraw_dispute_btn').on('click', function(){
+      if($('#dispute_id_select').val() == 'select'){
+        window.alert('Select an open case');
+        return;
+      }
+      postDispute('withdrawDispute', {
+        dispute_id: $('#dispute_id_select').val()
+      }, 'Dispute withdrawn');
     });
     $('#my_accounts_menu').click();
 	  $(".loader-wrapper").delay( 1000 ).fadeOut("slow");

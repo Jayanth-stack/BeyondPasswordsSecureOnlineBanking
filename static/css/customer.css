@@ -172,3 +172,18 @@ body {
   /*noinspection CssInvalidFunction*/
   border-color: lighten(var(--success-color), 55%);
 }
+
+#disputes_pane {
+  color: #fff;
+}
+
+#disputes_tbl td, #disputes_tbl th {
+  font-size: 13px;
+}
+
+.dispute-status-open { color: #ffc107; }
+.dispute-status-investigating { color: #17a2b8; }
+.dispute-status-provisionally_credited { color: #28a745; }
+.dispute-status-upheld { color: #28a745; }
+.dispute-status-denied { color: #dc3545; }
+.dispute-status-withdrawn { color: #6c757d; }

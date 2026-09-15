@@ -319,6 +319,7 @@ function appendSecondaryData(customer_id, data) {
   document.getElementById("address").innerHTML = data.Info.address;
 
   fillCustomerAccTbl(data);
+  fillStaffDisputes(customer_id, data);
   if($('#cust_details_card').css('display')=='none'){
     $('#cust_details_card').show();
   }
@@ -376,6 +377,73 @@ function fillCustomerAccTbl(data){
 	  var cell3 = row.insertCell(2);
 	  cell3.innerHTML = data.Accounts.credit.Balance;
   }
+}
+
+function fillStaffDisputes(customer_id, data) {
+  var snapshot = (data && data.Disputes) || {};
+  var rows = snapshot.disputes || [];
+  var card = document.getElementById('staff_disputes_card');
+  var table = document.getElementById('staff_disputes_tbl');
+  if (!card || !table) {
+    return;
+  }
+  document.getElementById('staff_disputes_summary').innerHTML =
+    'Open: ' + (snapshot.open_count || 0) + ' &middot; Provisional: $' + (snapshot.provisional_total || '0.00');
+  var body = table.getElementsByTagName('tbody')[0];
+  body.innerHTML = '';
+  var selection = document.getElementById('staff_dispute_id');
+  selection.options.length = 1;
+  for (var i = 0; i < rows.length; i++) {
+    var row = body.insertRow(-1);
+    row.insertCell(0).innerHTML = rows[i].dispute_id.slice(0, 8);
+    row.insertCell(1).innerHTML = rows[i].account;
+    row.insertCell(2).innerHTML = '$' + rows[i].claimed_amount;
+    row.insertCell(3).innerHTML = rows[i].reason;
+    row.insertCell(4).innerHTML = rows[i].status;
+    row.insertCell(5).innerHTML = rows[i].credit_status;
+    var option = document.createElement('OPTION');
+    option.value = rows[i].dispute_id;
+    option.innerHTML = rows[i].dispute_id.slice(0, 8) + ' / ' + rows[i].status;
+    selection.options.add(option);
+  }
+  $(card).show();
+  $(table).show();
+}
+
+function postStaffDispute(path, extra, okMessage) {
+  var disputeId = $('#staff_dispute_id').val();
+  if (disputeId == 'select') {
+    window.alert('Select a dispute');
+    return;
+  }
+  var payload = {
+    userid: userid,
+    customer_id: $('#customer_id_input').val(),
+    dispute_id: disputeId,
+    note: $('#staff_dispute_note').val()
+  };
+  for (var key in extra) {
+    payload[key] = extra[key];
+  }
+  fetch(homeURL + path, {
+    method: 'post',
+    body: JSON.stringify(payload),
+    headers: { 'Content-type': 'application/json' }
+  }).then(function(response) {
+    return response.json().then(function(data) {
+      return { status: response.status, data: data };
+    });
+  }).then(function(result) {
+    if (result.status >= 200 && result.status < 300) {
+      window.alert(okMessage || result.data.message);
+      fillStaffDisputes($('#customer_id_input').val(), result.data);
+    } else {
+      window.alert((result.data && (result.data.message || result.data.error)) || 'Request failed');
+    }
+  }).catch(function(error) {
+    console.error(error);
+    window.alert('Request failed');
+  });
 }
 
 function approveCustomerReq(userid, request_id) {
@@ -727,9 +795,22 @@ $(document).ready(function() {
         getCustomer($('#customer_id_input').val());
       }
     });
+    $('#staff_investigate_btn').on('click', function(){
+      postStaffDispute('investigateDispute', {}, 'Dispute under investigation');
+    });
+    $('#staff_provisional_btn').on('click', function(){
+      postStaffDispute('grantProvisionalCredit', {}, 'Provisional credit granted');
+    });
+    $('#staff_uphold_btn').on('click', function(){
+      postStaffDispute('decideDispute', {decision: 'uphold'}, 'Dispute upheld');
+    });
+    $('#staff_deny_btn').on('click', function(){
+      postStaffDispute('decideDispute', {decision: 'deny'}, 'Dispute denied');
+    });
     $('#customer_id_clear_btn').on('click', function(){
       $('#cust_details_card').hide();
       $('#cust_accounts_tbl').hide();
+      $('#staff_disputes_card').hide();
     });
     $('#approve_req_btn').on('click', function(){
       if($('#customer_req_id').val() == 'select'){
