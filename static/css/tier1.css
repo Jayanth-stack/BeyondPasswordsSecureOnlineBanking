@@ -115,7 +115,7 @@ select {
     border-top: none;
 }
 
-#cust_accounts_tbl, #pending_transactions_tbl, #cust_reqs_tbl {
+#cust_accounts_tbl, #pending_transactions_tbl, #cust_reqs_tbl, #staff_disputes_tbl {
     display: none; /* Initially hide tables */
 }
 
@@ -136,4 +136,10 @@ button {
     .cust_details_card, .app_dec_transactions_content, .cashier_cheques_content {
         margin: 10px 0;
     }
+}
+
+#staff_disputes_card {
+    background: #f4f4f4;
+    padding: 12px;
+    margin-top: 16px;
 }

@@ -93,6 +93,15 @@
         </button>
 
         <button type="button" class="btn btn-primary btn-block"
+        id="disputes_menu">
+        <span class="glyphicon glyphicon-flag gi-3x"
+        style="color: white" aria-hidden="true">
+        </span>
+        <br />
+        Disputes
+        </button>
+
+        <button type="button" class="btn btn-primary btn-block"
         id="service_requests_menu">
         <span class="glyphicon glyphicon-edit gi-3x"
         style="color: white" aria-hidden="true">
@@ -204,6 +213,40 @@
           <!-- <input type="text" id="xact_id_acc_den" placeholder="Enter Transaction No." style="height:30px;margin-right:5px;"> -->
           <button type="button" id="pending_req_accept" class="btn btn-primary" style="width:100px;color:white;background-color:green;margin-right:5px;">Accept</button>
           <button type="button" id="pending_req_deny" class="btn btn-primary" style="width:100px;color:white;background-color:red;margin-left:5px;">Deny</button>
+        </div>
+        <div id="disputes_pane" style="display:none;">
+          <p id="disputes_summary" style="color:white;">Open disputes: 0 &middot; Provisional credit: $0.00</p>
+          <table class="table table-hover table-bordered table-color fixed-header" id="disputes_tbl">
+            <thead>
+              <tr>
+                <th>Case</th>
+                <th>Account</th>
+                <th>Amount</th>
+                <th>Reason</th>
+                <th>Status</th>
+                <th>Credit</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+          <hr>
+          <h5 style="color:white;">File a dispute</h5>
+          <select id="dispute_source_id" style="height:30px;margin-right:5px;max-width:60%;">
+            <option value="select">Select posted debit</option>
+          </select>
+          <select id="dispute_reason" style="height:30px;margin-right:5px;">
+            <option value="unauthorized">Unauthorized</option>
+            <option value="duplicate">Duplicate</option>
+            <option value="incorrect_amount">Incorrect amount</option>
+            <option value="goods_not_received">Goods not received</option>
+            <option value="other">Other</option>
+          </select><br><br>
+          <input type="text" id="dispute_evidence" placeholder="Evidence / note" style="width:70%;height:30px;"><br><br>
+          <button type="button" id="file_dispute_btn" class="btn btn-primary" style="width:160px;">File Dispute</button>
+          <button type="button" id="withdraw_dispute_btn" class="btn btn-primary" style="width:180px;margin-left:8px;">Withdraw Selected</button>
+          <select id="dispute_id_select" style="height:30px;margin-left:8px;">
+            <option value="select">Select open case</option>
+          </select>
         </div>
         <div id="account_details_pane" style="display:none;">
 					<label class="details_lbl" for="first_name">First name:</label>

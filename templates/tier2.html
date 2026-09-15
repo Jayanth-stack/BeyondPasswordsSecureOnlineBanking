@@ -258,6 +258,31 @@
               </thead>
               <tbody></tbody>
             </table>
+            <div id="staff_disputes_card" style="display:none;">
+              <h4 class="header_text" style="color:white;">Disputes / Provisional Credit</h4>
+              <p id="staff_disputes_summary" style="color:white;">Open: 0</p>
+              <table class="table table-hover table-bordered table-color" id="staff_disputes_tbl">
+                <thead>
+                  <tr>
+                    <th>Case</th>
+                    <th>Account</th>
+                    <th>Amount</th>
+                    <th>Reason</th>
+                    <th>Status</th>
+                    <th>Credit</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+              <select id="staff_dispute_id" style="height:30px;margin-right:5px;">
+                <option value="select">Select case</option>
+              </select>
+              <button type="button" id="staff_investigate_btn" class="btn btn-primary">Investigate</button>
+              <button type="button" id="staff_provisional_btn" class="btn btn-primary">Grant Provisional</button>
+              <button type="button" id="staff_uphold_btn" class="btn btn-primary">Uphold</button>
+              <button type="button" id="staff_deny_btn" class="btn btn-primary">Deny</button>
+              <input type="text" id="staff_dispute_note" placeholder="Decision note" style="height:30px;margin-left:6px;width:220px;">
+            </div>
           </div>
 
           <div id="account_details_pane" style="display: none">

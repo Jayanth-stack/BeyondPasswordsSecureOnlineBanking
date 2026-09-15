@@ -160,3 +160,9 @@ body {
   -webkit-animation: spin 2s linear infinite; /* Safari */
   animation: spin 2s linear infinite;
 }
+
+#staff_disputes_card {
+  background: #f4f4f4;
+  padding: 12px;
+  margin-top: 16px;
+}
