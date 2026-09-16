@@ -93,6 +93,15 @@
         </button>
 
         <button type="button" class="btn btn-primary btn-block"
+        id="tax_forms_menu">
+        <span class="glyphicon glyphicon-file gi-3x"
+        style="color: white" aria-hidden="true">
+        </span>
+        <br />
+        Tax Forms
+        </button>
+
+        <button type="button" class="btn btn-primary btn-block"
         id="service_requests_menu">
         <span class="glyphicon glyphicon-edit gi-3x"
         style="color: white" aria-hidden="true">
@@ -204,6 +213,36 @@
           <!-- <input type="text" id="xact_id_acc_den" placeholder="Enter Transaction No." style="height:30px;margin-right:5px;"> -->
           <button type="button" id="pending_req_accept" class="btn btn-primary" style="width:100px;color:white;background-color:green;margin-right:5px;">Accept</button>
           <button type="button" id="pending_req_deny" class="btn btn-primary" style="width:100px;color:white;background-color:red;margin-left:5px;">Deny</button>
+        </div>
+        <div id="tax_forms_pane" style="display:none;">
+          <p id="tax_forms_summary" style="color:white;">YTD interest: $0.00 &middot; 1099-INT required: no</p>
+          <table class="table table-hover table-bordered table-color fixed-header" id="tax_forms_tbl">
+            <thead>
+              <tr>
+                <th>Year</th>
+                <th>Form</th>
+                <th>Box 1</th>
+                <th>Box 2</th>
+                <th>Box 4</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+          <hr>
+          <h5 style="color:white;">Year-end 1099-INT</h5>
+          <input type="number" id="tax_form_year" placeholder="Tax year" style="height:30px;width:120px;margin-right:5px;">
+          <button type="button" id="generate_tax_form_btn" class="btn btn-primary" style="width:160px;">Generate 1099-INT</button>
+          <button type="button" id="download_tax_form_btn" class="btn btn-primary" style="width:140px;margin-left:8px;">Download PDF</button>
+          <select id="tax_form_id_select" style="height:30px;margin-left:8px;">
+            <option value="select">Select form</option>
+          </select><br><br>
+          <select id="tax_copy_channel" style="height:30px;margin-right:5px;">
+            <option value="electronic">Electronic</option>
+            <option value="mail">Mail</option>
+            <option value="branch">Branch pickup</option>
+          </select>
+          <button type="button" id="request_tax_copy_btn" class="btn btn-primary" style="width:180px;">Request Official Copy</button>
         </div>
         <div id="account_details_pane" style="display:none;">
 					<label class="details_lbl" for="first_name">First name:</label>

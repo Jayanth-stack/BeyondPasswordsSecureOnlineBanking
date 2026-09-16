@@ -8,6 +8,12 @@ from customer import Customers
 from employee import Employee
 from twilio.base.exceptions import TwilioRestException
 from utility.encrypt import check_encrypted_password
+from utility.tax import (
+    attach_tax_routes,
+    build_service as build_tax_service,
+    get_service as get_tax_service,
+    set_service as set_tax_service,
+)
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -259,7 +265,8 @@ def get_customer_data():
         response = {
             'Accounts': c.get_all_account(customer_id),
             'Info': c.get_customer_details(customer_id),
-            'FundsRequests': c.get_funds_requests(customer_id)
+            'FundsRequests': c.get_funds_requests(customer_id),
+            'TaxForms': _tax_snapshot(customer_id),
         }
         return jsonify(response), 200
     except Exception as e:
@@ -878,7 +885,8 @@ def get_customer():
             c = Customers()
             response = {
                 'Accounts': c.get_all_account(values['customer_id']),
-                'Info': c.get_customer_details(values['customer_id'])
+                'Info': c.get_customer_details(values['customer_id']),
+                'TaxForms': _tax_snapshot(values['customer_id']),
             }
             return jsonify(response), 200
         except Exception as e:
@@ -1288,6 +1296,40 @@ def get_system_logs():
         logging.error(f'An error occurred when trying to send the log file: {str(e)}')
         return jsonify({'message': 'Failed to retrieve system logs', 'error': str(e)}), 500
 
+
+def _tax_recipient(userid):
+    try:
+        info = Customers().get_customer_details(userid)
+    except Exception:
+        return {}
+    if not info or info == 'None' or not isinstance(info, dict):
+        return {}
+    parts = [info.get('first_name'), info.get('middle_name'), info.get('last_name')]
+    return {
+        'name': ' '.join(part for part in parts if part),
+        'address': info.get('address') or '',
+    }
+
+
+def _tax_snapshot(userid):
+    service = get_tax_service()
+    if service is None:
+        return {
+            'enabled': False, 'forms': [], 'entries': [], 'copy_requests': [],
+            'box1': '0.00', 'box2': '0.00', 'box4': '0.00', 'required': False,
+        }
+    try:
+        return service.snapshot(userid)
+    except Exception:
+        return {
+            'enabled': False, 'forms': [], 'entries': [], 'copy_requests': [],
+            'box1': '0.00', 'box2': '0.00', 'box4': '0.00', 'required': False,
+        }
+
+
+tax_service = build_tax_service(recipient_fn=_tax_recipient)
+set_tax_service(tax_service)
+attach_tax_routes(app, tax_service)
 
 app.config['SESSION_COOKIE_SECURE'] = True
 app.config['SESSION_COOKIE_HTTPONLY'] = True

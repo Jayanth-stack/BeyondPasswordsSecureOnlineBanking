@@ -242,6 +242,7 @@ function appendSecondaryData(customer_id, data) {
   document.getElementById("address").innerHTML = data.Info.address;
 
   fillCustomerAccTbl(data);
+  fillStaffTax(customer_id, data);
   if($('#cust_details_card').css('display')=='none'){
     $('#cust_details_card').show();
   }
@@ -299,6 +300,82 @@ function fillCustomerAccTbl(data){
 	  var cell3 = row.insertCell(2);
 	  cell3.innerHTML = data.Accounts.credit.Balance;
   }
+}
+
+function fillStaffTax(customer_id, data) {
+  var snapshot = (data && data.TaxForms) || {};
+  var rows = snapshot.forms || [];
+  var copies = snapshot.copy_requests || [];
+  var card = document.getElementById('staff_tax_card');
+  var table = document.getElementById('staff_tax_tbl');
+  if (!card || !table) {
+    return;
+  }
+  document.getElementById('staff_tax_summary').innerHTML =
+    'YTD interest: $' + (snapshot.box1 || '0.00') +
+    ' &middot; penalty $' + (snapshot.box2 || '0.00') +
+    ' &middot; withholding $' + (snapshot.box4 || '0.00');
+  var body = table.getElementsByTagName('tbody')[0];
+  body.innerHTML = '';
+  var selection = document.getElementById('staff_tax_form_id');
+  selection.options.length = 1;
+  for (var i = 0; i < rows.length; i++) {
+    var row = body.insertRow(-1);
+    row.insertCell(0).innerHTML = rows[i].tax_year;
+    row.insertCell(1).innerHTML = rows[i].form_type;
+    row.insertCell(2).innerHTML = '$' + rows[i].box1;
+    row.insertCell(3).innerHTML = rows[i].status;
+    row.insertCell(4).innerHTML = rows[i].required ? 'yes' : 'no';
+    var option = document.createElement('OPTION');
+    option.value = rows[i].form_id;
+    option.innerHTML = rows[i].tax_year + ' / ' + rows[i].status;
+    selection.options.add(option);
+  }
+  var copySelect = document.getElementById('staff_tax_copy_id');
+  copySelect.options.length = 1;
+  for (var j = 0; j < copies.length; j++) {
+    if (!copies[j].pending) {
+      continue;
+    }
+    var copyOpt = document.createElement('OPTION');
+    copyOpt.value = copies[j].request_id;
+    copyOpt.innerHTML = copies[j].channel + ' / ' + copies[j].form_id.slice(0, 8);
+    copySelect.options.add(copyOpt);
+  }
+  if (snapshot.prior_year && !$('#staff_tax_year').val()) {
+    $('#staff_tax_year').val(snapshot.prior_year);
+  }
+  $(card).show();
+  $(table).show();
+}
+
+function postStaffTax(path, extra, okMessage) {
+  var payload = {
+    userid: userid,
+    customer_id: $('#customer_id_input').val()
+  };
+  for (var key in extra) {
+    payload[key] = extra[key];
+  }
+  fetch(homeURL + path, {
+    method: 'post',
+    body: JSON.stringify(payload),
+    headers: { 'Content-type': 'application/json' }
+  }).then(function(response) {
+    return response.json().then(function(data) {
+      return { status: response.status, data: data };
+    });
+  }).then(function(result) {
+    if (result.status >= 200 && result.status < 300) {
+      window.alert(okMessage || result.data.message);
+      fillStaffTax($('#customer_id_input').val(), result.data);
+    } else {
+      window.alert((result.data && (result.data.message || result.data.error)) || 'Request failed');
+    }
+  }).catch(function(error) {
+    console.error(error);
+    window.alert('Request failed');
+  });
 }
 
 function approve_request(userid, xactno) {
@@ -653,9 +730,52 @@ $(document).ready(function() {
         getModifyCustomer($('#modify_userid').val());
       }
     });
+    $('#staff_tax_post_btn').on('click', function(){
+      if (!$('#staff_tax_account').val() || !$('#staff_tax_amount').val()) {
+        window.alert('Account and amount required');
+        return;
+      }
+      postStaffTax('postReportable', {
+        account: $('#staff_tax_account').val(),
+        amount: $('#staff_tax_amount').val(),
+        box: $('#staff_tax_box').val(),
+        tax_year: $('#staff_tax_year').val() || 'current'
+      }, 'Reportable income posted');
+    });
+    $('#staff_tax_generate_btn').on('click', function(){
+      postStaffTax('generateTaxForm', {
+        tax_year: $('#staff_tax_year').val() || 'prior',
+        force: true
+      }, '1099-INT generated');
+    });
+    $('#staff_tax_file_btn').on('click', function(){
+      if ($('#staff_tax_form_id').val() == 'select') {
+        window.alert('Select a form');
+        return;
+      }
+      postStaffTax('fileTaxForm', {form_id: $('#staff_tax_form_id').val()}, 'Tax form filed');
+    });
+    $('#staff_tax_correct_btn').on('click', function(){
+      if ($('#staff_tax_form_id').val() == 'select') {
+        window.alert('Select a form');
+        return;
+      }
+      postStaffTax('correctTaxForm', {form_id: $('#staff_tax_form_id').val()}, 'Corrected form issued');
+    });
+    $('#staff_tax_fulfill_btn').on('click', function(){
+      if ($('#staff_tax_copy_id').val() == 'select') {
+        window.alert('Select a copy request');
+        return;
+      }
+      postStaffTax('decideTaxCopy', {
+        request_id: $('#staff_tax_copy_id').val(),
+        decision: 'fulfill'
+      }, 'Copy fulfilled');
+    });
     $('#customer_id_clear_btn').on('click', function(){
       $('#cust_details_card').hide();
       $('#cust_accounts_tbl').hide();
+      $('#staff_tax_card').hide();
     });
     $('#approve_trans_btn').on('click', function(){
       if($('#customer_trans_no').val() == 'select'){

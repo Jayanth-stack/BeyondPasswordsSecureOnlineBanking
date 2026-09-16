@@ -126,6 +126,98 @@ function appendPrimaryData(data) {
 
   createCheckDropdown();
   fillPendingTransTbl(data);
+  fillTaxForms(data);
+}
+
+function fillTaxForms(data) {
+  var snapshot = data.TaxForms || {};
+  var rows = snapshot.forms || [];
+  var summary = document.getElementById('tax_forms_summary');
+  if (summary) {
+    summary.innerHTML = 'YTD interest: $' + (snapshot.box1 || '0.00') +
+      ' &middot; penalty $' + (snapshot.box2 || '0.00') +
+      ' &middot; withholding $' + (snapshot.box4 || '0.00') +
+      ' &middot; 1099-INT required: ' + (snapshot.ytd_required ? 'yes' : 'no');
+  }
+  var table = document.getElementById('tax_forms_tbl');
+  if (!table) {
+    return;
+  }
+  var body = table.getElementsByTagName('tbody')[0];
+  body.innerHTML = '';
+  var selection = document.getElementById('tax_form_id_select');
+  selection.options.length = 1;
+  for (var i = 0; i < rows.length; i++) {
+    var row = body.insertRow(-1);
+    row.insertCell(0).innerHTML = rows[i].tax_year;
+    row.insertCell(1).innerHTML = rows[i].form_type;
+    row.insertCell(2).innerHTML = '$' + rows[i].box1;
+    row.insertCell(3).innerHTML = '$' + rows[i].box2;
+    row.insertCell(4).innerHTML = '$' + rows[i].box4;
+    row.insertCell(5).innerHTML = rows[i].status + (rows[i].required ? ' / required' : '');
+    var option = document.createElement('OPTION');
+    option.value = rows[i].form_id;
+    option.innerHTML = rows[i].tax_year + ' ' + rows[i].form_type + ' / ' + rows[i].status;
+    option.setAttribute('data-form', JSON.stringify(rows[i]));
+    selection.options.add(option);
+  }
+  if (snapshot.prior_year && !$('#tax_form_year').val()) {
+    $('#tax_form_year').val(snapshot.prior_year);
+  }
+}
+
+function postTax(path, payload, okMessage) {
+  payload.userid = userid;
+  fetch(homeURL + path, {
+    method: 'post',
+    body: JSON.stringify(payload),
+    headers: { 'Content-type': 'application/json' }
+  }).then(function(response) {
+    return response.json().then(function(data) {
+      return { status: response.status, data: data };
+    });
+  }).then(function(result) {
+    if (result.status >= 200 && result.status < 300) {
+      window.alert(okMessage || result.data.message);
+      if (result.data.TaxForms) {
+        fillTaxForms({ TaxForms: result.data.TaxForms });
+      } else {
+        getUser();
+      }
+    } else {
+      window.alert((result.data && (result.data.message || result.data.error)) || 'Request failed');
+    }
+  }).catch(function(error) {
+    console.error(error);
+    window.alert('Request failed');
+  });
+}
+
+function downloadSelectedTaxForm() {
+  var selection = document.getElementById('tax_form_id_select');
+  if (!selection || selection.value == 'select') {
+    window.alert('Select a tax form');
+    return;
+  }
+  var chosen = selection.options[selection.selectedIndex];
+  var form;
+  try {
+    form = JSON.parse(chosen.getAttribute('data-form') || '{}');
+  } catch (e) {
+    window.alert('Could not read form');
+    return;
+  }
+  var doc = new jsPDF();
+  doc.text('Form ' + (form.form_type || '1099-INT'), 20, 20);
+  doc.text('Payer: ' + ((form.payer && form.payer.name) || 'Konoha Bank'), 20, 32);
+  doc.text('Recipient: ' + ((form.recipient && form.recipient.name) || ''), 20, 44);
+  doc.text('TIN last4: ' + ((form.recipient && form.recipient.tin_last4) || '****'), 20, 56);
+  doc.text('Tax year: ' + form.tax_year, 20, 68);
+  doc.text('Box 1 Interest: $' + form.box1, 20, 80);
+  doc.text('Box 2 Early withdrawal: $' + form.box2, 20, 92);
+  doc.text('Box 4 Federal withholding: $' + form.box4, 20, 104);
+  doc.text('Status: ' + form.status, 20, 116);
+  doc.save('1099-INT-' + form.tax_year + '.pdf');
 }
 
 function fillPendingTransTbl(data){
@@ -854,6 +946,7 @@ $(document).ready(function() {
       $('#service_requests_menu').css('background-color','maroon');
       $('#my_accounts_menu').css('background-color','maroon');
       $('#pending_transaction_requests_menu').css('background-color','maroon');
+      $('#tax_forms_menu').css('background-color','maroon');
     });
     $('#service_requests_menu').on('click', function(){
       if($('#service_requests_pane').css('display')=='none'){
@@ -862,6 +955,7 @@ $(document).ready(function() {
       $('#service_requests_menu').css('background-color','#FF6600');
       $('#my_accounts_menu').css('background-color','maroon');
       $('#pending_transaction_requests_menu').css('background-color','maroon');
+      $('#tax_forms_menu').css('background-color','maroon');
     });
     $('#my_accounts_menu').on('click', function(){
       getUser();
@@ -880,6 +974,7 @@ $(document).ready(function() {
       $('#my_accounts_menu').css('background-color','#FF6600');
       $('#service_requests_menu').css('background-color','maroon');
       $('#pending_transaction_requests_menu').css('background-color','maroon');
+      $('#tax_forms_menu').css('background-color','maroon');
     });
     $('#pending_transaction_requests_menu').on('click', function(){
       if($('#pending_transaction_requests_pane').css('display')=='none'){
@@ -888,6 +983,34 @@ $(document).ready(function() {
       $('#pending_transaction_requests_menu').css('background-color','#FF6600');
       $('#my_accounts_menu').css('background-color','maroon');
       $('#service_requests_menu').css('background-color','maroon');
+      $('#tax_forms_menu').css('background-color','maroon');
+    });
+    $('#tax_forms_menu').on('click', function(){
+      if($('#tax_forms_pane').css('display')=='none'){
+          $('#tax_forms_pane').show().siblings('div').hide();
+      }
+      $('#tax_forms_menu').css('background-color','#FF6600');
+      $('#my_accounts_menu').css('background-color','maroon');
+      $('#service_requests_menu').css('background-color','maroon');
+      $('#pending_transaction_requests_menu').css('background-color','maroon');
+    });
+    $('#generate_tax_form_btn').on('click', function(){
+      postTax('generateTaxForm', {
+        tax_year: $('#tax_form_year').val() || 'prior'
+      }, '1099-INT generated');
+    });
+    $('#download_tax_form_btn').on('click', function(){
+      downloadSelectedTaxForm();
+    });
+    $('#request_tax_copy_btn').on('click', function(){
+      if($('#tax_form_id_select').val() == 'select'){
+        window.alert('Select a tax form');
+        return;
+      }
+      postTax('requestTaxCopy', {
+        form_id: $('#tax_form_id_select').val(),
+        channel: $('#tax_copy_channel').val()
+      }, 'Official copy requested');
     });
     $('#my_accounts_menu').click();
 	  $(".loader-wrapper").delay( 1000 ).fadeOut("slow");

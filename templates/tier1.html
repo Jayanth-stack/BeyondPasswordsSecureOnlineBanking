@@ -226,6 +226,41 @@
                 <tbody>
                 </tbody>
             </table>
+            <div id="staff_tax_card" style="display:none;">
+              <h4 class="header_text" style="color:white;">1099-INT / Tax Forms</h4>
+              <p id="staff_tax_summary" style="color:white;">YTD interest: $0.00</p>
+              <table class="table table-hover table-bordered table-color" id="staff_tax_tbl">
+                <thead>
+                  <tr>
+                    <th>Year</th>
+                    <th>Form</th>
+                    <th>Box 1</th>
+                    <th>Status</th>
+                    <th>Required</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+              <input type="text" id="staff_tax_account" placeholder="Account" style="height:30px;width:120px;margin-right:5px;">
+              <input type="text" id="staff_tax_amount" placeholder="Amount" style="height:30px;width:100px;margin-right:5px;">
+              <select id="staff_tax_box" style="height:30px;margin-right:5px;">
+                <option value="interest">Box 1 interest</option>
+                <option value="early_withdrawal">Box 2 penalty</option>
+                <option value="withholding">Box 4 withholding</option>
+              </select>
+              <input type="number" id="staff_tax_year" placeholder="Tax year" style="height:30px;width:110px;margin-right:5px;">
+              <button type="button" id="staff_tax_post_btn" class="btn btn-primary">Post Reportable</button>
+              <button type="button" id="staff_tax_generate_btn" class="btn btn-primary">Generate</button>
+              <select id="staff_tax_form_id" style="height:30px;margin-left:6px;">
+                <option value="select">Select form</option>
+              </select>
+              <button type="button" id="staff_tax_file_btn" class="btn btn-primary">File</button>
+              <button type="button" id="staff_tax_correct_btn" class="btn btn-primary">Correct</button>
+              <select id="staff_tax_copy_id" style="height:30px;margin-left:6px;">
+                <option value="select">Select copy request</option>
+              </select>
+              <button type="button" id="staff_tax_fulfill_btn" class="btn btn-primary">Fulfill Copy</button>
+            </div>
         </div>
         <div id="account_details_pane" style="display:none;">
           <label class="details_lbl" for="first_name">First name:</label>

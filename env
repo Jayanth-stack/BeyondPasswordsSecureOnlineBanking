@@ -6,3 +6,6 @@ DB_USER=root
 DB_PASSWORD=root
 DB_PORT=3306
 DB_NAME=bankingapplication
+TAX_ENABLED=true
+TAX_INT_THRESHOLD=10.00
+TAX_PAYER_NAME=Konoha Bank

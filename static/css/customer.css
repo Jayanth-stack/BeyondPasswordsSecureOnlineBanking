@@ -172,3 +172,13 @@ body {
   /*noinspection CssInvalidFunction*/
   border-color: lighten(var(--success-color), 55%);
 }
+
+#tax_forms_pane,
+#staff_tax_card {
+  margin-top: 12px;
+}
+
+#tax_forms_summary,
+#staff_tax_summary {
+  margin-bottom: 8px;
+}
