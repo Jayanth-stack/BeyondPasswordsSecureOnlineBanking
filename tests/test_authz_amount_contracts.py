@@ -115,9 +115,9 @@ class StaffGateHoleTests(unittest.TestCase):
     def test_dashboard_html_is_served_without_session(self):
         for path in ("/", "/customer_dash", "/admin", "/tier1", "/tier2", "/otp_page"):
             with self.subTest(path=path):
-                response = self.client.get(path)
-                self.assertEqual(response.status_code, 200)
-                self.assertTrue(response.data)
+                with self.client.get(path) as response:
+                    self.assertEqual(response.status_code, 200)
+                    self.assertTrue(response.data)
 
     def test_register_customer_empty_empid_is_treated_as_staff_create(self):
         # Only the literal string 'None' takes the self-register redirect.
