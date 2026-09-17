@@ -258,6 +258,29 @@
               </thead>
               <tbody></tbody>
             </table>
+            <div id="staff_ach_card" style="display:none;">
+              <h4 class="header_text" style="color:white;">Direct Deposit / ACH</h4>
+              <p id="staff_ach_summary" style="color:white;">YTD inbound ACH: $0.00</p>
+              <table class="table table-hover table-bordered table-color" id="staff_ach_tbl">
+                <thead>
+                  <tr>
+                    <th>Nickname</th>
+                    <th>Company</th>
+                    <th>Default A/C</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+              <select id="staff_ach_source_id" style="height:30px;margin-right:5px;">
+                <option value="select">Select source</option>
+              </select>
+              <input type="text" id="staff_ach_amount" placeholder="Amount" style="height:30px;width:100px;margin-right:5px;">
+              <input type="text" id="staff_ach_trace" placeholder="Trace id" style="height:30px;width:120px;margin-right:5px;">
+              <button type="button" id="staff_ach_preview_btn" class="btn btn-primary">Preview</button>
+              <button type="button" id="staff_ach_post_btn" class="btn btn-primary">Post Payroll</button>
+              <p id="staff_ach_preview" style="color:yellow;margin-top:8px;"></p>
+            </div>
           </div>
 
           <div id="account_details_pane" style="display: none">

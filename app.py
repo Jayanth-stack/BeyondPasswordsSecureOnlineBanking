@@ -8,6 +8,12 @@ from customer import Customers
 from employee import Employee
 from twilio.base.exceptions import TwilioRestException
 from utility.encrypt import check_encrypted_password
+from utility.ach import (
+    attach_ach_routes,
+    build_service as build_ach_service,
+    get_service as get_ach_service,
+    set_service as set_ach_service,
+)
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -259,7 +265,8 @@ def get_customer_data():
         response = {
             'Accounts': c.get_all_account(customer_id),
             'Info': c.get_customer_details(customer_id),
-            'FundsRequests': c.get_funds_requests(customer_id)
+            'FundsRequests': c.get_funds_requests(customer_id),
+            'DirectDeposit': _ach_snapshot(customer_id),
         }
         return jsonify(response), 200
     except Exception as e:
@@ -878,7 +885,8 @@ def get_customer():
             c = Customers()
             response = {
                 'Accounts': c.get_all_account(values['customer_id']),
-                'Info': c.get_customer_details(values['customer_id'])
+                'Info': c.get_customer_details(values['customer_id']),
+                'DirectDeposit': _ach_snapshot(values['customer_id']),
             }
             return jsonify(response), 200
         except Exception as e:
@@ -1288,6 +1296,40 @@ def get_system_logs():
         logging.error(f'An error occurred when trying to send the log file: {str(e)}')
         return jsonify({'message': 'Failed to retrieve system logs', 'error': str(e)}), 500
 
+
+def _ach_accounts(userid):
+    try:
+        accounts = Customers().get_all_account(userid)
+    except Exception:
+        return {}
+    if not isinstance(accounts, dict):
+        return {}
+    return accounts
+
+
+def _ach_credit(account, amount, remark=None):
+    return Customers().credit_request(account, amount, remark=remark)
+
+
+def _ach_snapshot(userid):
+    service = get_ach_service()
+    if service is None:
+        return {
+            'enabled': False, 'sources': [], 'inbounds': [], 'ytd': '0.00',
+            'active_sources': 0,
+        }
+    try:
+        return service.snapshot(userid)
+    except Exception:
+        return {
+            'enabled': False, 'sources': [], 'inbounds': [], 'ytd': '0.00',
+            'active_sources': 0,
+        }
+
+
+ach_service = build_ach_service(credit_fn=_ach_credit, accounts_fn=_ach_accounts)
+set_ach_service(ach_service)
+attach_ach_routes(app, ach_service)
 
 app.config['SESSION_COOKIE_SECURE'] = True
 app.config['SESSION_COOKIE_HTTPONLY'] = True

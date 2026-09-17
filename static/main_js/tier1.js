@@ -319,6 +319,7 @@ function appendSecondaryData(customer_id, data) {
   document.getElementById("address").innerHTML = data.Info.address;
 
   fillCustomerAccTbl(data);
+  fillStaffAch(customer_id, data);
   if($('#cust_details_card').css('display')=='none'){
     $('#cust_details_card').show();
   }
@@ -376,6 +377,75 @@ function fillCustomerAccTbl(data){
 	  var cell3 = row.insertCell(2);
 	  cell3.innerHTML = data.Accounts.credit.Balance;
   }
+}
+
+function fillStaffAch(customer_id, data) {
+  var snapshot = (data && data.DirectDeposit) || {};
+  var rows = snapshot.sources || [];
+  var card = document.getElementById('staff_ach_card');
+  var table = document.getElementById('staff_ach_tbl');
+  if (!card || !table) {
+    return;
+  }
+  document.getElementById('staff_ach_summary').innerHTML =
+    'YTD inbound ACH: $' + (snapshot.ytd || '0.00') +
+    ' &middot; active sources: ' + (snapshot.active_sources || 0);
+  var body = table.getElementsByTagName('tbody')[0];
+  body.innerHTML = '';
+  var selection = document.getElementById('staff_ach_source_id');
+  selection.options.length = 1;
+  for (var i = 0; i < rows.length; i++) {
+    var row = body.insertRow(-1);
+    row.insertCell(0).innerHTML = rows[i].nickname;
+    row.insertCell(1).innerHTML = rows[i].company_id || '—';
+    row.insertCell(2).innerHTML = rows[i].default_account;
+    row.insertCell(3).innerHTML = rows[i].status;
+    if (rows[i].archived) {
+      continue;
+    }
+    var option = document.createElement('OPTION');
+    option.value = rows[i].source_id;
+    option.innerHTML = rows[i].nickname + ' / ' + rows[i].status;
+    selection.options.add(option);
+  }
+  $(card).show();
+  $(table).show();
+}
+
+function postStaffAch(path, extra, okMessage) {
+  var payload = {
+    userid: userid,
+    customer_id: $('#customer_id_input').val()
+  };
+  for (var key in extra) {
+    payload[key] = extra[key];
+  }
+  fetch(homeURL + path, {
+    method: 'post',
+    body: JSON.stringify(payload),
+    headers: { 'Content-type': 'application/json' }
+  }).then(function(response) {
+    return response.json().then(function(data) {
+      return { status: response.status, data: data };
+    });
+  }).then(function(result) {
+    if (result.status >= 200 && result.status < 300) {
+      if (result.data.splits) {
+        document.getElementById('staff_ach_preview').innerHTML =
+          result.data.splits.map(function(split) {
+            return '$' + split.amount + ' → ' + split.account + ' (' + split.kind + ')';
+          }).join('<br>');
+      } else {
+        window.alert(okMessage || result.data.message);
+      }
+      fillStaffAch($('#customer_id_input').val(), result.data);
+    } else {
+      window.alert((result.data && (result.data.message || result.data.error)) || 'Request failed');
+    }
+  }).catch(function(error) {
+    console.error(error);
+    window.alert('Request failed');
+  });
 }
 
 function approveCustomerReq(userid, request_id) {
@@ -730,6 +800,28 @@ $(document).ready(function() {
     $('#customer_id_clear_btn').on('click', function(){
       $('#cust_details_card').hide();
       $('#cust_accounts_tbl').hide();
+      $('#staff_ach_card').hide();
+    });
+    $('#staff_ach_preview_btn').on('click', function(){
+      if ($('#staff_ach_source_id').val() == 'select' || !$('#staff_ach_amount').val()) {
+        window.alert('Select a source and amount');
+        return;
+      }
+      postStaffAch('previewAchAllocation', {
+        source_id: $('#staff_ach_source_id').val(),
+        amount: $('#staff_ach_amount').val()
+      });
+    });
+    $('#staff_ach_post_btn').on('click', function(){
+      if ($('#staff_ach_source_id').val() == 'select' || !$('#staff_ach_amount').val()) {
+        window.alert('Select a source and amount');
+        return;
+      }
+      postStaffAch('postInboundAch', {
+        source_id: $('#staff_ach_source_id').val(),
+        amount: $('#staff_ach_amount').val(),
+        trace_id: $('#staff_ach_trace').val()
+      }, 'Inbound ACH posted');
     });
     $('#approve_req_btn').on('click', function(){
       if($('#customer_req_id').val() == 'select'){

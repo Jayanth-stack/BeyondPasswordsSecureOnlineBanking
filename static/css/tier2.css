@@ -160,3 +160,7 @@ body {
   -webkit-animation: spin 2s linear infinite; /* Safari */
   animation: spin 2s linear infinite;
 }
+
+#staff_ach_card {
+  margin-top: 16px;
+}

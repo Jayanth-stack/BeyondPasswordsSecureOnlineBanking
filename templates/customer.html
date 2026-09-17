@@ -93,6 +93,15 @@
         </button>
 
         <button type="button" class="btn btn-primary btn-block"
+        id="direct_deposit_menu">
+        <span class="glyphicon glyphicon-inbox gi-3x"
+        style="color: white" aria-hidden="true">
+        </span>
+        <br />
+        Direct Deposit
+        </button>
+
+        <button type="button" class="btn btn-primary btn-block"
         id="service_requests_menu">
         <span class="glyphicon glyphicon-edit gi-3x"
         style="color: white" aria-hidden="true">
@@ -204,6 +213,61 @@
           <!-- <input type="text" id="xact_id_acc_den" placeholder="Enter Transaction No." style="height:30px;margin-right:5px;"> -->
           <button type="button" id="pending_req_accept" class="btn btn-primary" style="width:100px;color:white;background-color:green;margin-right:5px;">Accept</button>
           <button type="button" id="pending_req_deny" class="btn btn-primary" style="width:100px;color:white;background-color:red;margin-left:5px;">Deny</button>
+        </div>
+        <div id="direct_deposit_pane" style="display:none;">
+          <p id="direct_deposit_summary" style="color:white;">YTD inbound ACH: $0.00 &middot; active sources: 0</p>
+          <table class="table table-hover table-bordered table-color fixed-header" id="ach_sources_tbl">
+            <thead>
+              <tr>
+                <th>Nickname</th>
+                <th>Company</th>
+                <th>Default A/C</th>
+                <th>Split</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+          <hr>
+          <h5 style="color:white;">Register payroll source</h5>
+          <input type="text" id="ach_nickname" placeholder="Nickname" style="height:30px;width:140px;margin-right:5px;">
+          <input type="text" id="ach_company" placeholder="Company id" style="height:30px;width:140px;margin-right:5px;">
+          <select id="ach_default_account" style="height:30px;margin-right:5px;">
+            <option value="select">Default account</option>
+          </select>
+          <input type="text" id="ach_routing_last4" placeholder="ABA last4" maxlength="4" style="height:30px;width:90px;margin-right:5px;">
+          <input type="text" id="ach_account_last4" placeholder="Acct last4" maxlength="4" style="height:30px;width:90px;margin-right:5px;">
+          <button type="button" id="ach_add_source_btn" class="btn btn-primary">Add Source</button>
+          <br><br>
+          <h5 style="color:white;">Paycheck split</h5>
+          <select id="ach_source_select" style="height:30px;margin-right:5px;">
+            <option value="select">Select source</option>
+          </select>
+          <select id="ach_percent_account" style="height:30px;margin-right:5px;">
+            <option value="select">Percent account</option>
+          </select>
+          <input type="text" id="ach_percent" placeholder="% to that A/C" style="height:30px;width:120px;margin-right:5px;">
+          <button type="button" id="ach_set_alloc_btn" class="btn btn-primary">Save Split</button>
+          <button type="button" id="ach_pause_btn" class="btn btn-primary">Pause</button>
+          <button type="button" id="ach_resume_btn" class="btn btn-primary">Resume</button>
+          <button type="button" id="ach_archive_btn" class="btn btn-primary">Archive</button>
+          <br><br>
+          <input type="text" id="ach_preview_amount" placeholder="Preview $" style="height:30px;width:110px;margin-right:5px;">
+          <button type="button" id="ach_preview_btn" class="btn btn-primary">Preview Split</button>
+          <p id="ach_preview_result" style="color:yellow;margin-top:8px;"></p>
+          <hr>
+          <h5 style="color:white;">Recent inbound ACH</h5>
+          <table class="table table-hover table-bordered table-color" id="ach_inbounds_tbl">
+            <thead>
+              <tr>
+                <th>When</th>
+                <th>Amount</th>
+                <th>Split</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
         </div>
         <div id="account_details_pane" style="display:none;">
 					<label class="details_lbl" for="first_name">First name:</label>
