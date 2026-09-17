@@ -172,3 +172,15 @@ body {
   /*noinspection CssInvalidFunction*/
   border-color: lighten(var(--success-color), 55%);
 }
+
+#direct_deposit_pane,
+#staff_ach_card {
+  margin-top: 12px;
+}
+
+#direct_deposit_summary,
+#staff_ach_summary,
+#ach_preview_result,
+#staff_ach_preview {
+  margin-bottom: 8px;
+}

@@ -346,7 +346,7 @@ class Customers:
             return 'Cannot Debit funds:'
 
     #################        FUNCTION TO CREDIT FUNDS                     #################
-    def credit_request(self, account, amount):
+    def credit_request(self, account, amount, remark=None):
         query = """ 
                 Select active from Accounts where account_no = %d; 
             """ % (int(account))
@@ -366,7 +366,7 @@ class Customers:
             """ % (float(amount), int(account))
         cursor.execute(query)
 
-        str1 = '$' + str(amount) + ' direct deposited  ' + ' on ' + getdate() + ',<br>'
+        str1 = '$' + str(amount) + ' ' + (remark or 'direct deposited') + '  ' + ' on ' + getdate() + ',<br>'
         print(str1)
         query = """ 
                 UPDATE Accounts SET transaction_history=concat('%s', transaction_history) where account_no = %d; 

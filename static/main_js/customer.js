@@ -126,6 +126,133 @@ function appendPrimaryData(data) {
 
   createCheckDropdown();
   fillPendingTransTbl(data);
+  fillDirectDeposit(data);
+}
+
+function fillAchAccountSelect(selectId) {
+  var selection = document.getElementById(selectId);
+  if (!selection) {
+    return;
+  }
+  var keepFirst = selection.options[0] ? selection.options[0].text : 'Select';
+  selection.options.length = 1;
+  selection.options[0].text = keepFirst;
+  if (checking_ac_no && checking_ac_no != 'NA') {
+    var ca = document.createElement('OPTION');
+    ca.value = checking_ac_no;
+    ca.innerHTML = 'Checking ' + checking_ac_no;
+    selection.options.add(ca);
+  }
+  if (savings_ac_no && savings_ac_no != 'NA') {
+    var sa = document.createElement('OPTION');
+    sa.value = savings_ac_no;
+    sa.innerHTML = 'Savings ' + savings_ac_no;
+    selection.options.add(sa);
+  }
+  if (cc_no && cc_no != 'NA') {
+    var cc = document.createElement('OPTION');
+    cc.value = cc_no;
+    cc.innerHTML = 'Credit ' + cc_no;
+    selection.options.add(cc);
+  }
+}
+
+function formatAchLegs(legs) {
+  if (!legs || !legs.length) {
+    return '100% default';
+  }
+  return legs.map(function(leg) {
+    if (leg.kind == 'percent') {
+      return leg.value + '% → ' + leg.account;
+    }
+    if (leg.kind == 'fixed') {
+      return '$' + leg.value + ' → ' + leg.account;
+    }
+    return 'rest → ' + leg.account;
+  }).join('; ');
+}
+
+function fillDirectDeposit(data) {
+  var snapshot = data.DirectDeposit || {};
+  var sources = snapshot.sources || [];
+  var inbounds = snapshot.inbounds || [];
+  var summary = document.getElementById('direct_deposit_summary');
+  if (summary) {
+    summary.innerHTML = 'YTD inbound ACH: $' + (snapshot.ytd || '0.00') +
+      ' &middot; active sources: ' + (snapshot.active_sources || 0);
+  }
+  var table = document.getElementById('ach_sources_tbl');
+  if (!table) {
+    return;
+  }
+  var body = table.getElementsByTagName('tbody')[0];
+  body.innerHTML = '';
+  var selection = document.getElementById('ach_source_select');
+  selection.options.length = 1;
+  fillAchAccountSelect('ach_default_account');
+  fillAchAccountSelect('ach_percent_account');
+  for (var i = 0; i < sources.length; i++) {
+    var row = body.insertRow(-1);
+    row.insertCell(0).innerHTML = sources[i].nickname;
+    row.insertCell(1).innerHTML = sources[i].company_id || '—';
+    row.insertCell(2).innerHTML = sources[i].default_account;
+    row.insertCell(3).innerHTML = formatAchLegs(sources[i].legs);
+    row.insertCell(4).innerHTML = sources[i].status;
+    if (sources[i].archived) {
+      continue;
+    }
+    var option = document.createElement('OPTION');
+    option.value = sources[i].source_id;
+    option.innerHTML = sources[i].nickname + ' / ' + sources[i].status;
+    option.setAttribute('data-source', JSON.stringify(sources[i]));
+    selection.options.add(option);
+  }
+  var inboundTable = document.getElementById('ach_inbounds_tbl');
+  var inboundBody = inboundTable.getElementsByTagName('tbody')[0];
+  inboundBody.innerHTML = '';
+  for (var j = 0; j < inbounds.length; j++) {
+    var inboundRow = inboundBody.insertRow(-1);
+    inboundRow.insertCell(0).innerHTML = inbounds[j].description || inbounds[j].trace_id;
+    inboundRow.insertCell(1).innerHTML = '$' + inbounds[j].amount;
+    inboundRow.insertCell(2).innerHTML = (inbounds[j].splits || []).map(function(split) {
+      return '$' + split.amount + ' → ' + split.account;
+    }).join('; ');
+    inboundRow.insertCell(3).innerHTML = inbounds[j].status;
+  }
+}
+
+function postAch(path, payload, okMessage) {
+  payload.userid = userid;
+  fetch(homeURL + path, {
+    method: 'post',
+    body: JSON.stringify(payload),
+    headers: { 'Content-type': 'application/json' }
+  }).then(function(response) {
+    return response.json().then(function(data) {
+      return { status: response.status, data: data };
+    });
+  }).then(function(result) {
+    if (result.status >= 200 && result.status < 300) {
+      if (result.data.splits) {
+        document.getElementById('ach_preview_result').innerHTML =
+          result.data.splits.map(function(split) {
+            return '$' + split.amount + ' → ' + split.account + ' (' + split.kind + ')';
+          }).join('<br>');
+      } else {
+        window.alert(okMessage || result.data.message);
+      }
+      if (result.data.DirectDeposit) {
+        fillDirectDeposit({ DirectDeposit: result.data.DirectDeposit });
+      } else {
+        getUser();
+      }
+    } else {
+      window.alert((result.data && (result.data.message || result.data.error)) || 'Request failed');
+    }
+  }).catch(function(error) {
+    console.error(error);
+    window.alert('Request failed');
+  });
 }
 
 function fillPendingTransTbl(data){
@@ -854,6 +981,7 @@ $(document).ready(function() {
       $('#service_requests_menu').css('background-color','maroon');
       $('#my_accounts_menu').css('background-color','maroon');
       $('#pending_transaction_requests_menu').css('background-color','maroon');
+      $('#direct_deposit_menu').css('background-color','maroon');
     });
     $('#service_requests_menu').on('click', function(){
       if($('#service_requests_pane').css('display')=='none'){
@@ -862,6 +990,7 @@ $(document).ready(function() {
       $('#service_requests_menu').css('background-color','#FF6600');
       $('#my_accounts_menu').css('background-color','maroon');
       $('#pending_transaction_requests_menu').css('background-color','maroon');
+      $('#direct_deposit_menu').css('background-color','maroon');
     });
     $('#my_accounts_menu').on('click', function(){
       getUser();
@@ -880,6 +1009,7 @@ $(document).ready(function() {
       $('#my_accounts_menu').css('background-color','#FF6600');
       $('#service_requests_menu').css('background-color','maroon');
       $('#pending_transaction_requests_menu').css('background-color','maroon');
+      $('#direct_deposit_menu').css('background-color','maroon');
     });
     $('#pending_transaction_requests_menu').on('click', function(){
       if($('#pending_transaction_requests_pane').css('display')=='none'){
@@ -888,6 +1018,74 @@ $(document).ready(function() {
       $('#pending_transaction_requests_menu').css('background-color','#FF6600');
       $('#my_accounts_menu').css('background-color','maroon');
       $('#service_requests_menu').css('background-color','maroon');
+      $('#direct_deposit_menu').css('background-color','maroon');
+    });
+    $('#direct_deposit_menu').on('click', function(){
+      if($('#direct_deposit_pane').css('display')=='none'){
+          $('#direct_deposit_pane').show().siblings('div').hide();
+      }
+      $('#direct_deposit_menu').css('background-color','#FF6600');
+      $('#my_accounts_menu').css('background-color','maroon');
+      $('#service_requests_menu').css('background-color','maroon');
+      $('#pending_transaction_requests_menu').css('background-color','maroon');
+    });
+    $('#ach_add_source_btn').on('click', function(){
+      if ($('#ach_nickname').val() == '' || $('#ach_default_account').val() == 'select') {
+        window.alert('Nickname and default account required');
+        return;
+      }
+      postAch('addAchSource', {
+        nickname: $('#ach_nickname').val(),
+        company_id: $('#ach_company').val(),
+        default_account: $('#ach_default_account').val(),
+        routing_last4: $('#ach_routing_last4').val(),
+        account_last4: $('#ach_account_last4').val()
+      }, 'ACH source added');
+    });
+    $('#ach_set_alloc_btn').on('click', function(){
+      if ($('#ach_source_select').val() == 'select' || $('#ach_percent_account').val() == 'select' || $('#ach_percent').val() == '') {
+        window.alert('Select a source, percent account, and percent');
+        return;
+      }
+      postAch('setAchAllocation', {
+        source_id: $('#ach_source_select').val(),
+        legs: [{
+          account: $('#ach_percent_account').val(),
+          kind: 'percent',
+          value: $('#ach_percent').val()
+        }]
+      }, 'Allocation saved');
+    });
+    $('#ach_pause_btn').on('click', function(){
+      if ($('#ach_source_select').val() == 'select') {
+        window.alert('Select a source');
+        return;
+      }
+      postAch('pauseAchSource', {source_id: $('#ach_source_select').val()}, 'ACH source paused');
+    });
+    $('#ach_resume_btn').on('click', function(){
+      if ($('#ach_source_select').val() == 'select') {
+        window.alert('Select a source');
+        return;
+      }
+      postAch('resumeAchSource', {source_id: $('#ach_source_select').val()}, 'ACH source resumed');
+    });
+    $('#ach_archive_btn').on('click', function(){
+      if ($('#ach_source_select').val() == 'select') {
+        window.alert('Select a source');
+        return;
+      }
+      postAch('archiveAchSource', {source_id: $('#ach_source_select').val()}, 'ACH source archived');
+    });
+    $('#ach_preview_btn').on('click', function(){
+      if ($('#ach_source_select').val() == 'select' || $('#ach_preview_amount').val() == '') {
+        window.alert('Select a source and amount');
+        return;
+      }
+      postAch('previewAchAllocation', {
+        source_id: $('#ach_source_select').val(),
+        amount: $('#ach_preview_amount').val()
+      });
     });
     $('#my_accounts_menu').click();
 	  $(".loader-wrapper").delay( 1000 ).fadeOut("slow");

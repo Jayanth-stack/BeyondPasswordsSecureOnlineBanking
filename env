@@ -6,3 +6,6 @@ DB_USER=root
 DB_PASSWORD=root
 DB_PORT=3306
 DB_NAME=bankingapplication
+ACH_ENABLED=true
+ACH_ALLOW_CREDIT=true
+ACH_MAX_SOURCES=8
