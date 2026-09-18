@@ -93,6 +93,15 @@
         </button>
 
         <button type="button" class="btn btn-primary btn-block"
+        id="bill_pay_menu">
+        <span class="glyphicon glyphicon-send gi-3x"
+        style="color: white" aria-hidden="true">
+        </span>
+        <br />
+        Bill Pay
+        </button>
+
+        <button type="button" class="btn btn-primary btn-block"
         id="service_requests_menu">
         <span class="glyphicon glyphicon-edit gi-3x"
         style="color: white" aria-hidden="true">
@@ -204,6 +213,88 @@
           <!-- <input type="text" id="xact_id_acc_den" placeholder="Enter Transaction No." style="height:30px;margin-right:5px;"> -->
           <button type="button" id="pending_req_accept" class="btn btn-primary" style="width:100px;color:white;background-color:green;margin-right:5px;">Accept</button>
           <button type="button" id="pending_req_deny" class="btn btn-primary" style="width:100px;color:white;background-color:red;margin-left:5px;">Deny</button>
+        </div>
+        <div id="bill_pay_pane" style="display:none;">
+          <p id="bill_pay_summary" style="color:white;">YTD bill pay: $0.00 &middot; active billers: 0</p>
+          <table class="table table-hover table-bordered table-color fixed-header" id="billers_tbl">
+            <thead>
+              <tr>
+                <th>Nickname</th>
+                <th>Category</th>
+                <th>From A/C</th>
+                <th>Last4</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+          <hr>
+          <h5 style="color:white;">Register biller</h5>
+          <input type="text" id="bp_nickname" placeholder="Nickname" style="height:30px;width:140px;margin-right:5px;">
+          <select id="bp_category" style="height:30px;margin-right:5px;">
+            <option value="utility">Utility</option>
+            <option value="rent">Rent</option>
+            <option value="loan">Loan</option>
+            <option value="card">Card</option>
+            <option value="insurance">Insurance</option>
+            <option value="other">Other</option>
+          </select>
+          <select id="bp_from_account" style="height:30px;margin-right:5px;">
+            <option value="select">From account</option>
+          </select>
+          <input type="text" id="bp_routing_last4" placeholder="ABA last4" maxlength="4" style="height:30px;width:90px;margin-right:5px;">
+          <input type="text" id="bp_account_last4" placeholder="Acct last4" maxlength="4" style="height:30px;width:90px;margin-right:5px;">
+          <button type="button" id="bp_add_biller_btn" class="btn btn-primary">Add Biller</button>
+          <br><br>
+          <h5 style="color:white;">Pay or schedule</h5>
+          <select id="bp_biller_select" style="height:30px;margin-right:5px;">
+            <option value="select">Select biller</option>
+          </select>
+          <input type="text" id="bp_amount" placeholder="Amount" style="height:30px;width:100px;margin-right:5px;">
+          <select id="bp_interval" style="height:30px;margin-right:5px;">
+            <option value="once">Once</option>
+            <option value="weekly">Weekly</option>
+            <option value="monthly">Monthly</option>
+          </select>
+          <input type="text" id="bp_start_at" placeholder="Start (ISO or unix)" style="height:30px;width:160px;margin-right:5px;">
+          <button type="button" id="bp_pay_btn" class="btn btn-primary">Pay Now</button>
+          <button type="button" id="bp_schedule_btn" class="btn btn-primary">Schedule</button>
+          <button type="button" id="bp_pause_btn" class="btn btn-primary">Pause</button>
+          <button type="button" id="bp_resume_btn" class="btn btn-primary">Resume</button>
+          <button type="button" id="bp_archive_btn" class="btn btn-primary">Archive</button>
+          <br><br>
+          <h5 style="color:white;">Recurring</h5>
+          <table class="table table-hover table-bordered table-color" id="bp_instructions_tbl">
+            <thead>
+              <tr>
+                <th>Biller</th>
+                <th>Amount</th>
+                <th>Interval</th>
+                <th>Next</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+          <select id="bp_instruction_select" style="height:30px;margin-right:5px;">
+            <option value="select">Select instruction</option>
+          </select>
+          <button type="button" id="bp_pause_instr_btn" class="btn btn-primary">Pause</button>
+          <button type="button" id="bp_resume_instr_btn" class="btn btn-primary">Resume</button>
+          <button type="button" id="bp_cancel_instr_btn" class="btn btn-primary">Cancel</button>
+          <br><br>
+          <h5 style="color:white;">Outbound ACH</h5>
+          <table class="table table-hover table-bordered table-color" id="bp_payments_tbl">
+            <thead>
+              <tr>
+                <th>Biller</th>
+                <th>Amount</th>
+                <th>From</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
         </div>
         <div id="account_details_pane" style="display:none;">
 					<label class="details_lbl" for="first_name">First name:</label>

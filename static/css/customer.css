@@ -172,3 +172,12 @@ body {
   /*noinspection CssInvalidFunction*/
   border-color: lighten(var(--success-color), 55%);
 }
+
+.table-color {
+  background-color: #fff8ee;
+  color: #212529;
+}
+
+#bill_pay_pane h5 {
+  margin-top: 12px;
+}
