@@ -126,6 +126,122 @@ function appendPrimaryData(data) {
 
   createCheckDropdown();
   fillPendingTransTbl(data);
+  fillBillPay(data);
+}
+
+function fillBillPayAccountSelect(selectId) {
+  var selection = document.getElementById(selectId);
+  if (!selection) {
+    return;
+  }
+  var keepFirst = selection.options[0] ? selection.options[0].text : 'Select';
+  selection.options.length = 1;
+  selection.options[0].text = keepFirst;
+  if (checking_ac_no && checking_ac_no != 'NA') {
+    var ca = document.createElement('OPTION');
+    ca.value = checking_ac_no;
+    ca.innerHTML = 'Checking ' + checking_ac_no;
+    selection.options.add(ca);
+  }
+  if (savings_ac_no && savings_ac_no != 'NA') {
+    var sa = document.createElement('OPTION');
+    sa.value = savings_ac_no;
+    sa.innerHTML = 'Savings ' + savings_ac_no;
+    selection.options.add(sa);
+  }
+}
+
+function fillBillPay(data) {
+  var snapshot = data.BillPay || {};
+  var billers = snapshot.billers || [];
+  var instructions = snapshot.instructions || [];
+  var payments = snapshot.payments || [];
+  var summary = document.getElementById('bill_pay_summary');
+  if (summary) {
+    summary.innerHTML = 'YTD bill pay: $' + (snapshot.ytd || '0.00') +
+      ' &middot; returned: $' + (snapshot.returned_ytd || '0.00') +
+      ' &middot; active billers: ' + (snapshot.active_billers || 0);
+  }
+  fillBillPayAccountSelect('bp_from_account');
+  var table = document.getElementById('billers_tbl');
+  if (!table) {
+    return;
+  }
+  var body = table.getElementsByTagName('tbody')[0];
+  body.innerHTML = '';
+  var selection = document.getElementById('bp_biller_select');
+  selection.options.length = 1;
+  for (var i = 0; i < billers.length; i++) {
+    var row = body.insertRow(-1);
+    row.insertCell(0).innerHTML = billers[i].nickname;
+    row.insertCell(1).innerHTML = billers[i].category;
+    row.insertCell(2).innerHTML = billers[i].default_from_account;
+    row.insertCell(3).innerHTML = (billers[i].routing_last4 || '—') + '/' + (billers[i].account_last4 || '—');
+    row.insertCell(4).innerHTML = billers[i].status;
+    if (billers[i].archived) {
+      continue;
+    }
+    var option = document.createElement('OPTION');
+    option.value = billers[i].biller_id;
+    option.innerHTML = billers[i].nickname;
+    selection.options.add(option);
+  }
+  var instrTable = document.getElementById('bp_instructions_tbl');
+  var instrBody = instrTable.getElementsByTagName('tbody')[0];
+  instrBody.innerHTML = '';
+  var instrSelect = document.getElementById('bp_instruction_select');
+  instrSelect.options.length = 1;
+  var billerNames = {};
+  for (var b = 0; b < billers.length; b++) {
+    billerNames[billers[b].biller_id] = billers[b].nickname;
+  }
+  for (var j = 0; j < instructions.length; j++) {
+    var irow = instrBody.insertRow(-1);
+    irow.insertCell(0).innerHTML = billerNames[instructions[j].biller_id] || instructions[j].biller_id;
+    irow.insertCell(1).innerHTML = '$' + instructions[j].amount;
+    irow.insertCell(2).innerHTML = instructions[j].interval;
+    irow.insertCell(3).innerHTML = instructions[j].next_run;
+    irow.insertCell(4).innerHTML = instructions[j].status;
+    if (instructions[j].status == 'cancelled' || instructions[j].status == 'completed') {
+      continue;
+    }
+    var iopt = document.createElement('OPTION');
+    iopt.value = instructions[j].instruction_id;
+    iopt.innerHTML = (billerNames[instructions[j].biller_id] || 'biller') + ' ' + instructions[j].interval;
+    instrSelect.options.add(iopt);
+  }
+  var payTable = document.getElementById('bp_payments_tbl');
+  var payBody = payTable.getElementsByTagName('tbody')[0];
+  payBody.innerHTML = '';
+  for (var k = 0; k < payments.length; k++) {
+    var prow = payBody.insertRow(-1);
+    prow.insertCell(0).innerHTML = payments[k].nickname;
+    prow.insertCell(1).innerHTML = '$' + payments[k].amount;
+    prow.insertCell(2).innerHTML = payments[k].from_account;
+    prow.insertCell(3).innerHTML = payments[k].status;
+  }
+}
+
+function postBillPay(path, payload, okMsg) {
+  payload.userid = userid;
+  fetch(homeURL + path, {
+    method: 'post',
+    body: JSON.stringify(payload),
+    headers: { 'Content-type': 'application/json' }
+  }).then(function(response) {
+    return response.json().then(function(body) {
+      if (!response.ok) {
+        window.alert((body && (body.message || body.error)) || 'Request failed');
+        return;
+      }
+      if (okMsg) {
+        window.alert(okMsg);
+      }
+      getUser();
+    });
+  }).catch(function(error) {
+    console.error(error);
+  });
 }
 
 function fillPendingTransTbl(data){
@@ -854,6 +970,7 @@ $(document).ready(function() {
       $('#service_requests_menu').css('background-color','maroon');
       $('#my_accounts_menu').css('background-color','maroon');
       $('#pending_transaction_requests_menu').css('background-color','maroon');
+      $('#bill_pay_menu').css('background-color','maroon');
     });
     $('#service_requests_menu').on('click', function(){
       if($('#service_requests_pane').css('display')=='none'){
@@ -862,6 +979,7 @@ $(document).ready(function() {
       $('#service_requests_menu').css('background-color','#FF6600');
       $('#my_accounts_menu').css('background-color','maroon');
       $('#pending_transaction_requests_menu').css('background-color','maroon');
+      $('#bill_pay_menu').css('background-color','maroon');
     });
     $('#my_accounts_menu').on('click', function(){
       getUser();
@@ -880,6 +998,7 @@ $(document).ready(function() {
       $('#my_accounts_menu').css('background-color','#FF6600');
       $('#service_requests_menu').css('background-color','maroon');
       $('#pending_transaction_requests_menu').css('background-color','maroon');
+      $('#bill_pay_menu').css('background-color','maroon');
     });
     $('#pending_transaction_requests_menu').on('click', function(){
       if($('#pending_transaction_requests_pane').css('display')=='none'){
@@ -888,6 +1007,77 @@ $(document).ready(function() {
       $('#pending_transaction_requests_menu').css('background-color','#FF6600');
       $('#my_accounts_menu').css('background-color','maroon');
       $('#service_requests_menu').css('background-color','maroon');
+      $('#bill_pay_menu').css('background-color','maroon');
+    });
+    $('#bill_pay_menu').on('click', function(){
+      if($('#bill_pay_pane').css('display')=='none'){
+          $('#bill_pay_pane').show().siblings('div').hide();
+      }
+      $('#bill_pay_menu').css('background-color','#FF6600');
+      $('#my_accounts_menu').css('background-color','maroon');
+      $('#service_requests_menu').css('background-color','maroon');
+      $('#pending_transaction_requests_menu').css('background-color','maroon');
+    });
+    $('#bp_add_biller_btn').on('click', function(){
+      if($('#bp_nickname').val() == '' || $('#bp_from_account').val() == 'select'){
+        window.alert('Nickname and from account are required.');
+        return;
+      }
+      postBillPay('addBiller', {
+        nickname: $('#bp_nickname').val(),
+        category: $('#bp_category').val(),
+        default_from_account: $('#bp_from_account').val(),
+        routing_last4: $('#bp_routing_last4').val(),
+        account_last4: $('#bp_account_last4').val()
+      }, 'Biller added');
+    });
+    $('#bp_pay_btn').on('click', function(){
+      if($('#bp_biller_select').val() == 'select' || $('#bp_amount').val() == ''){
+        window.alert('Select a biller and amount.');
+        return;
+      }
+      postBillPay('payBill', {
+        biller_id: $('#bp_biller_select').val(),
+        amount: $('#bp_amount').val(),
+        from_account: $('#bp_from_account').val() == 'select' ? null : $('#bp_from_account').val()
+      }, 'Bill paid');
+    });
+    $('#bp_schedule_btn').on('click', function(){
+      if($('#bp_biller_select').val() == 'select' || $('#bp_amount').val() == ''){
+        window.alert('Select a biller and amount.');
+        return;
+      }
+      postBillPay('scheduleBillPay', {
+        biller_id: $('#bp_biller_select').val(),
+        amount: $('#bp_amount').val(),
+        interval: $('#bp_interval').val(),
+        start_at: $('#bp_start_at').val(),
+        from_account: $('#bp_from_account').val() == 'select' ? null : $('#bp_from_account').val()
+      }, 'Bill pay scheduled');
+    });
+    $('#bp_pause_btn').on('click', function(){
+      if($('#bp_biller_select').val() == 'select'){ window.alert('Select a biller.'); return; }
+      postBillPay('pauseBiller', { biller_id: $('#bp_biller_select').val() }, 'Biller paused');
+    });
+    $('#bp_resume_btn').on('click', function(){
+      if($('#bp_biller_select').val() == 'select'){ window.alert('Select a biller.'); return; }
+      postBillPay('resumeBiller', { biller_id: $('#bp_biller_select').val() }, 'Biller resumed');
+    });
+    $('#bp_archive_btn').on('click', function(){
+      if($('#bp_biller_select').val() == 'select'){ window.alert('Select a biller.'); return; }
+      postBillPay('archiveBiller', { biller_id: $('#bp_biller_select').val() }, 'Biller archived');
+    });
+    $('#bp_pause_instr_btn').on('click', function(){
+      if($('#bp_instruction_select').val() == 'select'){ window.alert('Select an instruction.'); return; }
+      postBillPay('pauseBillPay', { instruction_id: $('#bp_instruction_select').val() }, 'Paused');
+    });
+    $('#bp_resume_instr_btn').on('click', function(){
+      if($('#bp_instruction_select').val() == 'select'){ window.alert('Select an instruction.'); return; }
+      postBillPay('resumeBillPay', { instruction_id: $('#bp_instruction_select').val() }, 'Resumed');
+    });
+    $('#bp_cancel_instr_btn').on('click', function(){
+      if($('#bp_instruction_select').val() == 'select'){ window.alert('Select an instruction.'); return; }
+      postBillPay('cancelBillPay', { instruction_id: $('#bp_instruction_select').val() }, 'Cancelled');
     });
     $('#my_accounts_menu').click();
 	  $(".loader-wrapper").delay( 1000 ).fadeOut("slow");

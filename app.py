@@ -8,6 +8,12 @@ from customer import Customers
 from employee import Employee
 from twilio.base.exceptions import TwilioRestException
 from utility.encrypt import check_encrypted_password
+from utility.billpay import (
+    attach_billpay_routes,
+    build_service as build_billpay_service,
+    get_service as get_billpay_service,
+    set_service as set_billpay_service,
+)
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -259,7 +265,8 @@ def get_customer_data():
         response = {
             'Accounts': c.get_all_account(customer_id),
             'Info': c.get_customer_details(customer_id),
-            'FundsRequests': c.get_funds_requests(customer_id)
+            'FundsRequests': c.get_funds_requests(customer_id),
+            'BillPay': _billpay_snapshot(customer_id, actor=customer_id, actor_type='customer'),
         }
         return jsonify(response), 200
     except Exception as e:
@@ -878,7 +885,12 @@ def get_customer():
             c = Customers()
             response = {
                 'Accounts': c.get_all_account(values['customer_id']),
-                'Info': c.get_customer_details(values['customer_id'])
+                'Info': c.get_customer_details(values['customer_id']),
+                'BillPay': _billpay_snapshot(
+                    values['customer_id'],
+                    actor=session['userid'],
+                    actor_type=session.get('usertype') or 'employee',
+                ),
             }
             return jsonify(response), 200
         except Exception as e:
@@ -1287,6 +1299,49 @@ def get_system_logs():
     except Exception as e:
         logging.error(f'An error occurred when trying to send the log file: {str(e)}')
         return jsonify({'message': 'Failed to retrieve system logs', 'error': str(e)}), 500
+
+
+def _billpay_accounts(userid):
+    try:
+        accounts = Customers().get_all_account(userid)
+    except Exception:
+        return {}
+    if not isinstance(accounts, dict):
+        return {}
+    return accounts
+
+
+def _billpay_debit(account, amount, remark=None):
+    return Customers().debit_request(account, amount, remark=remark)
+
+
+def _billpay_credit(account, amount, remark=None):
+    return Customers().credit_request(account, amount, remark=remark)
+
+
+def _billpay_snapshot(userid, actor=None, actor_type='customer'):
+    service = get_billpay_service()
+    if service is None:
+        return {
+            'enabled': False, 'billers': [], 'instructions': [], 'payments': [],
+            'ytd': '0.00', 'returned_ytd': '0.00', 'active_billers': 0, 'open_instructions': 0,
+        }
+    try:
+        return service.snapshot(userid, actor=actor or userid, actor_type=actor_type)
+    except Exception:
+        return {
+            'enabled': False, 'billers': [], 'instructions': [], 'payments': [],
+            'ytd': '0.00', 'returned_ytd': '0.00', 'active_billers': 0, 'open_instructions': 0,
+        }
+
+
+billpay_service = build_billpay_service(
+    debit_fn=_billpay_debit,
+    credit_fn=_billpay_credit,
+    accounts_fn=_billpay_accounts,
+)
+set_billpay_service(billpay_service)
+attach_billpay_routes(app, billpay_service)
 
 
 app.config['SESSION_COOKIE_SECURE'] = True

@@ -88,6 +88,10 @@ body {
     margin-bottom: 15px;
 }
 
+#staff_billpay_card {
+    margin-top: 16px;
+}
+
 .custom_label, .details_lbl {
     display: block;
     margin-bottom: 5px;

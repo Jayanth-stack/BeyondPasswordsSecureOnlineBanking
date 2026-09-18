@@ -226,6 +226,45 @@
                 <tbody>
                 </tbody>
             </table>
+            <div id="staff_billpay_card" style="display:none;">
+              <h4 class="header_text" style="color:white;">Bill Pay / Outbound ACH</h4>
+              <p id="staff_billpay_summary" style="color:white;">YTD bill pay: $0.00</p>
+              <table class="table table-hover table-bordered table-color" id="staff_billpay_tbl">
+                <thead>
+                  <tr>
+                    <th>Nickname</th>
+                    <th>Category</th>
+                    <th>From A/C</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+              <table class="table table-hover table-bordered table-color" id="staff_billpay_payments_tbl">
+                <thead>
+                  <tr>
+                    <th>Biller</th>
+                    <th>Amount</th>
+                    <th>Status</th>
+                    <th>Payment</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+              <select id="staff_bp_payment_id" style="height:30px;margin-right:5px;">
+                <option value="select">Select payment</option>
+              </select>
+              <select id="staff_bp_reason" style="height:30px;margin-right:5px;">
+                <option value="unauthorized">Unauthorized</option>
+                <option value="duplicate">Duplicate</option>
+                <option value="wrong_amount">Wrong amount</option>
+                <option value="stop">Stop</option>
+                <option value="other">Other</option>
+              </select>
+              <button type="button" id="staff_bp_settle_btn" class="btn btn-primary">Settle</button>
+              <button type="button" id="staff_bp_return_btn" class="btn btn-primary">Return ACH</button>
+              <p id="staff_bp_result" style="color:white;"></p>
+            </div>
         </div>
         <div id="account_details_pane" style="display:none;">
           <label class="details_lbl" for="first_name">First name:</label>
