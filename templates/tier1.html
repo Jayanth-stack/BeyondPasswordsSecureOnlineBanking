@@ -226,6 +226,45 @@
                 <tbody>
                 </tbody>
             </table>
+            <div id="staff_linked_card" style="display:none;">
+              <h4 class="header_text" style="color:white;">Linked Accounts</h4>
+              <p id="staff_linked_summary" style="color:white;">YTD push: $0.00 &middot; YTD pull: $0.00</p>
+              <table class="table table-hover table-bordered table-color" id="staff_linked_tbl">
+                <thead>
+                  <tr>
+                    <th>Nickname</th>
+                    <th>Method</th>
+                    <th>Status</th>
+                    <th>Last4</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+              <select id="staff_la_link_id" style="height:30px;margin-right:5px;">
+                <option value="select">Select pending link</option>
+              </select>
+              <button type="button" id="staff_la_force_btn" class="btn btn-primary">Force verify</button>
+              <button type="button" id="staff_la_accept_btn" class="btn btn-primary">Accept prenote</button>
+              <button type="button" id="staff_la_reject_btn" class="btn btn-primary">Reject prenote</button>
+              <br><br>
+              <table class="table table-hover table-bordered table-color" id="staff_linked_movements_tbl">
+                <thead>
+                  <tr>
+                    <th>Nickname</th>
+                    <th>Amount</th>
+                    <th>Status</th>
+                    <th>Id</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+              <select id="staff_la_movement_id" style="height:30px;margin-right:5px;">
+                <option value="select">Select sent ACH</option>
+              </select>
+              <button type="button" id="staff_la_settle_btn" class="btn btn-primary">Settle</button>
+              <button type="button" id="staff_la_return_btn" class="btn btn-primary">Return</button>
+              <p id="staff_la_result" style="color:yellow;margin-top:8px;"></p>
+            </div>
         </div>
         <div id="account_details_pane" style="display:none;">
           <label class="details_lbl" for="first_name">First name:</label>

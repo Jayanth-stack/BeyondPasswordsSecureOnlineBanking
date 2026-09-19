@@ -6,3 +6,7 @@ DB_USER=root
 DB_PASSWORD=root
 DB_PORT=3306
 DB_NAME=bankingapplication
+LINK_ENABLED=true
+LINK_ALLOW_CREDIT=false
+LINK_MAX_LINKS=8
+LINK_CHALLENGE_SECRET=dev-link-secret

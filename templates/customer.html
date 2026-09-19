@@ -93,6 +93,15 @@
         </button>
 
         <button type="button" class="btn btn-primary btn-block"
+        id="linked_accounts_menu">
+        <span class="glyphicon glyphicon-link gi-3x"
+        style="color: white" aria-hidden="true">
+        </span>
+        <br />
+        Linked Accounts
+        </button>
+
+        <button type="button" class="btn btn-primary btn-block"
         id="service_requests_menu">
         <span class="glyphicon glyphicon-edit gi-3x"
         style="color: white" aria-hidden="true">
@@ -204,6 +213,65 @@
           <!-- <input type="text" id="xact_id_acc_den" placeholder="Enter Transaction No." style="height:30px;margin-right:5px;"> -->
           <button type="button" id="pending_req_accept" class="btn btn-primary" style="width:100px;color:white;background-color:green;margin-right:5px;">Accept</button>
           <button type="button" id="pending_req_deny" class="btn btn-primary" style="width:100px;color:white;background-color:red;margin-left:5px;">Deny</button>
+        </div>
+        <div id="linked_accounts_pane" style="display:none;">
+          <p id="linked_accounts_summary" style="color:white;">Verified: 0 &middot; pending: 0 &middot; YTD push: $0.00 &middot; YTD pull: $0.00</p>
+          <table class="table table-hover table-bordered table-color fixed-header" id="linked_accounts_tbl">
+            <thead>
+              <tr>
+                <th>Nickname</th>
+                <th>Method</th>
+                <th>Last4</th>
+                <th>From A/C</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+          <hr>
+          <h5 style="color:white;">Link an external account</h5>
+          <input type="text" id="la_nickname" placeholder="Nickname" style="height:30px;width:140px;margin-right:5px;">
+          <select id="la_method" style="height:30px;margin-right:5px;">
+            <option value="micro">Micro-deposits</option>
+            <option value="prenote">Prenote</option>
+          </select>
+          <select id="la_default_account" style="height:30px;margin-right:5px;">
+            <option value="select">Internal account</option>
+          </select>
+          <input type="text" id="la_routing_last4" placeholder="ABA last4" maxlength="4" style="height:30px;width:90px;margin-right:5px;">
+          <input type="text" id="la_account_last4" placeholder="Acct last4" maxlength="4" style="height:30px;width:90px;margin-right:5px;">
+          <button type="button" id="la_add_btn" class="btn btn-primary">Start verification</button>
+          <br><br>
+          <h5 style="color:white;">Confirm micro-deposits</h5>
+          <select id="la_link_select" style="height:30px;margin-right:5px;">
+            <option value="select">Select linked account</option>
+          </select>
+          <input type="text" id="la_amount1" placeholder="Deposit 1" style="height:30px;width:90px;margin-right:5px;">
+          <input type="text" id="la_amount2" placeholder="Deposit 2" style="height:30px;width:90px;margin-right:5px;">
+          <button type="button" id="la_confirm_btn" class="btn btn-primary">Confirm</button>
+          <button type="button" id="la_resend_btn" class="btn btn-primary">Resend</button>
+          <br><br>
+          <h5 style="color:white;">Transfer after verified</h5>
+          <input type="text" id="la_amount" placeholder="Amount" style="height:30px;width:100px;margin-right:5px;">
+          <button type="button" id="la_push_btn" class="btn btn-primary">Send to linked</button>
+          <button type="button" id="la_pull_btn" class="btn btn-primary">Pull from linked</button>
+          <button type="button" id="la_pause_btn" class="btn btn-primary">Pause</button>
+          <button type="button" id="la_resume_btn" class="btn btn-primary">Resume</button>
+          <button type="button" id="la_close_btn" class="btn btn-primary">Close</button>
+          <p id="la_result" style="color:yellow;margin-top:10px;"></p>
+          <hr>
+          <h5 style="color:white;">Linked ACH history</h5>
+          <table class="table table-hover table-bordered table-color fixed-header" id="linked_ach_tbl">
+            <thead>
+              <tr>
+                <th>Nickname</th>
+                <th>Direction</th>
+                <th>Amount</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
         </div>
         <div id="account_details_pane" style="display:none;">
 					<label class="details_lbl" for="first_name">First name:</label>

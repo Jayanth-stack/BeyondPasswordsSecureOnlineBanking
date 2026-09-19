@@ -126,6 +126,100 @@ function appendPrimaryData(data) {
 
   createCheckDropdown();
   fillPendingTransTbl(data);
+  fillLinkedAccounts(data);
+}
+
+function fillLinkedAccountSelect(selectId) {
+  var selection = document.getElementById(selectId);
+  if (!selection) {
+    return;
+  }
+  selection.options.length = 1;
+  if (checking_ac_no && checking_ac_no != 'NA' && checking_ac_no != 'None') {
+    var checkOpt = document.createElement('OPTION');
+    checkOpt.value = checking_ac_no;
+    checkOpt.innerHTML = 'Checking ' + checking_ac_no;
+    selection.options.add(checkOpt);
+  }
+  if (savings_ac_no && savings_ac_no != 'NA' && savings_ac_no != 'None') {
+    var saveOpt = document.createElement('OPTION');
+    saveOpt.value = savings_ac_no;
+    saveOpt.innerHTML = 'Savings ' + savings_ac_no;
+    selection.options.add(saveOpt);
+  }
+}
+
+function fillLinkedAccounts(data) {
+  var snapshot = data.LinkedAccounts || {};
+  var summary = document.getElementById('linked_accounts_summary');
+  if (summary) {
+    summary.innerHTML = 'Verified: ' + (snapshot.verified_count || 0) +
+      ' &middot; pending: ' + (snapshot.pending_count || 0) +
+      ' &middot; YTD push: $' + (snapshot.ytd_push || '0.00') +
+      ' &middot; YTD pull: $' + (snapshot.ytd_pull || '0.00');
+  }
+  fillLinkedAccountSelect('la_default_account');
+  var table = document.getElementById('linked_accounts_tbl');
+  if (!table) {
+    return;
+  }
+  var body = table.getElementsByTagName('tbody')[0];
+  body.innerHTML = '';
+  var selection = document.getElementById('la_link_select');
+  selection.options.length = 1;
+  var links = snapshot.links || [];
+  for (var i = 0; i < links.length; i++) {
+    var row = body.insertRow(-1);
+    row.insertCell(0).innerHTML = links[i].nickname;
+    row.insertCell(1).innerHTML = links[i].method;
+    row.insertCell(2).innerHTML = (links[i].routing_last4 || '') + '/' + (links[i].account_last4 || '');
+    row.insertCell(3).innerHTML = links[i].default_account;
+    row.insertCell(4).innerHTML = links[i].status;
+    var option = document.createElement('OPTION');
+    option.value = links[i].link_id;
+    option.innerHTML = links[i].nickname + ' (' + links[i].status + ')';
+    selection.options.add(option);
+  }
+  var moveTable = document.getElementById('linked_ach_tbl');
+  var moveBody = moveTable.getElementsByTagName('tbody')[0];
+  moveBody.innerHTML = '';
+  var movements = snapshot.movements || [];
+  for (var j = 0; j < movements.length; j++) {
+    var mrow = moveBody.insertRow(-1);
+    mrow.insertCell(0).innerHTML = movements[j].nickname;
+    mrow.insertCell(1).innerHTML = movements[j].direction;
+    mrow.insertCell(2).innerHTML = '$' + movements[j].amount;
+    mrow.insertCell(3).innerHTML = movements[j].status;
+  }
+}
+
+function postLinked(path, payload, okMsg) {
+  payload.userid = userid;
+  fetch(homeURL + path, {
+    method: 'post',
+    body: JSON.stringify(payload),
+    headers: { 'Content-type': 'application/json' }
+  }).then(function(response) {
+    return response.json().then(function(body) {
+      var result = document.getElementById('la_result');
+      if (!response.ok) {
+        if (result) { result.innerHTML = (body && (body.message || body.error)) || 'Failed'; }
+        window.alert((body && (body.message || body.error)) || 'Request failed');
+        if (body && body.LinkedAccounts) {
+          fillLinkedAccounts({ LinkedAccounts: body.LinkedAccounts });
+        }
+        return;
+      }
+      if (result) { result.innerHTML = okMsg || body.message || 'Done'; }
+      if (body && body.LinkedAccounts) {
+        fillLinkedAccounts({ LinkedAccounts: body.LinkedAccounts });
+      } else {
+        getUser();
+      }
+    });
+  }).catch(function(error) {
+    console.error(error);
+  });
 }
 
 function fillPendingTransTbl(data){
@@ -854,6 +948,7 @@ $(document).ready(function() {
       $('#service_requests_menu').css('background-color','maroon');
       $('#my_accounts_menu').css('background-color','maroon');
       $('#pending_transaction_requests_menu').css('background-color','maroon');
+      $('#linked_accounts_menu').css('background-color','maroon');
     });
     $('#service_requests_menu').on('click', function(){
       if($('#service_requests_pane').css('display')=='none'){
@@ -862,6 +957,7 @@ $(document).ready(function() {
       $('#service_requests_menu').css('background-color','#FF6600');
       $('#my_accounts_menu').css('background-color','maroon');
       $('#pending_transaction_requests_menu').css('background-color','maroon');
+      $('#linked_accounts_menu').css('background-color','maroon');
     });
     $('#my_accounts_menu').on('click', function(){
       getUser();
@@ -880,6 +976,7 @@ $(document).ready(function() {
       $('#my_accounts_menu').css('background-color','#FF6600');
       $('#service_requests_menu').css('background-color','maroon');
       $('#pending_transaction_requests_menu').css('background-color','maroon');
+      $('#linked_accounts_menu').css('background-color','maroon');
     });
     $('#pending_transaction_requests_menu').on('click', function(){
       if($('#pending_transaction_requests_pane').css('display')=='none'){
@@ -888,6 +985,78 @@ $(document).ready(function() {
       $('#pending_transaction_requests_menu').css('background-color','#FF6600');
       $('#my_accounts_menu').css('background-color','maroon');
       $('#service_requests_menu').css('background-color','maroon');
+      $('#linked_accounts_menu').css('background-color','maroon');
+    });
+    $('#linked_accounts_menu').on('click', function(){
+      if($('#linked_accounts_pane').css('display')=='none'){
+          $('#linked_accounts_pane').show().siblings('div').hide();
+      }
+      $('#linked_accounts_menu').css('background-color','#FF6600');
+      $('#my_accounts_menu').css('background-color','maroon');
+      $('#service_requests_menu').css('background-color','maroon');
+      $('#pending_transaction_requests_menu').css('background-color','maroon');
+    });
+    $('#la_add_btn').on('click', function(){
+      if($('#la_nickname').val() == '' || $('#la_default_account').val() == 'select'){
+        window.alert('Nickname and internal account are required.');
+        return;
+      }
+      postLinked('addLinkedAccount', {
+        nickname: $('#la_nickname').val(),
+        method: $('#la_method').val(),
+        default_account: $('#la_default_account').val(),
+        routing_last4: $('#la_routing_last4').val(),
+        account_last4: $('#la_account_last4').val()
+      }, 'Verification started');
+    });
+    $('#la_confirm_btn').on('click', function(){
+      if($('#la_link_select').val() == 'select' || $('#la_amount1').val() == '' || $('#la_amount2').val() == ''){
+        window.alert('Select a link and both deposit amounts.');
+        return;
+      }
+      postLinked('confirmLinkedAccount', {
+        link_id: $('#la_link_select').val(),
+        amount1: $('#la_amount1').val(),
+        amount2: $('#la_amount2').val()
+      }, 'Linked account verified');
+    });
+    $('#la_resend_btn').on('click', function(){
+      if($('#la_link_select').val() == 'select'){ window.alert('Select a linked account.'); return; }
+      postLinked('resendLinkedChallenge', { link_id: $('#la_link_select').val() }, 'Challenge resent');
+    });
+    $('#la_push_btn').on('click', function(){
+      if($('#la_link_select').val() == 'select' || $('#la_amount').val() == ''){
+        window.alert('Select a linked account and amount.');
+        return;
+      }
+      postLinked('pushToLinked', {
+        link_id: $('#la_link_select').val(),
+        amount: $('#la_amount').val(),
+        account: $('#la_default_account').val() == 'select' ? null : $('#la_default_account').val()
+      }, 'Sent to linked account');
+    });
+    $('#la_pull_btn').on('click', function(){
+      if($('#la_link_select').val() == 'select' || $('#la_amount').val() == ''){
+        window.alert('Select a linked account and amount.');
+        return;
+      }
+      postLinked('pullFromLinked', {
+        link_id: $('#la_link_select').val(),
+        amount: $('#la_amount').val(),
+        account: $('#la_default_account').val() == 'select' ? null : $('#la_default_account').val()
+      }, 'Pulled from linked account');
+    });
+    $('#la_pause_btn').on('click', function(){
+      if($('#la_link_select').val() == 'select'){ window.alert('Select a linked account.'); return; }
+      postLinked('pauseLinkedAccount', { link_id: $('#la_link_select').val() }, 'Paused');
+    });
+    $('#la_resume_btn').on('click', function(){
+      if($('#la_link_select').val() == 'select'){ window.alert('Select a linked account.'); return; }
+      postLinked('resumeLinkedAccount', { link_id: $('#la_link_select').val() }, 'Resumed');
+    });
+    $('#la_close_btn').on('click', function(){
+      if($('#la_link_select').val() == 'select'){ window.alert('Select a linked account.'); return; }
+      postLinked('closeLinkedAccount', { link_id: $('#la_link_select').val() }, 'Closed');
     });
     $('#my_accounts_menu').click();
 	  $(".loader-wrapper").delay( 1000 ).fadeOut("slow");
