@@ -319,12 +319,89 @@ function appendSecondaryData(customer_id, data) {
   document.getElementById("address").innerHTML = data.Info.address;
 
   fillCustomerAccTbl(data);
+  fillStaffLinked(data);
   if($('#cust_details_card').css('display')=='none'){
     $('#cust_details_card').show();
   }
   if($('#cust_accounts_tbl').css('display')=='none'){
     $('#cust_details_tbl').show();
   }
+}
+
+function fillStaffLinked(data) {
+  var snapshot = data.LinkedAccounts || {};
+  var card = document.getElementById('staff_linked_card');
+  if (!card) {
+    return;
+  }
+  card.style.display = 'block';
+  var summary = document.getElementById('staff_linked_summary');
+  if (summary) {
+    summary.innerHTML = 'YTD push: $' + (snapshot.ytd_push || '0.00') +
+      ' &middot; YTD pull: $' + (snapshot.ytd_pull || '0.00') +
+      ' &middot; returned: $' + (snapshot.returned_ytd || '0.00');
+  }
+  var table = document.getElementById('staff_linked_tbl');
+  var body = table.getElementsByTagName('tbody')[0];
+  body.innerHTML = '';
+  var linkSelect = document.getElementById('staff_la_link_id');
+  linkSelect.options.length = 1;
+  var links = snapshot.links || [];
+  for (var i = 0; i < links.length; i++) {
+    var row = body.insertRow(-1);
+    row.insertCell(0).innerHTML = links[i].nickname;
+    row.insertCell(1).innerHTML = links[i].method;
+    row.insertCell(2).innerHTML = links[i].status;
+    row.insertCell(3).innerHTML = (links[i].routing_last4 || '') + '/' + (links[i].account_last4 || '');
+    if (links[i].status != 'pending') {
+      continue;
+    }
+    var option = document.createElement('OPTION');
+    option.value = links[i].link_id;
+    option.innerHTML = links[i].nickname + ' (' + links[i].method + ')';
+    linkSelect.options.add(option);
+  }
+  var moveTable = document.getElementById('staff_linked_movements_tbl');
+  var moveBody = moveTable.getElementsByTagName('tbody')[0];
+  moveBody.innerHTML = '';
+  var selection = document.getElementById('staff_la_movement_id');
+  selection.options.length = 1;
+  var movements = snapshot.movements || [];
+  for (var j = 0; j < movements.length; j++) {
+    var prow = moveBody.insertRow(-1);
+    prow.insertCell(0).innerHTML = movements[j].nickname + ' ' + movements[j].direction;
+    prow.insertCell(1).innerHTML = '$' + movements[j].amount;
+    prow.insertCell(2).innerHTML = movements[j].status;
+    prow.insertCell(3).innerHTML = movements[j].movement_id.slice(0, 8);
+    if (movements[j].status != 'sent') {
+      continue;
+    }
+    var moveOpt = document.createElement('OPTION');
+    moveOpt.value = movements[j].movement_id;
+    moveOpt.innerHTML = movements[j].nickname + ' $' + movements[j].amount;
+    selection.options.add(moveOpt);
+  }
+}
+
+function postStaffLinked(path, payload) {
+  payload.userid = userid;
+  fetch(homeURL + path, {
+    method: 'post',
+    body: JSON.stringify(payload),
+    headers: { 'Content-type': 'application/json' }
+  }).then(function(response) {
+    return response.json().then(function(body) {
+      var result = document.getElementById('staff_la_result');
+      if (!response.ok) {
+        if (result) { result.innerHTML = (body && (body.message || body.error)) || 'Failed'; }
+        return;
+      }
+      if (result) { result.innerHTML = body.message || 'Done'; }
+      getCustomer($('#customer_id_input').val() || document.getElementById('customer_id').innerHTML);
+    });
+  }).catch(function(error) {
+    console.error(error);
+  });
 }
 
 function fillCustomerAccTbl(data){
@@ -730,6 +807,27 @@ $(document).ready(function() {
     $('#customer_id_clear_btn').on('click', function(){
       $('#cust_details_card').hide();
       $('#cust_accounts_tbl').hide();
+      $('#staff_linked_card').hide();
+    });
+    $('#staff_la_force_btn').on('click', function(){
+      if($('#staff_la_link_id').val() == 'select'){ window.alert('Select a pending link.'); return; }
+      postStaffLinked('forceVerifyLinkedAccount', { link_id: $('#staff_la_link_id').val() });
+    });
+    $('#staff_la_accept_btn').on('click', function(){
+      if($('#staff_la_link_id').val() == 'select'){ window.alert('Select a pending link.'); return; }
+      postStaffLinked('acceptPrenote', { link_id: $('#staff_la_link_id').val() });
+    });
+    $('#staff_la_reject_btn').on('click', function(){
+      if($('#staff_la_link_id').val() == 'select'){ window.alert('Select a pending link.'); return; }
+      postStaffLinked('rejectPrenote', { link_id: $('#staff_la_link_id').val() });
+    });
+    $('#staff_la_settle_btn').on('click', function(){
+      if($('#staff_la_movement_id').val() == 'select'){ window.alert('Select a sent ACH.'); return; }
+      postStaffLinked('settleLinkedAch', { movement_id: $('#staff_la_movement_id').val() });
+    });
+    $('#staff_la_return_btn').on('click', function(){
+      if($('#staff_la_movement_id').val() == 'select'){ window.alert('Select a sent ACH.'); return; }
+      postStaffLinked('returnLinkedAch', { movement_id: $('#staff_la_movement_id').val(), reason: 'unauthorized' });
     });
     $('#approve_req_btn').on('click', function(){
       if($('#customer_req_id').val() == 'select'){

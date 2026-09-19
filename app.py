@@ -9,6 +9,12 @@ from employee import Employee
 from twilio.base.exceptions import TwilioRestException
 from utility.encrypt import check_encrypted_password
 from dotenv import load_dotenv
+from utility.link import (
+    attach_link_routes,
+    build_service as build_link_service,
+    get_service as get_link_service,
+    set_service as set_link_service,
+)
 
 load_dotenv()
 
@@ -259,7 +265,8 @@ def get_customer_data():
         response = {
             'Accounts': c.get_all_account(customer_id),
             'Info': c.get_customer_details(customer_id),
-            'FundsRequests': c.get_funds_requests(customer_id)
+            'FundsRequests': c.get_funds_requests(customer_id),
+            'LinkedAccounts': _link_snapshot(customer_id, actor=customer_id, actor_type='customer'),
         }
         return jsonify(response), 200
     except Exception as e:
@@ -878,7 +885,10 @@ def get_customer():
             c = Customers()
             response = {
                 'Accounts': c.get_all_account(values['customer_id']),
-                'Info': c.get_customer_details(values['customer_id'])
+                'Info': c.get_customer_details(values['customer_id']),
+                'LinkedAccounts': _link_snapshot(
+                    values['customer_id'], actor=session['userid'], actor_type=session.get('usertype') or 'employee',
+                ),
             }
             return jsonify(response), 200
         except Exception as e:
@@ -1288,6 +1298,39 @@ def get_system_logs():
         logging.error(f'An error occurred when trying to send the log file: {str(e)}')
         return jsonify({'message': 'Failed to retrieve system logs', 'error': str(e)}), 500
 
+
+def _link_accounts(userid):
+    try:
+        return Customers().get_all_account(userid)
+    except Exception:
+        return {}
+
+
+def _link_debit(account, amount, remark=None):
+    return Customers().debit_request(account, amount, remark=remark)
+
+
+def _link_credit(account, amount, remark=None):
+    return Customers().credit_request(account, amount, remark=remark)
+
+
+def _link_snapshot(userid, actor=None, actor_type='customer'):
+    service = get_link_service()
+    if service is None:
+        return {'enabled': False, 'links': [], 'movements': []}
+    try:
+        return service.snapshot(userid, actor=actor, actor_type=actor_type)
+    except Exception:
+        return {'enabled': False, 'links': [], 'movements': []}
+
+
+link_service = build_link_service(
+    debit_fn=_link_debit,
+    credit_fn=_link_credit,
+    accounts_fn=_link_accounts,
+)
+set_link_service(link_service)
+attach_link_routes(app, link_service)
 
 app.config['SESSION_COOKIE_SECURE'] = True
 app.config['SESSION_COOKIE_HTTPONLY'] = True
