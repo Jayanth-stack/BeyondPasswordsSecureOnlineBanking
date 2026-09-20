@@ -102,6 +102,15 @@
         </button>
 
         <button type="button" class="btn btn-primary btn-block"
+        id="wires_menu">
+        <span class="glyphicon glyphicon-send gi-3x"
+        style="color: white" aria-hidden="true">
+        </span>
+        <br />
+        Wires
+        </button>
+
+        <button type="button" class="btn btn-primary btn-block"
         id="service_requests_menu">
         <span class="glyphicon glyphicon-edit gi-3x"
         style="color: white" aria-hidden="true">
@@ -272,6 +281,77 @@
             </thead>
             <tbody></tbody>
           </table>
+        </div>
+        <div id="wires_pane" style="display:none;">
+          <p id="wires_summary" style="color:white;">Active: 0 &middot; open: 0 &middot; YTD sent: $0.00 &middot; fees: $0.00</p>
+          <p id="wires_clock" style="color:white;">Cutoff 17:00 &middot; value date --</p>
+          <table class="table table-hover table-bordered table-color fixed-header" id="wire_bene_tbl">
+            <thead>
+              <tr>
+                <th>Nickname</th>
+                <th>Name</th>
+                <th>ABA</th>
+                <th>Last4</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+          <hr>
+          <h5 style="color:white;">Add a wire beneficiary</h5>
+          <input type="text" id="wire_nickname" placeholder="Nickname" style="height:30px;width:140px;margin-right:5px;">
+          <input type="text" id="wire_legal_name" placeholder="Legal name" style="height:30px;width:160px;margin-right:5px;">
+          <input type="text" id="wire_aba" placeholder="ABA routing" maxlength="9" style="height:30px;width:110px;margin-right:5px;">
+          <input type="text" id="wire_account_number" placeholder="Account no." style="height:30px;width:120px;margin-right:5px;">
+          <select id="wire_default_account" style="height:30px;margin-right:5px;">
+            <option value="select">Internal account</option>
+          </select>
+          <br><br>
+          <input type="text" id="wire_street" placeholder="Street" style="height:30px;width:180px;margin-right:5px;">
+          <input type="text" id="wire_city" placeholder="City" style="height:30px;width:120px;margin-right:5px;">
+          <input type="text" id="wire_state" placeholder="ST" maxlength="2" style="height:30px;width:50px;margin-right:5px;">
+          <input type="text" id="wire_postal" placeholder="ZIP" maxlength="9" style="height:30px;width:90px;margin-right:5px;">
+          <button type="button" id="wire_add_btn" class="btn btn-primary">Add beneficiary</button>
+          <br><br>
+          <h5 style="color:white;">Send a domestic wire</h5>
+          <select id="wire_bene_select" style="height:30px;margin-right:5px;">
+            <option value="select">Select beneficiary</option>
+          </select>
+          <input type="text" id="wire_amount" placeholder="Amount" style="height:30px;width:100px;margin-right:5px;">
+          <select id="wire_purpose" style="height:30px;margin-right:5px;">
+            <option value="other">Other</option>
+            <option value="family">Family</option>
+            <option value="goods">Goods</option>
+            <option value="payroll">Payroll</option>
+            <option value="tax">Tax</option>
+            <option value="loan">Loan</option>
+            <option value="rent">Rent</option>
+          </select>
+          <input type="text" id="wire_memo" placeholder="Memo" style="height:30px;width:140px;margin-right:5px;">
+          <button type="button" id="wire_preview_btn" class="btn btn-primary">Preview</button>
+          <button type="button" id="wire_send_btn" class="btn btn-primary">Send wire</button>
+          <button type="button" id="wire_cancel_btn" class="btn btn-primary">Cancel open</button>
+          <button type="button" id="wire_pause_btn" class="btn btn-primary">Pause</button>
+          <button type="button" id="wire_resume_btn" class="btn btn-primary">Resume</button>
+          <button type="button" id="wire_archive_btn" class="btn btn-primary">Archive</button>
+          <p id="wire_result" style="color:yellow;margin-top:10px;"></p>
+          <hr>
+          <h5 style="color:white;">Wire history</h5>
+          <table class="table table-hover table-bordered table-color fixed-header" id="wire_history_tbl">
+            <thead>
+              <tr>
+                <th>Nickname</th>
+                <th>Amount</th>
+                <th>Fee</th>
+                <th>Status</th>
+                <th>IMAD</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+          <select id="wire_open_select" style="height:30px;margin-right:5px;">
+            <option value="select">Select open wire</option>
+          </select>
         </div>
         <div id="account_details_pane" style="display:none;">
 					<label class="details_lbl" for="first_name">First name:</label>
