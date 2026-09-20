@@ -49,6 +49,25 @@ class SessionAuthRegressionTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.get_json()["message"], "Request Cancelled")
+        customers_cls.return_value.deny_funds_requested.assert_called_once_with(99, "alice")
+
+    @patch("app.Customers")
+    def test_deny_request_rejects_foreign_transaction(self, customers_cls):
+        customers_cls.return_value.deny_funds_requested.return_value = (
+            "Unauthorized or invalid transaction"
+        )
+        self._login_customer_session("alice")
+
+        response = self.client.post(
+            "/denyRequest",
+            json={"userid": "alice", "transaction_no": 99},
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(
+            response.get_json()["message"], "Unauthorized or invalid transaction"
+        )
+        customers_cls.return_value.deny_funds_requested.assert_called_once_with(99, "alice")
 
     def test_logout_clears_session(self):
         self._login_customer_session("alice")
@@ -72,6 +91,7 @@ class SessionAuthRegressionTests(unittest.TestCase):
     @patch("app.Employee")
     @patch("app.Customers")
     def test_approve_request_uses_session_userid(self, customers_cls, employee_cls):
+        customers_cls.return_value.owns_pending_transaction.return_value = True
         employee_cls.return_value.get_amount_of_transaction.return_value = 50
         employee_cls.return_value.get_fromAccount_of_transaction.return_value = 1
         employee_cls.return_value.get_toAccount_of_transaction.return_value = 2
@@ -85,7 +105,31 @@ class SessionAuthRegressionTests(unittest.TestCase):
         )
 
         self.assertEqual(response.status_code, 200)
+        customers_cls.return_value.owns_pending_transaction.assert_called_once_with(
+            "alice", 10
+        )
         customers_cls.return_value.fund_transfers.assert_called_once()
+
+    @patch("app.Employee")
+    @patch("app.Customers")
+    def test_approve_request_rejects_foreign_transaction(self, customers_cls, employee_cls):
+        customers_cls.return_value.owns_pending_transaction.return_value = False
+        self._login_customer_session("alice")
+
+        response = self.client.post(
+            "/approveRequest",
+            json={"customer_id": "alice", "transaction_no": 10},
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(
+            response.get_json()["message"], "Unauthorized or invalid transaction"
+        )
+        customers_cls.return_value.owns_pending_transaction.assert_called_once_with(
+            "alice", 10
+        )
+        employee_cls.return_value.get_amount_of_transaction.assert_not_called()
+        customers_cls.return_value.fund_transfers.assert_not_called()
 
     @patch("app.Customers")
     @patch("app.Employee")
@@ -126,6 +170,56 @@ class SessionAuthRegressionTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         employee_cls.return_value.deactivate_account.assert_called_once_with("tier2emp", 42)
+
+
+class TransactionOwnershipQueryTests(unittest.TestCase):
+    def setUp(self):
+        from customer import cursor as cust_cursor, db as cust_db
+
+        self.cust_cursor = cust_cursor
+        self.cust_db = cust_db
+        self.cust_cursor.reset_mock()
+        self.cust_db.reset_mock()
+
+    def test_deny_funds_requested_filters_by_approver(self):
+        from customer import Customers
+
+        self.cust_cursor.rowcount = 1
+        result = Customers().deny_funds_requested(99, "alice")
+
+        sql, params = self.cust_cursor.execute.call_args[0]
+        self.assertIn("approver1_id", sql)
+        self.assertIn("status = 1", sql)
+        self.assertEqual(params, (99, "alice"))
+        self.assertEqual(result, "Request Cancelled")
+        self.cust_db.commit.assert_called_once()
+
+    def test_deny_funds_requested_rejects_unowned_row(self):
+        from customer import Customers
+
+        self.cust_cursor.rowcount = 0
+        result = Customers().deny_funds_requested(99, "alice")
+
+        self.assertEqual(result, "Unauthorized or invalid transaction")
+        self.cust_db.rollback.assert_called()
+        self.cust_db.commit.assert_not_called()
+
+    def test_owns_pending_transaction_queries_owner(self):
+        from customer import Customers
+
+        self.cust_cursor.fetchone.return_value = (1,)
+        owned = Customers().owns_pending_transaction("alice", 10)
+
+        sql, params = self.cust_cursor.execute.call_args[0]
+        self.assertIn("approver1_id", sql)
+        self.assertEqual(params, (10, "alice"))
+        self.assertTrue(owned)
+
+    def test_owns_pending_transaction_false_when_missing(self):
+        from customer import Customers
+
+        self.cust_cursor.fetchone.return_value = None
+        self.assertFalse(Customers().owns_pending_transaction("alice", 10))
 
 
 if __name__ == "__main__":

@@ -459,6 +459,14 @@ def approve_request():
         return jsonify({'message': 'Some data missing'}), 400
 
     if session.get('usertype') == 'customer' and session.get('userid') == values['customer_id']:
+        c = Customers()
+        if not c.owns_pending_transaction(session['userid'], values['transaction_no']):
+            logging.warning(
+                'Unauthorized transaction access - ApproveRequest user=%s txn=%s',
+                session['userid'], values['transaction_no']
+            )
+            return jsonify({'message': 'Unauthorized or invalid transaction'}), 403
+
         emp = Employee()
         amount = emp.get_amount_of_transaction(values['transaction_no'])
 
@@ -477,7 +485,6 @@ def approve_request():
         status = emp.get_transaction_status(int(values['transaction_no']))
 
         if from_account != -1 and to_account != -1 and amount != -1 and status != 0:
-            c = Customers()
             response = {
                 'message': c.fund_transfers(from_account, to_account, amount, int(values['transaction_no']))
             }
@@ -556,10 +563,16 @@ def deny_request():
         return jsonify({'message': 'Unauthorized access'}), 403
 
     c = Customers()
-    response = {
-        'message': c.deny_funds_requested(values['transaction_no'])
-    }
-    return jsonify(response), 200
+    result = c.deny_funds_requested(values['transaction_no'], session['userid'])
+    if result != 'Request Cancelled':
+        status = 403 if result == 'Unauthorized or invalid transaction' else 500
+        logging.warning(
+            'DenyRequest rejected user=%s txn=%s result=%s',
+            session['userid'], values['transaction_no'], result
+        )
+        return jsonify({'message': result}), status
+
+    return jsonify({'message': result}), 200
 
 
 ###############                HANDLE TO GET TRANSACTION HISTORY            ###############
