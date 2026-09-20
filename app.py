@@ -15,6 +15,12 @@ from utility.link import (
     get_service as get_link_service,
     set_service as set_link_service,
 )
+from utility.wire import (
+    attach_wire_routes,
+    build_service as build_wire_service,
+    get_service as get_wire_service,
+    set_service as set_wire_service,
+)
 
 load_dotenv()
 
@@ -267,6 +273,7 @@ def get_customer_data():
             'Info': c.get_customer_details(customer_id),
             'FundsRequests': c.get_funds_requests(customer_id),
             'LinkedAccounts': _link_snapshot(customer_id, actor=customer_id, actor_type='customer'),
+            'Wires': _wire_snapshot(customer_id, actor=customer_id, actor_type='customer'),
         }
         return jsonify(response), 200
     except Exception as e:
@@ -889,6 +896,9 @@ def get_customer():
                 'LinkedAccounts': _link_snapshot(
                     values['customer_id'], actor=session['userid'], actor_type=session.get('usertype') or 'employee',
                 ),
+                'Wires': _wire_snapshot(
+                    values['customer_id'], actor=session['userid'], actor_type=session.get('usertype') or 'employee',
+                ),
             }
             return jsonify(response), 200
         except Exception as e:
@@ -1331,6 +1341,25 @@ link_service = build_link_service(
 )
 set_link_service(link_service)
 attach_link_routes(app, link_service)
+
+
+def _wire_snapshot(userid, actor=None, actor_type='customer'):
+    service = get_wire_service()
+    if service is None:
+        return {'enabled': False, 'beneficiaries': [], 'wires': []}
+    try:
+        return service.snapshot(userid, actor=actor, actor_type=actor_type)
+    except Exception:
+        return {'enabled': False, 'beneficiaries': [], 'wires': []}
+
+
+wire_service = build_wire_service(
+    debit_fn=_link_debit,
+    credit_fn=_link_credit,
+    accounts_fn=_link_accounts,
+)
+set_wire_service(wire_service)
+attach_wire_routes(app, wire_service)
 
 app.config['SESSION_COOKIE_SECURE'] = True
 app.config['SESSION_COOKIE_HTTPONLY'] = True
