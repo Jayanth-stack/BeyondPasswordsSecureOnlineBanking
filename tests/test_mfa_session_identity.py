@@ -201,11 +201,11 @@ class MfaSkipAndClaimedRoleTests(unittest.TestCase):
                 json={"userid": "emp9", "customer_id": "cust1"},
             )
         self.assertEqual(response.status_code, 200)
-        emp_cls.return_value.deactivate_customer.assert_called_once_with("cust1")
+        emp_cls.return_value.deactivate_customer.assert_called_once_with("emp9", "cust1")
 
-    def test_logout_unauthenticated_still_redirects(self):
+    def test_logout_unauthenticated_rejects_userid_mismatch(self):
         response = self.client.post("/logout", json={"userid": "cust1"})
-        self.assertIn(response.status_code, (301, 302))
+        self.assertEqual(response.status_code, 401)
 
     def test_update_info_customer_can_spoof_employee_requester(self):
         self._session("cust1", "customer")

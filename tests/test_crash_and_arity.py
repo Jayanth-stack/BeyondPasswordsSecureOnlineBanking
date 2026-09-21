@@ -275,23 +275,27 @@ class CrashAndArityRouteTests(unittest.TestCase):
             if emp_tier is not None:
                 sess["emp_tier"] = emp_tier
 
-    def test_deactivate_account_authorized_is_500_wrong_arity(self):
+    def test_deactivate_account_authorized_matches_helper_arity(self):
         self._session("emp1", "tier2", emp_tier=2)
-        response = self.client.post(
-            "/deactivateAccount",
-            json={"userid": "emp1", "account_no": 10},
-        )
-        self.assertEqual(response.status_code, 500)
-        self.assertIn("Failed to deactivate account", response.get_json()["message"])
+        with patch("app.Employee") as emp_cls:
+            emp_cls.return_value.deactivate_account.return_value = "Account Closed"
+            response = self.client.post(
+                "/deactivateAccount",
+                json={"userid": "emp1", "account_no": 10},
+            )
+        self.assertEqual(response.status_code, 200)
+        emp_cls.return_value.deactivate_account.assert_called_once_with("emp1", 10)
 
-    def test_deactivate_customer_authorized_is_500_wrong_arity(self):
+    def test_deactivate_customer_authorized_matches_helper_arity(self):
         self._session("emp1", "tier2", emp_tier=2)
-        response = self.client.post(
-            "/deactivateCustomer",
-            json={"userid": "emp1", "customer_id": "cust1"},
-        )
-        self.assertEqual(response.status_code, 500)
-        self.assertIn("Failed to deactivate customer", response.get_json()["message"])
+        with patch("app.Employee") as emp_cls:
+            emp_cls.return_value.deactivate_customer.return_value = "Customer deactivated"
+            response = self.client.post(
+                "/deactivateCustomer",
+                json={"userid": "emp1", "customer_id": "cust1"},
+            )
+        self.assertEqual(response.status_code, 200)
+        emp_cls.return_value.deactivate_customer.assert_called_once_with("emp1", "cust1")
 
     def test_deactivate_employee_authorized_is_500_wrong_arity(self):
         self._session("admin1", "admin", emp_tier=3)
@@ -302,14 +306,16 @@ class CrashAndArityRouteTests(unittest.TestCase):
         self.assertEqual(response.status_code, 500)
         self.assertIn("Failed to deactivate employee", response.get_json()["message"])
 
-    def test_approve_update_info_authorized_is_500_wrong_arity(self):
+    def test_approve_update_info_authorized_matches_helper_arity(self):
         self._session("emp1", "employee", emp_tier=2)
-        response = self.client.post(
-            "/approveUpdateInfo",
-            json={"userid": "emp1", "update_req_no": 9},
-        )
-        self.assertEqual(response.status_code, 500)
-        self.assertIn("Failed to approve update info", response.get_json()["message"])
+        with patch("app.Employee") as emp_cls:
+            emp_cls.return_value.approve_update_info.return_value = "Customer Updated"
+            response = self.client.post(
+                "/approveUpdateInfo",
+                json={"userid": "emp1", "update_req_no": 9},
+            )
+        self.assertEqual(response.status_code, 200)
+        emp_cls.return_value.approve_update_info.assert_called_once_with("emp1", 9)
 
     def test_update_employee_authorized_is_500_bad_kwargs(self):
         self._session("admin1", "admin", emp_tier=3)
@@ -331,19 +337,21 @@ class CrashAndArityRouteTests(unittest.TestCase):
         self.assertEqual(response.status_code, 500)
         self.assertIn("Failed to update employee", response.get_json()["message"])
 
-    def test_reset_password_approved_otp_typeerrors_on_arity(self):
-        # Route calls reset_password(userid, newPassword); helper requires oldPassword too.
+    def test_reset_password_approved_otp_calls_force_reset(self):
         with patch.object(
             self.app_module.Employee, "retrieve_phone_number", return_value="+14155552671"
-        ), patch("app.twilio_client") as twilio:
+        ), patch.object(
+            self.app_module.Employee, "reset_fpassword", return_value="Password Updated"
+        ) as reset_fpassword, patch("app.twilio_client") as twilio:
             twilio.verify.v2.services.return_value.verification_checks.create.return_value.status = (
                 "approved"
             )
-            with self.assertRaises(TypeError):
-                self.client.post(
-                    "/resetPassword",
-                    json={"userid": "emp1", "newPassword": "n3w", "otp": "123456"},
-                )
+            response = self.client.post(
+                "/resetPassword",
+                json={"userid": "emp1", "newPassword": "n3w", "otp": "123456"},
+            )
+        self.assertEqual(response.status_code, 200)
+        reset_fpassword.assert_called_once_with("emp1", "n3w")
 
     def test_send_otp_unauthenticated_still_sends(self):
         with patch("app.Employee") as emp_cls, patch("app.twilio_client") as twilio:

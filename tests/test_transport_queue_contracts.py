@@ -131,7 +131,7 @@ class HttpSecureCookieAndMutatingGetTests(unittest.TestCase):
             twilio.verify.v2.services.return_value.verification_checks.create.return_value.status = (
                 "approved"
             )
-            customers_cls.return_value.reset_password.return_value = "Password Updated"
+            customers_cls.return_value.reset_fpassword.return_value = "Password Updated"
             response = self.client.get(
                 "/resetPassword",
                 json={
@@ -142,7 +142,8 @@ class HttpSecureCookieAndMutatingGetTests(unittest.TestCase):
                 },
             )
         self.assertEqual(response.status_code, 200)
-        customers_cls.return_value.reset_password.assert_called_once()
+        customers_cls.return_value.reset_fpassword.assert_called_once()
+        customers_cls.return_value.reset_password.assert_not_called()
 
 
 class StaffAuthAndDenyHelperTests(unittest.TestCase):
@@ -187,8 +188,7 @@ class StaffAuthAndDenyHelperTests(unittest.TestCase):
         self.assertEqual(args[0], "admin9")
         self.assertEqual(args[9], 3)
 
-    def test_deny_request_uses_customer_helper_even_for_staff_session(self):
-        # Employee.deny_funds_requested checks tier >= 2; the route never calls it.
+    def test_deny_request_rejects_staff_session(self):
         with self.client.session_transaction() as sess:
             sess["userid"] = "emp1"
             sess["usertype"] = "employee"
@@ -200,11 +200,11 @@ class StaffAuthAndDenyHelperTests(unittest.TestCase):
                 "/denyRequest",
                 json={"userid": "emp1", "transaction_no": 9},
             )
-        self.assertEqual(response.status_code, 200)
-        customers_cls.return_value.deny_funds_requested.assert_called_once_with(9)
+        self.assertEqual(response.status_code, 403)
+        customers_cls.return_value.deny_funds_requested.assert_not_called()
         emp_cls.return_value.deny_funds_requested.assert_not_called()
 
-    def test_self_register_session_key_enables_deny_without_login(self):
+    def test_self_register_session_key_does_not_enable_deny_without_login(self):
         with patch("app.Customers") as customers_cls, patch(
             "app.url_for", return_value="/customer_dash"
         ):
@@ -225,8 +225,8 @@ class StaffAuthAndDenyHelperTests(unittest.TestCase):
                 "/denyRequest",
                 json={"userid": "cust1", "transaction_no": 44},
             )
-        self.assertEqual(deny.status_code, 200)
-        customers_cls.return_value.deny_funds_requested.assert_called_once_with(44)
+        self.assertIn(deny.status_code, (301, 302))
+        customers_cls.return_value.deny_funds_requested.assert_not_called()
 
     def test_empty_amount_on_fund_transfer_raises_instead_of_400(self):
         with self.client.session_transaction() as sess:

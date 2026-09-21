@@ -191,7 +191,7 @@ class OtpStoreAndUnauthChequeTests(unittest.TestCase):
             "app.twilio_client"
         ) as twilio:
             emp_cls.return_value.retrieve_phone_number.return_value = "+14155552671"
-            emp_cls.return_value.reset_password.return_value = "Password Updated"
+            emp_cls.return_value.reset_fpassword.return_value = "Password Updated"
             twilio.verify.v2.services.return_value.verification_checks.create.return_value.status = (
                 "approved"
             )
@@ -205,7 +205,8 @@ class OtpStoreAndUnauthChequeTests(unittest.TestCase):
                 },
             )
         self.assertEqual(response.status_code, 200)
-        emp_cls.return_value.reset_password.assert_called_once_with("cust1", "n3w")
+        emp_cls.return_value.reset_fpassword.assert_called_once_with("cust1", "n3w")
+        customers_cls.return_value.reset_fpassword.assert_not_called()
         customers_cls.return_value.reset_password.assert_not_called()
 
     def test_get_cheque_list_unauthenticated_redirects(self):
