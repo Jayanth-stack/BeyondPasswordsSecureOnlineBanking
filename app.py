@@ -9,7 +9,11 @@ from employee import Employee
 from twilio.base.exceptions import TwilioRestException
 from utility.encrypt import check_encrypted_password
 
-logging.basicConfig(level=logging.INFO, filename='SystemLogs/bank.log', filemode='w',
+_log_file = os.environ.get('BANK_LOG_FILE', os.path.join('SystemLogs', 'bank.log'))
+_log_dir = os.path.dirname(_log_file)
+if _log_dir:
+    os.makedirs(_log_dir, exist_ok=True)
+logging.basicConfig(level=logging.INFO, filename=_log_file, filemode='a',
                     format='%(asctime)-15s - %(name)s - %(levelname)s - %(message)s', datefmt='%d-%m-%Y %H:%M:%S')
 otpSet = {}
 

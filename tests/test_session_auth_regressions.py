@@ -1,5 +1,10 @@
+import os
+import tempfile
 import unittest
 from unittest.mock import MagicMock, patch
+
+# Keep unittest imports from truncating the tracked production log.
+os.environ["BANK_LOG_FILE"] = os.path.join(tempfile.mkdtemp(), "bank.log")
 
 # customer/employee modules connect to MySQL at import time; stub before app import.
 _MOCK_DB = MagicMock()
