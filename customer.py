@@ -229,7 +229,7 @@ class Customers:
                     print('Insufficient Balance')
                     print(transaction_no)
                     if transaction_no != -1:
-                        self.deny_funds_requested(transaction_no)
+                        self._cancel_pending_transaction(transaction_no)
                     return 'Insufficient Balance in Credit Card'
                 if result[0][0] < amount and result[0][2] != 'credit':
                     print('Insufficient Balance')
@@ -687,16 +687,40 @@ class Customers:
         return result
 
     #################                 FUNCTION TO DENY FUND REQUEST             #################
-    def deny_funds_requested(self, transaction_no):
-        # from_account = se
-        # self.fund_transfers(int(from_account), int(to_account), int(amount))
+    def owns_pending_transaction(self, customer_id, transaction_no):
+        query = """
+            SELECT 1 FROM Transactions
+            WHERE transaction_no = %s AND approver1_id = %s AND status = 1
+            LIMIT 1
+        """
+        cursor.execute(query, (int(transaction_no), customer_id))
+        return cursor.fetchone() is not None
+
+    def _cancel_pending_transaction(self, transaction_no):
         query = """
             UPDATE Transactions SET remark='Request Denied', status=0
-            WHERE transaction_no = %d;""" % (int(transaction_no))
-        cursor.execute(query)
+            WHERE transaction_no = %s AND status = 1
+        """
+        cursor.execute(query, (int(transaction_no),))
         try:
             db.commit()
-            result = cursor.fetchall()
+            return 'Request Cancelled'
+        except Exception as e:
+            db.rollback()
+            print(e, ' : Error in  Denying Request')
+            return 'Please try again later'
+
+    def deny_funds_requested(self, transaction_no, customer_id):
+        query = """
+            UPDATE Transactions SET remark='Request Denied', status=0
+            WHERE transaction_no = %s AND approver1_id = %s AND status = 1
+        """
+        cursor.execute(query, (int(transaction_no), customer_id))
+        try:
+            if cursor.rowcount == 0:
+                db.rollback()
+                return 'Unauthorized or invalid transaction'
+            db.commit()
             return 'Request Cancelled'
         except Exception as e:
             db.rollback()
