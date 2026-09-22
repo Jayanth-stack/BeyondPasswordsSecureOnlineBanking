@@ -111,6 +111,15 @@
         </button>
 
         <button type="button" class="btn btn-primary btn-block"
+        id="sepa_menu">
+        <span class="glyphicon glyphicon-globe gi-3x"
+        style="color: white" aria-hidden="true">
+        </span>
+        <br />
+        SEPA
+        </button>
+
+        <button type="button" class="btn btn-primary btn-block"
         id="service_requests_menu">
         <span class="glyphicon glyphicon-edit gi-3x"
         style="color: white" aria-hidden="true">
@@ -351,6 +360,81 @@
           </table>
           <select id="wire_open_select" style="height:30px;margin-right:5px;">
             <option value="select">Select open wire</option>
+          </select>
+        </div>
+        <div id="sepa_pane" style="display:none;">
+          <p id="sepa_summary" style="color:white;">Active: 0 &middot; open: 0 &middot; YTD sent: €0.00 &middot; fees: $0.00</p>
+          <p id="sepa_clock" style="color:white;">TARGET2 cutoff 16:00 &middot; Instant 24/7</p>
+          <table class="table table-hover table-bordered table-color fixed-header" id="sepa_creditor_tbl">
+            <thead>
+              <tr>
+                <th>Nickname</th>
+                <th>Name</th>
+                <th>IBAN</th>
+                <th>BIC</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+          <hr>
+          <h5 style="color:white;">Add a SEPA creditor</h5>
+          <input type="text" id="sepa_nickname" placeholder="Nickname" style="height:30px;width:140px;margin-right:5px;">
+          <input type="text" id="sepa_legal_name" placeholder="Legal name" style="height:30px;width:160px;margin-right:5px;">
+          <input type="text" id="sepa_iban" placeholder="IBAN" style="height:30px;width:220px;margin-right:5px;">
+          <input type="text" id="sepa_bic" placeholder="BIC (optional)" style="height:30px;width:140px;margin-right:5px;">
+          <select id="sepa_default_account" style="height:30px;margin-right:5px;">
+            <option value="select">Internal account</option>
+          </select>
+          <br><br>
+          <input type="text" id="sepa_city" placeholder="City" style="height:30px;width:120px;margin-right:5px;">
+          <input type="text" id="sepa_country" placeholder="DE" maxlength="2" style="height:30px;width:50px;margin-right:5px;">
+          <input type="text" id="sepa_ref" placeholder="RF creditor ref" style="height:30px;width:180px;margin-right:5px;">
+          <button type="button" id="sepa_add_btn" class="btn btn-primary">Add creditor</button>
+          <br><br>
+          <h5 style="color:white;">Send a SEPA payment</h5>
+          <select id="sepa_creditor_select" style="height:30px;margin-right:5px;">
+            <option value="select">Select creditor</option>
+          </select>
+          <input type="text" id="sepa_amount" placeholder="EUR amount" style="height:30px;width:110px;margin-right:5px;">
+          <select id="sepa_scheme" style="height:30px;margin-right:5px;">
+            <option value="sct">SCT (T+1)</option>
+            <option value="sct_inst">SCT Inst (24/7)</option>
+          </select>
+          <select id="sepa_purpose" style="height:30px;margin-right:5px;">
+            <option value="other">Other</option>
+            <option value="family">Family</option>
+            <option value="goods">Goods</option>
+            <option value="payroll">Payroll</option>
+            <option value="tax">Tax</option>
+            <option value="loan">Loan</option>
+            <option value="rent">Rent</option>
+          </select>
+          <input type="text" id="sepa_memo" placeholder="Remittance" style="height:30px;width:140px;margin-right:5px;">
+          <button type="button" id="sepa_preview_btn" class="btn btn-primary">Preview</button>
+          <button type="button" id="sepa_send_btn" class="btn btn-primary">Send SEPA</button>
+          <button type="button" id="sepa_cancel_btn" class="btn btn-primary">Cancel open</button>
+          <button type="button" id="sepa_pause_btn" class="btn btn-primary">Pause</button>
+          <button type="button" id="sepa_resume_btn" class="btn btn-primary">Resume</button>
+          <button type="button" id="sepa_archive_btn" class="btn btn-primary">Archive</button>
+          <p id="sepa_result" style="color:yellow;margin-top:10px;"></p>
+          <hr>
+          <h5 style="color:white;">SEPA history</h5>
+          <table class="table table-hover table-bordered table-color fixed-header" id="sepa_history_tbl">
+            <thead>
+              <tr>
+                <th>Nickname</th>
+                <th>EUR</th>
+                <th>USD</th>
+                <th>Scheme</th>
+                <th>Status</th>
+                <th>E2E</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+          <select id="sepa_open_select" style="height:30px;margin-right:5px;">
+            <option value="select">Select open SEPA</option>
           </select>
         </div>
         <div id="account_details_pane" style="display:none;">
