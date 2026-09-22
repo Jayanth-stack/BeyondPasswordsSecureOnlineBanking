@@ -563,13 +563,21 @@ def deny_request():
         logging.warning('Not logged In or Unauthorized Access - denyRequest')
         return redirect(url_for('get_login_page_ui', _external=True, _scheme='http'))
 
-    if session.get('usertype') != 'customer':
+    usertype = session.get('usertype')
+    if usertype == 'customer':
+        c = Customers()
+        result = c.deny_funds_requested(values['transaction_no'], session['userid'])
+    elif usertype in ['admin', 'employee', 'tier1', 'tier2']:
+        emp = Employee()
+        result = emp.deny_funds_requested(session['userid'], values['transaction_no'])
+    else:
         return jsonify({'message': 'Unauthorized access'}), 403
 
-    c = Customers()
-    result = c.deny_funds_requested(values['transaction_no'], session['userid'])
     if result != 'Request Cancelled':
-        status = 403 if result == 'Unauthorized or invalid transaction' else 500
+        status = 403 if result in (
+            'Unauthorized or invalid transaction',
+            'Not authorized to GET/Approve transactions',
+        ) else 500
         logging.warning(
             'DenyRequest rejected user=%s txn=%s result=%s',
             session['userid'], values['transaction_no'], result

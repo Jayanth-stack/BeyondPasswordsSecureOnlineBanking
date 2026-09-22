@@ -56,6 +56,20 @@ class SessionAuthRegressionTests(unittest.TestCase):
         self.assertEqual(response.get_json()["message"], "Request Cancelled")
         customers_cls.return_value.deny_funds_requested.assert_called_once_with(99, "alice")
 
+    @patch("app.Employee")
+    def test_deny_request_allows_tier2_employee(self, employee_cls):
+        employee_cls.return_value.deny_funds_requested.return_value = "Request Cancelled"
+        self._login_tier2_session("tier2emp")
+
+        response = self.client.post(
+            "/denyRequest",
+            json={"userid": "tier2emp", "transaction_no": 99},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json()["message"], "Request Cancelled")
+        employee_cls.return_value.deny_funds_requested.assert_called_once_with("tier2emp", 99)
+
     @patch("app.Customers")
     def test_deny_request_rejects_foreign_transaction(self, customers_cls):
         customers_cls.return_value.deny_funds_requested.return_value = (
