@@ -321,6 +321,7 @@ function appendSecondaryData(customer_id, data) {
   fillCustomerAccTbl(data);
   fillStaffLinked(data);
   fillStaffWires(data);
+  fillStaffRtp(data);
   if($('#cust_details_card').css('display')=='none'){
     $('#cust_details_card').show();
   }
@@ -449,6 +450,93 @@ function fillStaffWires(data) {
     option.innerHTML = wires[j].nickname + ' $' + wires[j].amount + ' (' + wires[j].status + ')';
     selection.options.add(option);
   }
+}
+
+function fillStaffRtp(data) {
+  var snapshot = data.Rtp || {};
+  var card = document.getElementById('staff_rtp_card');
+  if (!card) {
+    return;
+  }
+  card.style.display = 'block';
+  var summary = document.getElementById('staff_rtp_summary');
+  if (summary) {
+    summary.innerHTML = 'YTD sent: $' + (snapshot.ytd_sent || '0.00') +
+      ' &middot; fees: $' + (snapshot.ytd_fees || '0.00') +
+      ' &middot; collected: $' + (snapshot.ytd_collected || '0.00');
+  }
+  var partyTable = document.getElementById('staff_rtp_party_tbl');
+  var partyBody = partyTable.getElementsByTagName('tbody')[0];
+  partyBody.innerHTML = '';
+  var parties = snapshot.counterparties || [];
+  for (var i = 0; i < parties.length; i++) {
+    var row = partyBody.insertRow(-1);
+    row.insertCell(0).innerHTML = parties[i].nickname;
+    row.insertCell(1).innerHTML = parties[i].legal_name;
+    row.insertCell(2).innerHTML = parties[i].aba;
+    row.insertCell(3).innerHTML = parties[i].status;
+  }
+  var table = document.getElementById('staff_rtp_tbl');
+  var body = table.getElementsByTagName('tbody')[0];
+  body.innerHTML = '';
+  var selection = document.getElementById('staff_rtp_id');
+  selection.options.length = 1;
+  var payments = snapshot.payments || [];
+  for (var j = 0; j < payments.length; j++) {
+    var prow = body.insertRow(-1);
+    prow.insertCell(0).innerHTML = payments[j].nickname;
+    prow.insertCell(1).innerHTML = '$' + payments[j].amount;
+    prow.insertCell(2).innerHTML = payments[j].status;
+    prow.insertCell(3).innerHTML = (payments[j].uetr || payments[j].payment_id).slice(0, 12);
+    if (['held', 'pending_release'].indexOf(payments[j].status) < 0) {
+      continue;
+    }
+    var option = document.createElement('OPTION');
+    option.value = payments[j].payment_id;
+    option.innerHTML = payments[j].nickname + ' $' + payments[j].amount + ' (' + payments[j].status + ')';
+    selection.options.add(option);
+  }
+  var rfpTable = document.getElementById('staff_rfp_tbl');
+  var rfpBody = rfpTable.getElementsByTagName('tbody')[0];
+  rfpBody.innerHTML = '';
+  var rfpSelect = document.getElementById('staff_rfp_id');
+  rfpSelect.options.length = 1;
+  var requests = snapshot.requests || [];
+  for (var k = 0; k < requests.length; k++) {
+    var rrow = rfpBody.insertRow(-1);
+    rrow.insertCell(0).innerHTML = requests[k].nickname;
+    rrow.insertCell(1).innerHTML = '$' + requests[k].amount;
+    rrow.insertCell(2).innerHTML = requests[k].status;
+    rrow.insertCell(3).innerHTML = (requests[k].end_to_end_id || requests[k].request_id).slice(0, 12);
+    if (['requested', 'held'].indexOf(requests[k].status) < 0) {
+      continue;
+    }
+    var rfpOpt = document.createElement('OPTION');
+    rfpOpt.value = requests[k].request_id;
+    rfpOpt.innerHTML = requests[k].nickname + ' $' + requests[k].amount + ' (' + requests[k].status + ')';
+    rfpSelect.options.add(rfpOpt);
+  }
+}
+
+function postStaffRtp(path, payload) {
+  payload.userid = userid;
+  fetch(homeURL + path, {
+    method: 'post',
+    body: JSON.stringify(payload),
+    headers: { 'Content-type': 'application/json' }
+  }).then(function(response) {
+    return response.json().then(function(body) {
+      var result = document.getElementById(payload.request_id ? 'staff_rfp_result' : 'staff_rtp_result');
+      if (!response.ok) {
+        if (result) { result.innerHTML = (body && (body.message || body.error)) || 'Failed'; }
+        return;
+      }
+      if (result) { result.innerHTML = body.message || 'Done'; }
+      getCustomer($('#customer_id_input').val() || document.getElementById('customer_id').innerHTML);
+    });
+  }).catch(function(error) {
+    console.error(error);
+  });
 }
 
 function postStaffWire(path, payload) {
@@ -917,6 +1005,30 @@ $(document).ready(function() {
     $('#staff_wire_recall_btn').on('click', function(){
       if($('#staff_wire_id').val() == 'select'){ window.alert('Select a wire.'); return; }
       postStaffWire('recallWire', { wire_id: $('#staff_wire_id').val() });
+    });
+    $('#staff_rtp_override_btn').on('click', function(){
+      if($('#staff_rtp_id').val() == 'select'){ window.alert('Select a payment.'); return; }
+      postStaffRtp('overrideRtpOfac', { payment_id: $('#staff_rtp_id').val() });
+    });
+    $('#staff_rtp_release_btn').on('click', function(){
+      if($('#staff_rtp_id').val() == 'select'){ window.alert('Select a payment.'); return; }
+      postStaffRtp('releaseRtp', { payment_id: $('#staff_rtp_id').val() });
+    });
+    $('#staff_rtp_reject_btn').on('click', function(){
+      if($('#staff_rtp_id').val() == 'select'){ window.alert('Select a payment.'); return; }
+      postStaffRtp('rejectRtp', { payment_id: $('#staff_rtp_id').val() });
+    });
+    $('#staff_rfp_override_btn').on('click', function(){
+      if($('#staff_rfp_id').val() == 'select'){ window.alert('Select a request.'); return; }
+      postStaffRtp('overrideRfpOfac', { request_id: $('#staff_rfp_id').val() });
+    });
+    $('#staff_rfp_accept_btn').on('click', function(){
+      if($('#staff_rfp_id').val() == 'select'){ window.alert('Select a request.'); return; }
+      postStaffRtp('acceptRfp', { request_id: $('#staff_rfp_id').val() });
+    });
+    $('#staff_rfp_reject_btn').on('click', function(){
+      if($('#staff_rfp_id').val() == 'select'){ window.alert('Select a request.'); return; }
+      postStaffRtp('rejectRfp', { request_id: $('#staff_rfp_id').val() });
     });
     $('#approve_req_btn').on('click', function(){
       if($('#customer_req_id').val() == 'select'){
