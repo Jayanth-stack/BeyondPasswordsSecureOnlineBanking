@@ -9,17 +9,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Secret key for HMAC, must be set in .env as RECEIPT_SECRET
-_receipt_secret = os.getenv("RECEIPT_SECRET")
-if not _receipt_secret:
-    raise ValueError("RECEIPT_SECRET environment variable must be set")
-SECRET = _receipt_secret.encode()
-
-
-def is_successful_transfer(result) -> bool:
-    """True when fund_transfers completed; accepts legacy 'done' or signed receipt dict."""
-    return result == "done" or (
-        isinstance(result, dict) and "signature" in result
-    )
+SECRET = os.getenv("RECEIPT_SECRET").encode()
 
 def generate_nonce():
     return str(uuid.uuid4())

@@ -9,7 +9,7 @@ from mysql import connector as mysql
 import os
 from dotenv import load_dotenv
 import uuid
-from utility.crypto_receipt import generate_receipt, generate_nonce, is_successful_transfer
+from utility.crypto_receipt import generate_receipt, generate_nonce, current_timestamp
 
 load_dotenv()
 
@@ -639,7 +639,7 @@ class Customers:
         amount = result[0][2]
 
         transfer_status = self.fund_transfers(int(from_account), int(to_account), float(amount))
-        if not is_successful_transfer(transfer_status):
+        if transfer_status != 'done':
             return transfer_status
 
         query = """
