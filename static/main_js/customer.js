@@ -128,6 +128,7 @@ function appendPrimaryData(data) {
   fillPendingTransTbl(data);
   fillLinkedAccounts(data);
   fillWires(data);
+  fillRtp(data);
 }
 
 function fillLinkedAccountSelect(selectId) {
@@ -281,6 +282,121 @@ function postWire(path, payload, okMsg) {
       }
       if (body && body.Wires) {
         fillWires({ Wires: body.Wires });
+      } else {
+        getUser();
+      }
+    });
+  }).catch(function(error) {
+    console.error(error);
+  });
+}
+
+function fillRtp(data) {
+  var snapshot = data.Rtp || {};
+  var summary = document.getElementById('rtp_summary');
+  if (summary) {
+    summary.innerHTML = 'Active: ' + (snapshot.active_count || 0) +
+      ' &middot; open: ' + (snapshot.open_count || 0) +
+      ' &middot; YTD sent: $' + (snapshot.ytd_sent || '0.00') +
+      ' &middot; collected: $' + (snapshot.ytd_collected || '0.00');
+  }
+  var clockEl = document.getElementById('rtp_clock');
+  if (clockEl && snapshot.clock) {
+    clockEl.innerHTML = 'Hours ' + (snapshot.clock.hours || '24/7') +
+      ' &middot; value date ' + (snapshot.clock.value_date || '--');
+  }
+  fillLinkedAccountSelect('rtp_default_account');
+  var table = document.getElementById('rtp_party_tbl');
+  if (!table) {
+    return;
+  }
+  var body = table.getElementsByTagName('tbody')[0];
+  body.innerHTML = '';
+  var selection = document.getElementById('rtp_party_select');
+  selection.options.length = 1;
+  var parties = snapshot.counterparties || [];
+  for (var i = 0; i < parties.length; i++) {
+    var row = body.insertRow(-1);
+    row.insertCell(0).innerHTML = parties[i].nickname;
+    row.insertCell(1).innerHTML = parties[i].legal_name;
+    row.insertCell(2).innerHTML = parties[i].aba;
+    row.insertCell(3).innerHTML = parties[i].account_last4;
+    row.insertCell(4).innerHTML = parties[i].status;
+    var option = document.createElement('OPTION');
+    option.value = parties[i].counterparty_id;
+    option.innerHTML = parties[i].nickname + ' (' + parties[i].status + ')';
+    selection.options.add(option);
+  }
+  var hist = document.getElementById('rtp_history_tbl');
+  var histBody = hist.getElementsByTagName('tbody')[0];
+  histBody.innerHTML = '';
+  var openSelect = document.getElementById('rtp_open_select');
+  openSelect.options.length = 1;
+  var payments = snapshot.payments || [];
+  for (var j = 0; j < payments.length; j++) {
+    var prow = histBody.insertRow(-1);
+    prow.insertCell(0).innerHTML = payments[j].nickname;
+    prow.insertCell(1).innerHTML = payments[j].rail;
+    prow.insertCell(2).innerHTML = '$' + payments[j].amount;
+    prow.insertCell(3).innerHTML = payments[j].status;
+    prow.insertCell(4).innerHTML = (payments[j].uetr || '').slice(0, 16);
+    if (!payments[j].cancelable) {
+      continue;
+    }
+    var openOpt = document.createElement('OPTION');
+    openOpt.value = payments[j].payment_id;
+    openOpt.innerHTML = payments[j].nickname + ' $' + payments[j].amount + ' (' + payments[j].status + ')';
+    openSelect.options.add(openOpt);
+  }
+  var rfpTable = document.getElementById('rtp_rfp_tbl');
+  var rfpBody = rfpTable.getElementsByTagName('tbody')[0];
+  rfpBody.innerHTML = '';
+  var rfpSelect = document.getElementById('rtp_rfp_select');
+  rfpSelect.options.length = 1;
+  var requests = snapshot.requests || [];
+  for (var k = 0; k < requests.length; k++) {
+    var rrow = rfpBody.insertRow(-1);
+    rrow.insertCell(0).innerHTML = requests[k].nickname;
+    rrow.insertCell(1).innerHTML = '$' + requests[k].amount;
+    rrow.insertCell(2).innerHTML = requests[k].status;
+    rrow.insertCell(3).innerHTML = (requests[k].end_to_end_id || '').slice(0, 16);
+    if (!requests[k].cancelable) {
+      continue;
+    }
+    var rfpOpt = document.createElement('OPTION');
+    rfpOpt.value = requests[k].request_id;
+    rfpOpt.innerHTML = requests[k].nickname + ' $' + requests[k].amount + ' (' + requests[k].status + ')';
+    rfpSelect.options.add(rfpOpt);
+  }
+}
+
+function postRtp(path, payload, okMsg) {
+  payload.userid = userid;
+  fetch(homeURL + path, {
+    method: 'post',
+    body: JSON.stringify(payload),
+    headers: { 'Content-type': 'application/json' }
+  }).then(function(response) {
+    return response.json().then(function(body) {
+      var result = document.getElementById('rtp_result');
+      if (!response.ok) {
+        if (result) { result.innerHTML = (body && (body.message || body.error)) || 'Failed'; }
+        window.alert((body && (body.message || body.error)) || 'Request failed');
+        if (body && body.Rtp) {
+          fillRtp({ Rtp: body.Rtp });
+        }
+        return;
+      }
+      if (result) {
+        if (body && body.preview) {
+          result.innerHTML = 'Fee $' + body.preview.fee + ' &middot; total $' + body.preview.total +
+            ' &middot; ' + (body.preview.rail || 'fednow') + ' &middot; irrevocable';
+        } else {
+          result.innerHTML = okMsg || body.message || 'Done';
+        }
+      }
+      if (body && body.Rtp) {
+        fillRtp({ Rtp: body.Rtp });
       } else {
         getUser();
       }
@@ -1047,6 +1163,7 @@ $(document).ready(function() {
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#rtp_menu').css('background-color','maroon');
     });
     $('#service_requests_menu').on('click', function(){
       if($('#service_requests_pane').css('display')=='none'){
@@ -1057,6 +1174,7 @@ $(document).ready(function() {
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#rtp_menu').css('background-color','maroon');
     });
     $('#my_accounts_menu').on('click', function(){
       getUser();
@@ -1077,6 +1195,7 @@ $(document).ready(function() {
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#rtp_menu').css('background-color','maroon');
     });
     $('#pending_transaction_requests_menu').on('click', function(){
       if($('#pending_transaction_requests_pane').css('display')=='none'){
@@ -1087,6 +1206,7 @@ $(document).ready(function() {
       $('#service_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#rtp_menu').css('background-color','maroon');
     });
     $('#linked_accounts_menu').on('click', function(){
       if($('#linked_accounts_pane').css('display')=='none'){
@@ -1097,6 +1217,7 @@ $(document).ready(function() {
       $('#service_requests_menu').css('background-color','maroon');
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#rtp_menu').css('background-color','maroon');
     });
     $('#wires_menu').on('click', function(){
       if($('#wires_pane').css('display')=='none'){
@@ -1107,6 +1228,18 @@ $(document).ready(function() {
       $('#service_requests_menu').css('background-color','maroon');
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
+      $('#rtp_menu').css('background-color','maroon');
+    });
+    $('#rtp_menu').on('click', function(){
+      if($('#rtp_pane').css('display')=='none'){
+          $('#rtp_pane').show().siblings('div').hide();
+      }
+      $('#rtp_menu').css('background-color','#FF6600');
+      $('#my_accounts_menu').css('background-color','maroon');
+      $('#service_requests_menu').css('background-color','maroon');
+      $('#pending_transaction_requests_menu').css('background-color','maroon');
+      $('#linked_accounts_menu').css('background-color','maroon');
+      $('#wires_menu').css('background-color','maroon');
     });
     $('#wire_add_btn').on('click', function(){
       if($('#wire_nickname').val() == '' || $('#wire_legal_name').val() == '' || $('#wire_default_account').val() == 'select'){
@@ -1164,6 +1297,83 @@ $(document).ready(function() {
     $('#wire_archive_btn').on('click', function(){
       if($('#wire_bene_select').val() == 'select'){ window.alert('Select a beneficiary.'); return; }
       postWire('archiveWireBeneficiary', { beneficiary_id: $('#wire_bene_select').val() }, 'Archived');
+    });
+    $('#rtp_add_btn').on('click', function(){
+      if($('#rtp_nickname').val() == '' || $('#rtp_legal_name').val() == '' || $('#rtp_default_account').val() == 'select'){
+        window.alert('Nickname, legal name, and internal account are required.');
+        return;
+      }
+      postRtp('addRtpCounterparty', {
+        nickname: $('#rtp_nickname').val(),
+        legal_name: $('#rtp_legal_name').val(),
+        aba: $('#rtp_aba').val(),
+        account_number: $('#rtp_account_number').val(),
+        street: $('#rtp_street').val(),
+        city: $('#rtp_city').val(),
+        state: $('#rtp_state').val(),
+        postal: $('#rtp_postal').val(),
+        default_account: $('#rtp_default_account').val()
+      }, 'Counterparty added');
+    });
+    $('#rtp_preview_btn').on('click', function(){
+      if($('#rtp_party_select').val() == 'select' || $('#rtp_amount').val() == ''){
+        window.alert('Select a counterparty and amount.');
+        return;
+      }
+      postRtp('previewRtp', {
+        counterparty_id: $('#rtp_party_select').val(),
+        amount: $('#rtp_amount').val(),
+        rail: $('#rtp_rail').val(),
+        account: $('#rtp_default_account').val() == 'select' ? null : $('#rtp_default_account').val()
+      }, 'Preview');
+    });
+    $('#rtp_send_btn').on('click', function(){
+      if($('#rtp_party_select').val() == 'select' || $('#rtp_amount').val() == ''){
+        window.alert('Select a counterparty and amount.');
+        return;
+      }
+      postRtp('sendRtp', {
+        counterparty_id: $('#rtp_party_select').val(),
+        amount: $('#rtp_amount').val(),
+        rail: $('#rtp_rail').val(),
+        purpose: $('#rtp_purpose').val(),
+        memo: $('#rtp_memo').val(),
+        account: $('#rtp_default_account').val() == 'select' ? null : $('#rtp_default_account').val()
+      }, 'Instant payment originated');
+    });
+    $('#rtp_request_btn').on('click', function(){
+      if($('#rtp_party_select').val() == 'select' || $('#rtp_amount').val() == ''){
+        window.alert('Select a counterparty and amount.');
+        return;
+      }
+      postRtp('requestRtp', {
+        counterparty_id: $('#rtp_party_select').val(),
+        amount: $('#rtp_amount').val(),
+        rail: $('#rtp_rail').val(),
+        purpose: $('#rtp_purpose').val(),
+        memo: $('#rtp_memo').val(),
+        account: $('#rtp_default_account').val() == 'select' ? null : $('#rtp_default_account').val()
+      }, 'Request for payment created');
+    });
+    $('#rtp_cancel_btn').on('click', function(){
+      if($('#rtp_open_select').val() == 'select'){ window.alert('Select an open payment.'); return; }
+      postRtp('cancelRtp', { payment_id: $('#rtp_open_select').val() }, 'Cancelled');
+    });
+    $('#rtp_cancel_rfp_btn').on('click', function(){
+      if($('#rtp_rfp_select').val() == 'select'){ window.alert('Select an open request.'); return; }
+      postRtp('cancelRfp', { request_id: $('#rtp_rfp_select').val() }, 'Request cancelled');
+    });
+    $('#rtp_pause_btn').on('click', function(){
+      if($('#rtp_party_select').val() == 'select'){ window.alert('Select a counterparty.'); return; }
+      postRtp('pauseRtpCounterparty', { counterparty_id: $('#rtp_party_select').val() }, 'Paused');
+    });
+    $('#rtp_resume_btn').on('click', function(){
+      if($('#rtp_party_select').val() == 'select'){ window.alert('Select a counterparty.'); return; }
+      postRtp('resumeRtpCounterparty', { counterparty_id: $('#rtp_party_select').val() }, 'Resumed');
+    });
+    $('#rtp_archive_btn').on('click', function(){
+      if($('#rtp_party_select').val() == 'select'){ window.alert('Select a counterparty.'); return; }
+      postRtp('archiveRtpCounterparty', { counterparty_id: $('#rtp_party_select').val() }, 'Archived');
     });
     $('#la_add_btn').on('click', function(){
       if($('#la_nickname').val() == '' || $('#la_default_account').val() == 'select'){

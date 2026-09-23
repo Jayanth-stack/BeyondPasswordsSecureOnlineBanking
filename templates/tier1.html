@@ -300,6 +300,57 @@
               <button type="button" id="staff_wire_recall_btn" class="btn btn-primary">Recall</button>
               <p id="staff_wire_result" style="color:yellow;margin-top:8px;"></p>
             </div>
+            <div id="staff_rtp_card" style="display:none;">
+              <h4 class="header_text" style="color:white;">Instant Pay (FedNow / RTP)</h4>
+              <p id="staff_rtp_summary" style="color:white;">YTD sent: $0.00 &middot; collected: $0.00</p>
+              <table class="table table-hover table-bordered table-color" id="staff_rtp_party_tbl">
+                <thead>
+                  <tr>
+                    <th>Nickname</th>
+                    <th>Name</th>
+                    <th>ABA</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+              <table class="table table-hover table-bordered table-color" id="staff_rtp_tbl">
+                <thead>
+                  <tr>
+                    <th>Nickname</th>
+                    <th>Amount</th>
+                    <th>Status</th>
+                    <th>UETR</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+              <select id="staff_rtp_id" style="height:30px;margin-right:5px;">
+                <option value="select">Select open payment</option>
+              </select>
+              <button type="button" id="staff_rtp_override_btn" class="btn btn-primary">Override OFAC</button>
+              <button type="button" id="staff_rtp_release_btn" class="btn btn-primary">Release</button>
+              <button type="button" id="staff_rtp_reject_btn" class="btn btn-primary">Reject</button>
+              <p id="staff_rtp_result" style="color:yellow;margin-top:8px;"></p>
+              <table class="table table-hover table-bordered table-color" id="staff_rfp_tbl">
+                <thead>
+                  <tr>
+                    <th>Nickname</th>
+                    <th>Amount</th>
+                    <th>Status</th>
+                    <th>Id</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+              <select id="staff_rfp_id" style="height:30px;margin-right:5px;">
+                <option value="select">Select open request</option>
+              </select>
+              <button type="button" id="staff_rfp_override_btn" class="btn btn-primary">Override RfP OFAC</button>
+              <button type="button" id="staff_rfp_accept_btn" class="btn btn-primary">Accept RfP</button>
+              <button type="button" id="staff_rfp_reject_btn" class="btn btn-primary">Reject RfP</button>
+              <p id="staff_rfp_result" style="color:yellow;margin-top:8px;"></p>
+            </div>
         </div>
         <div id="account_details_pane" style="display:none;">
           <label class="details_lbl" for="first_name">First name:</label>

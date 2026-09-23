@@ -111,6 +111,15 @@
         </button>
 
         <button type="button" class="btn btn-primary btn-block"
+        id="rtp_menu">
+        <span class="glyphicon glyphicon-flash gi-3x"
+        style="color: white" aria-hidden="true">
+        </span>
+        <br />
+        Instant Pay
+        </button>
+
+        <button type="button" class="btn btn-primary btn-block"
         id="service_requests_menu">
         <span class="glyphicon glyphicon-edit gi-3x"
         style="color: white" aria-hidden="true">
@@ -351,6 +360,97 @@
           </table>
           <select id="wire_open_select" style="height:30px;margin-right:5px;">
             <option value="select">Select open wire</option>
+          </select>
+        </div>
+        <div id="rtp_pane" style="display:none;">
+          <p id="rtp_summary" style="color:white;">Active: 0 &middot; open: 0 &middot; YTD sent: $0.00 &middot; collected: $0.00</p>
+          <p id="rtp_clock" style="color:white;">Hours 24/7 &middot; value date --</p>
+          <table class="table table-hover table-bordered table-color fixed-header" id="rtp_party_tbl">
+            <thead>
+              <tr>
+                <th>Nickname</th>
+                <th>Name</th>
+                <th>ABA</th>
+                <th>Last4</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+          <hr>
+          <h5 style="color:white;">Add an instant counterparty</h5>
+          <input type="text" id="rtp_nickname" placeholder="Nickname" style="height:30px;width:140px;margin-right:5px;">
+          <input type="text" id="rtp_legal_name" placeholder="Legal name" style="height:30px;width:160px;margin-right:5px;">
+          <input type="text" id="rtp_aba" placeholder="ABA routing" maxlength="9" style="height:30px;width:110px;margin-right:5px;">
+          <input type="text" id="rtp_account_number" placeholder="Account no." style="height:30px;width:120px;margin-right:5px;">
+          <select id="rtp_default_account" style="height:30px;margin-right:5px;">
+            <option value="select">Internal account</option>
+          </select>
+          <br><br>
+          <input type="text" id="rtp_street" placeholder="Street" style="height:30px;width:180px;margin-right:5px;">
+          <input type="text" id="rtp_city" placeholder="City" style="height:30px;width:120px;margin-right:5px;">
+          <input type="text" id="rtp_state" placeholder="ST" maxlength="2" style="height:30px;width:50px;margin-right:5px;">
+          <input type="text" id="rtp_postal" placeholder="ZIP" maxlength="9" style="height:30px;width:90px;margin-right:5px;">
+          <button type="button" id="rtp_add_btn" class="btn btn-primary">Add counterparty</button>
+          <br><br>
+          <h5 style="color:white;">Send FedNow / RTP or request payment</h5>
+          <select id="rtp_party_select" style="height:30px;margin-right:5px;">
+            <option value="select">Select counterparty</option>
+          </select>
+          <select id="rtp_rail" style="height:30px;margin-right:5px;">
+            <option value="fednow">FedNow</option>
+            <option value="rtp">TCH RTP</option>
+          </select>
+          <input type="text" id="rtp_amount" placeholder="Amount" style="height:30px;width:100px;margin-right:5px;">
+          <select id="rtp_purpose" style="height:30px;margin-right:5px;">
+            <option value="other">Other</option>
+            <option value="family">Family</option>
+            <option value="goods">Goods</option>
+            <option value="payroll">Payroll</option>
+            <option value="tax">Tax</option>
+            <option value="loan">Loan</option>
+            <option value="rent">Rent</option>
+          </select>
+          <input type="text" id="rtp_memo" placeholder="Memo" style="height:30px;width:140px;margin-right:5px;">
+          <button type="button" id="rtp_preview_btn" class="btn btn-primary">Preview</button>
+          <button type="button" id="rtp_send_btn" class="btn btn-primary">Send instant</button>
+          <button type="button" id="rtp_request_btn" class="btn btn-primary">Request payment</button>
+          <button type="button" id="rtp_cancel_btn" class="btn btn-primary">Cancel open</button>
+          <button type="button" id="rtp_cancel_rfp_btn" class="btn btn-primary">Cancel request</button>
+          <button type="button" id="rtp_pause_btn" class="btn btn-primary">Pause</button>
+          <button type="button" id="rtp_resume_btn" class="btn btn-primary">Resume</button>
+          <button type="button" id="rtp_archive_btn" class="btn btn-primary">Archive</button>
+          <p id="rtp_result" style="color:yellow;margin-top:10px;"></p>
+          <hr>
+          <h5 style="color:white;">Instant history</h5>
+          <table class="table table-hover table-bordered table-color fixed-header" id="rtp_history_tbl">
+            <thead>
+              <tr>
+                <th>Nickname</th>
+                <th>Rail</th>
+                <th>Amount</th>
+                <th>Status</th>
+                <th>UETR</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+          <select id="rtp_open_select" style="height:30px;margin-right:5px;">
+            <option value="select">Select open payment</option>
+          </select>
+          <table class="table table-hover table-bordered table-color fixed-header" id="rtp_rfp_tbl">
+            <thead>
+              <tr>
+                <th>Nickname</th>
+                <th>Amount</th>
+                <th>Status</th>
+                <th>EndToEnd</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+          <select id="rtp_rfp_select" style="height:30px;margin-right:5px;">
+            <option value="select">Select open request</option>
           </select>
         </div>
         <div id="account_details_pane" style="display:none;">
