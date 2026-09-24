@@ -128,6 +128,7 @@ function appendPrimaryData(data) {
   fillPendingTransTbl(data);
   fillLinkedAccounts(data);
   fillWires(data);
+  fillSepa(data);
 }
 
 function fillLinkedAccountSelect(selectId) {
@@ -281,6 +282,109 @@ function postWire(path, payload, okMsg) {
       }
       if (body && body.Wires) {
         fillWires({ Wires: body.Wires });
+      } else {
+        getUser();
+      }
+    });
+  }).catch(function(error) {
+    console.error(error);
+  });
+}
+
+function fillSepa(data) {
+  var snapshot = data.Sepa || {};
+  var summary = document.getElementById('sepa_summary');
+  if (summary) {
+    summary.innerHTML = 'Active: ' + (snapshot.active_count || 0) +
+      ' &middot; open: ' + (snapshot.open_count || 0) +
+      ' &middot; YTD sent: €' + (snapshot.ytd_sent || '0.00') +
+      ' &middot; debit $' + (snapshot.ytd_debit_usd || '0.00') +
+      ' &middot; fees: $' + (snapshot.ytd_fees || '0.00');
+  }
+  var clockEl = document.getElementById('sepa_clock');
+  if (clockEl && snapshot.clock) {
+    clockEl.innerHTML = 'TARGET2 cutoff ' + (snapshot.clock.cutoff || '16:00') +
+      ' &middot; SCT value ' + (snapshot.clock.value_date || '--') +
+      (snapshot.clock.after_cutoff ? ' &middot; after cutoff' : '') +
+      ' &middot; Instant 24/7';
+  }
+  fillLinkedAccountSelect('sepa_default_account');
+  var table = document.getElementById('sepa_creditor_tbl');
+  if (!table) {
+    return;
+  }
+  var body = table.getElementsByTagName('tbody')[0];
+  body.innerHTML = '';
+  var selection = document.getElementById('sepa_creditor_select');
+  selection.options.length = 1;
+  var creditors = snapshot.creditors || [];
+  for (var i = 0; i < creditors.length; i++) {
+    var row = body.insertRow(-1);
+    row.insertCell(0).innerHTML = creditors[i].nickname;
+    row.insertCell(1).innerHTML = creditors[i].legal_name;
+    row.insertCell(2).innerHTML = creditors[i].iban_masked;
+    row.insertCell(3).innerHTML = creditors[i].bic || '';
+    row.insertCell(4).innerHTML = creditors[i].status;
+    var option = document.createElement('OPTION');
+    option.value = creditors[i].creditor_id;
+    option.innerHTML = creditors[i].nickname + ' (' + creditors[i].status + ')';
+    selection.options.add(option);
+  }
+  var hist = document.getElementById('sepa_history_tbl');
+  var histBody = hist.getElementsByTagName('tbody')[0];
+  histBody.innerHTML = '';
+  var openSelect = document.getElementById('sepa_open_select');
+  openSelect.options.length = 1;
+  var transfers = snapshot.transfers || [];
+  for (var j = 0; j < transfers.length; j++) {
+    var trow = histBody.insertRow(-1);
+    trow.insertCell(0).innerHTML = transfers[j].nickname;
+    trow.insertCell(1).innerHTML = '€' + transfers[j].amount;
+    trow.insertCell(2).innerHTML = '$' + transfers[j].debit_usd;
+    trow.insertCell(3).innerHTML = transfers[j].scheme;
+    trow.insertCell(4).innerHTML = transfers[j].status;
+    trow.insertCell(5).innerHTML = (transfers[j].end_to_end_id || '').slice(0, 16);
+    if (!transfers[j].cancelable) {
+      continue;
+    }
+    var openOpt = document.createElement('OPTION');
+    openOpt.value = transfers[j].transfer_id;
+    openOpt.innerHTML = transfers[j].nickname + ' €' + transfers[j].amount + ' (' + transfers[j].status + ')';
+    openSelect.options.add(openOpt);
+  }
+}
+
+function postSepa(path, payload, okMsg) {
+  payload.userid = userid;
+  fetch(homeURL + path, {
+    method: 'post',
+    body: JSON.stringify(payload),
+    headers: { 'Content-type': 'application/json' }
+  }).then(function(response) {
+    return response.json().then(function(body) {
+      var result = document.getElementById('sepa_result');
+      if (!response.ok) {
+        if (result) { result.innerHTML = (body && (body.message || body.error)) || 'Failed'; }
+        window.alert((body && (body.message || body.error)) || 'Request failed');
+        if (body && body.Sepa) {
+          fillSepa({ Sepa: body.Sepa });
+        }
+        return;
+      }
+      if (result) {
+        if (body && body.preview) {
+          var quote = body.preview.quote || {};
+          result.innerHTML = '€' + (body.preview.amount || quote.amount_eur || '') +
+            ' → $' + (quote.debit_usd || '') +
+            ' + fee $' + body.preview.fee +
+            ' = $' + (body.preview.total_usd || '') +
+            ' &middot; value ' + ((body.preview.clock && body.preview.clock.value_date) || '');
+        } else {
+          result.innerHTML = okMsg || body.message || 'Done';
+        }
+      }
+      if (body && body.Sepa) {
+        fillSepa({ Sepa: body.Sepa });
       } else {
         getUser();
       }
@@ -1047,6 +1151,7 @@ $(document).ready(function() {
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#sepa_menu').css('background-color','maroon');
     });
     $('#service_requests_menu').on('click', function(){
       if($('#service_requests_pane').css('display')=='none'){
@@ -1057,6 +1162,7 @@ $(document).ready(function() {
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#sepa_menu').css('background-color','maroon');
     });
     $('#my_accounts_menu').on('click', function(){
       getUser();
@@ -1077,6 +1183,7 @@ $(document).ready(function() {
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#sepa_menu').css('background-color','maroon');
     });
     $('#pending_transaction_requests_menu').on('click', function(){
       if($('#pending_transaction_requests_pane').css('display')=='none'){
@@ -1087,6 +1194,7 @@ $(document).ready(function() {
       $('#service_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#sepa_menu').css('background-color','maroon');
     });
     $('#linked_accounts_menu').on('click', function(){
       if($('#linked_accounts_pane').css('display')=='none'){
@@ -1097,12 +1205,25 @@ $(document).ready(function() {
       $('#service_requests_menu').css('background-color','maroon');
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#sepa_menu').css('background-color','maroon');
     });
     $('#wires_menu').on('click', function(){
       if($('#wires_pane').css('display')=='none'){
           $('#wires_pane').show().siblings('div').hide();
       }
       $('#wires_menu').css('background-color','#FF6600');
+      $('#my_accounts_menu').css('background-color','maroon');
+      $('#service_requests_menu').css('background-color','maroon');
+      $('#pending_transaction_requests_menu').css('background-color','maroon');
+      $('#linked_accounts_menu').css('background-color','maroon');
+      $('#sepa_menu').css('background-color','maroon');
+    });
+    $('#sepa_menu').on('click', function(){
+      if($('#sepa_pane').css('display')=='none'){
+          $('#sepa_pane').show().siblings('div').hide();
+      }
+      $('#sepa_menu').css('background-color','#FF6600');
+      $('#wires_menu').css('background-color','maroon');
       $('#my_accounts_menu').css('background-color','maroon');
       $('#service_requests_menu').css('background-color','maroon');
       $('#pending_transaction_requests_menu').css('background-color','maroon');
@@ -1164,6 +1285,64 @@ $(document).ready(function() {
     $('#wire_archive_btn').on('click', function(){
       if($('#wire_bene_select').val() == 'select'){ window.alert('Select a beneficiary.'); return; }
       postWire('archiveWireBeneficiary', { beneficiary_id: $('#wire_bene_select').val() }, 'Archived');
+    });
+    $('#sepa_add_btn').on('click', function(){
+      if($('#sepa_nickname').val() == '' || $('#sepa_legal_name').val() == '' || $('#sepa_iban').val() == '' || $('#sepa_default_account').val() == 'select'){
+        window.alert('Nickname, legal name, IBAN, and internal account are required.');
+        return;
+      }
+      postSepa('addSepaCreditor', {
+        nickname: $('#sepa_nickname').val(),
+        legal_name: $('#sepa_legal_name').val(),
+        iban: $('#sepa_iban').val(),
+        bic: $('#sepa_bic').val(),
+        city: $('#sepa_city').val() || 'Berlin',
+        country: $('#sepa_country').val(),
+        creditor_ref: $('#sepa_ref').val(),
+        default_account: $('#sepa_default_account').val()
+      }, 'Creditor added');
+    });
+    $('#sepa_preview_btn').on('click', function(){
+      if($('#sepa_creditor_select').val() == 'select' || $('#sepa_amount').val() == ''){
+        window.alert('Select a creditor and EUR amount.');
+        return;
+      }
+      postSepa('previewSepa', {
+        creditor_id: $('#sepa_creditor_select').val(),
+        amount: $('#sepa_amount').val(),
+        scheme: $('#sepa_scheme').val(),
+        account: $('#sepa_default_account').val() == 'select' ? null : $('#sepa_default_account').val()
+      }, 'Preview');
+    });
+    $('#sepa_send_btn').on('click', function(){
+      if($('#sepa_creditor_select').val() == 'select' || $('#sepa_amount').val() == ''){
+        window.alert('Select a creditor and EUR amount.');
+        return;
+      }
+      postSepa('sendSepa', {
+        creditor_id: $('#sepa_creditor_select').val(),
+        amount: $('#sepa_amount').val(),
+        scheme: $('#sepa_scheme').val(),
+        purpose: $('#sepa_purpose').val(),
+        memo: $('#sepa_memo').val(),
+        account: $('#sepa_default_account').val() == 'select' ? null : $('#sepa_default_account').val()
+      }, 'SEPA originated');
+    });
+    $('#sepa_cancel_btn').on('click', function(){
+      if($('#sepa_open_select').val() == 'select'){ window.alert('Select an open SEPA payment.'); return; }
+      postSepa('cancelSepa', { transfer_id: $('#sepa_open_select').val() }, 'Cancelled');
+    });
+    $('#sepa_pause_btn').on('click', function(){
+      if($('#sepa_creditor_select').val() == 'select'){ window.alert('Select a creditor.'); return; }
+      postSepa('pauseSepaCreditor', { creditor_id: $('#sepa_creditor_select').val() }, 'Paused');
+    });
+    $('#sepa_resume_btn').on('click', function(){
+      if($('#sepa_creditor_select').val() == 'select'){ window.alert('Select a creditor.'); return; }
+      postSepa('resumeSepaCreditor', { creditor_id: $('#sepa_creditor_select').val() }, 'Resumed');
+    });
+    $('#sepa_archive_btn').on('click', function(){
+      if($('#sepa_creditor_select').val() == 'select'){ window.alert('Select a creditor.'); return; }
+      postSepa('archiveSepaCreditor', { creditor_id: $('#sepa_creditor_select').val() }, 'Archived');
     });
     $('#la_add_btn').on('click', function(){
       if($('#la_nickname').val() == '' || $('#la_default_account').val() == 'select'){
