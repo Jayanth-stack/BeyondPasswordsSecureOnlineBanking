@@ -3,15 +3,20 @@ import tempfile
 import unittest
 from unittest.mock import MagicMock, patch
 
-# Keep unittest imports from truncating the tracked production log.
+# Keep unittest imports from truncating the tracked production log,
+# and keep Fedwire/ACH stores in-memory (this file does not import tests/).
 os.environ["BANK_LOG_FILE"] = os.path.join(tempfile.mkdtemp(), "bank.log")
+os.environ.setdefault("WIRE_STORE", "memory")
+os.environ.setdefault("LINK_STORE", "memory")
+os.environ.setdefault("LINK_CHALLENGE_SECRET", "test-link-challenge-secret")
+os.environ.setdefault("RECEIPT_SECRET", "test-receipt-secret-do-not-use-in-prod")
 
 # customer/employee modules connect to MySQL at import time; stub before app import.
 _MOCK_DB = MagicMock()
 _MOCK_CURSOR = MagicMock()
 _MOCK_DB.cursor.return_value = _MOCK_CURSOR
 
-with patch("mysql.connector.connect", return_value=_MOCK_DB):
+with patch("mysql.connector.connect", return_value=_MOCK_DB), patch("twilio.rest.Client"):
     from app import app
 
 
@@ -176,6 +181,53 @@ class SessionAuthRegressionTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         employee_cls.return_value.deactivate_account.assert_called_once_with("tier2emp", 42)
 
+    @patch("app.Customers")
+    @patch("app.Employee")
+    def test_deny_request_rejects_staff_usertype(self, employee_cls, customers_cls):
+        with self.client.session_transaction() as sess:
+            sess["userid"] = "emp1"
+            sess["usertype"] = "tier2"
+            sess["emp_tier"] = 2
+
+        response = self.client.post(
+            "/denyRequest",
+            json={"userid": "emp1", "transaction_no": 99},
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.get_json()["message"], "Unauthorized access")
+        customers_cls.return_value.deny_funds_requested.assert_not_called()
+        employee_cls.return_value.deny_funds_requested.assert_not_called()
+
+    @patch("app.Customers")
+    def test_deny_request_maps_helper_failure_to_500(self, customers_cls):
+        customers_cls.return_value.deny_funds_requested.return_value = (
+            "Please try again later"
+        )
+        self._login_customer_session("alice")
+
+        response = self.client.post(
+            "/denyRequest",
+            json={"userid": "alice", "transaction_no": 99},
+        )
+
+        self.assertEqual(response.status_code, 500)
+        self.assertEqual(response.get_json()["message"], "Please try again later")
+        customers_cls.return_value.deny_funds_requested.assert_called_once_with(99, "alice")
+
+    @patch("app.Customers")
+    def test_get_deny_request_still_mutates(self, customers_cls):
+        customers_cls.return_value.deny_funds_requested.return_value = "Request Cancelled"
+        self._login_customer_session("alice")
+
+        response = self.client.get(
+            "/denyRequest",
+            json={"userid": "alice", "transaction_no": 99},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        customers_cls.return_value.deny_funds_requested.assert_called_once_with(99, "alice")
+
 
 class TransactionOwnershipQueryTests(unittest.TestCase):
     def setUp(self):
@@ -185,6 +237,12 @@ class TransactionOwnershipQueryTests(unittest.TestCase):
         self.cust_db = cust_db
         self.cust_cursor.reset_mock()
         self.cust_db.reset_mock()
+        self.cust_db.commit.side_effect = None
+        self.cust_db.rollback.side_effect = None
+
+    def tearDown(self):
+        self.cust_db.commit.side_effect = None
+        self.cust_db.rollback.side_effect = None
 
     def test_deny_funds_requested_filters_by_approver(self):
         from customer import Customers
@@ -225,6 +283,41 @@ class TransactionOwnershipQueryTests(unittest.TestCase):
 
         self.cust_cursor.fetchone.return_value = None
         self.assertFalse(Customers().owns_pending_transaction("alice", 10))
+
+    def test_owns_pending_transaction_non_numeric_raises(self):
+        from customer import Customers
+
+        with self.assertRaises(ValueError):
+            Customers().owns_pending_transaction("alice", "not-a-number")
+        self.cust_cursor.execute.assert_not_called()
+
+    def test_deny_funds_requested_requires_customer_id(self):
+        from customer import Customers
+
+        with self.assertRaises(TypeError):
+            Customers().deny_funds_requested(99)
+
+    def test_cancel_pending_does_not_filter_by_owner(self):
+        from customer import Customers
+
+        result = Customers()._cancel_pending_transaction(55)
+
+        sql, params = self.cust_cursor.execute.call_args[0]
+        self.assertIn("status = 1", sql)
+        self.assertNotIn("approver1_id", sql)
+        self.assertEqual(params, (55,))
+        self.assertEqual(result, "Request Cancelled")
+        self.cust_db.commit.assert_called_once()
+
+    def test_cancel_pending_commit_failure_rolls_back(self):
+        from customer import Customers
+
+        self.cust_db.commit.side_effect = RuntimeError("disk full")
+        self.assertEqual(
+            Customers()._cancel_pending_transaction(55),
+            "Please try again later",
+        )
+        self.cust_db.rollback.assert_called()
 
 
 if __name__ == "__main__":

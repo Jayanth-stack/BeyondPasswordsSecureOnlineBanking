@@ -231,6 +231,37 @@ class WireRouteTests(unittest.TestCase):
         self.assertEqual(rejected.status_code, 200)
         self.assertEqual(rejected.get_json()['wire']['status'], 'rejected')
 
+    def test_claimed_admin_session_can_send_for_another_customer(self):
+        self.login('alice', 'admin')
+        added = self.client.post(
+            '/addWireBeneficiary',
+            json=self._bene_payload(userid='alice', customer_id='bob', default_account='1001'),
+        )
+        self.assertEqual(added.status_code, 201)
+        self.assertEqual(added.get_json()['beneficiary']['userid'], 'bob')
+        sent = self.client.post('/sendWire', json={
+            'userid': 'alice',
+            'customer_id': 'bob',
+            'beneficiary_id': added.get_json()['beneficiary']['beneficiary_id'],
+            'amount': '40.00',
+            'trace_id': 'claimed-admin',
+        })
+        self.assertEqual(sent.status_code, 201)
+        self.assertEqual(sent.get_json()['wire']['userid'], 'bob')
+        self.assertEqual(self.debits[0][0], '1001')
+
+    def test_get_add_and_send_still_mutate(self):
+        self.login()
+        added = self.client.get('/addWireBeneficiary', json=self._bene_payload(nickname='GETBene'))
+        self.assertEqual(added.status_code, 201)
+        bene_id = added.get_json()['beneficiary']['beneficiary_id']
+        sent = self.client.get('/sendWire', json={
+            'userid': 'alice', 'beneficiary_id': bene_id, 'amount': '40.00', 'trace_id': 'get-w1',
+        })
+        self.assertEqual(sent.status_code, 201)
+        self.assertEqual(sent.get_json()['wire']['status'], 'sent')
+        self.assertEqual(self.debits[0][1], '40.00')
+
 
 if __name__ == '__main__':
     unittest.main()
