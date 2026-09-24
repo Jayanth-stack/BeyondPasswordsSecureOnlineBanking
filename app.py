@@ -21,6 +21,12 @@ from utility.wire import (
     get_service as get_wire_service,
     set_service as set_wire_service,
 )
+from utility.swift import (
+    attach_swift_routes,
+    build_service as build_swift_service,
+    get_service as get_swift_service,
+    set_service as set_swift_service,
+)
 
 load_dotenv()
 
@@ -278,6 +284,7 @@ def get_customer_data():
             'FundsRequests': c.get_funds_requests(customer_id),
             'LinkedAccounts': _link_snapshot(customer_id, actor=customer_id, actor_type='customer'),
             'Wires': _wire_snapshot(customer_id, actor=customer_id, actor_type='customer'),
+            'Swift': _swift_snapshot(customer_id, actor=customer_id, actor_type='customer'),
         }
         return jsonify(response), 200
     except Exception as e:
@@ -918,6 +925,9 @@ def get_customer():
                 'Wires': _wire_snapshot(
                     values['customer_id'], actor=session['userid'], actor_type=session.get('usertype') or 'employee',
                 ),
+                'Swift': _swift_snapshot(
+                    values['customer_id'], actor=session['userid'], actor_type=session.get('usertype') or 'employee',
+                ),
             }
             return jsonify(response), 200
         except Exception as e:
@@ -1382,6 +1392,25 @@ wire_service = build_wire_service(
 )
 set_wire_service(wire_service)
 attach_wire_routes(app, wire_service)
+
+
+def _swift_snapshot(userid, actor=None, actor_type='customer'):
+    service = get_swift_service()
+    if service is None:
+        return {'enabled': False, 'beneficiaries': [], 'wires': []}
+    try:
+        return service.snapshot(userid, actor=actor, actor_type=actor_type)
+    except Exception:
+        return {'enabled': False, 'beneficiaries': [], 'wires': []}
+
+
+swift_service = build_swift_service(
+    debit_fn=_link_debit,
+    credit_fn=_link_credit,
+    accounts_fn=_link_accounts,
+)
+set_swift_service(swift_service)
+attach_swift_routes(app, swift_service)
 
 app.config['SESSION_COOKIE_SECURE'] = True
 app.config['SESSION_COOKIE_HTTPONLY'] = True

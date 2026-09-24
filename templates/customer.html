@@ -111,6 +111,15 @@
         </button>
 
         <button type="button" class="btn btn-primary btn-block"
+        id="swift_menu">
+        <span class="glyphicon glyphicon-globe gi-3x"
+        style="color: white" aria-hidden="true">
+        </span>
+        <br />
+        SWIFT
+        </button>
+
+        <button type="button" class="btn btn-primary btn-block"
         id="service_requests_menu">
         <span class="glyphicon glyphicon-edit gi-3x"
         style="color: white" aria-hidden="true">
@@ -351,6 +360,93 @@
           </table>
           <select id="wire_open_select" style="height:30px;margin-right:5px;">
             <option value="select">Select open wire</option>
+          </select>
+        </div>
+        <div id="swift_pane" style="display:none;">
+          <p id="swift_summary" style="color:white;">Active: 0 &middot; open: 0 &middot; YTD sent: $0.00 &middot; fees: $0.00</p>
+          <p id="swift_clock" style="color:white;">TARGET2 cutoff 16:00 &middot; value date --</p>
+          <table class="table table-hover table-bordered table-color fixed-header" id="swift_bene_tbl">
+            <thead>
+              <tr>
+                <th>Nickname</th>
+                <th>Name</th>
+                <th>BIC</th>
+                <th>IBAN</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+          <hr>
+          <h5 style="color:white;">Add a SWIFT beneficiary</h5>
+          <input type="text" id="swift_nickname" placeholder="Nickname" style="height:30px;width:140px;margin-right:5px;">
+          <input type="text" id="swift_legal_name" placeholder="Legal name" style="height:30px;width:160px;margin-right:5px;">
+          <input type="text" id="swift_bic" placeholder="BIC" maxlength="11" style="height:30px;width:110px;margin-right:5px;">
+          <input type="text" id="swift_iban" placeholder="IBAN" style="height:30px;width:220px;margin-right:5px;">
+          <select id="swift_default_account" style="height:30px;margin-right:5px;">
+            <option value="select">Internal account</option>
+          </select>
+          <br><br>
+          <input type="text" id="swift_street" placeholder="Street" style="height:30px;width:180px;margin-right:5px;">
+          <input type="text" id="swift_city" placeholder="City" style="height:30px;width:120px;margin-right:5px;">
+          <input type="text" id="swift_country" placeholder="DE" maxlength="2" style="height:30px;width:50px;margin-right:5px;">
+          <input type="text" id="swift_postal" placeholder="Postal" maxlength="12" style="height:30px;width:90px;margin-right:5px;">
+          <select id="swift_currency" style="height:30px;margin-right:5px;">
+            <option value="EUR">EUR</option>
+            <option value="GBP">GBP</option>
+            <option value="USD">USD</option>
+            <option value="CAD">CAD</option>
+            <option value="CHF">CHF</option>
+            <option value="JPY">JPY</option>
+            <option value="AUD">AUD</option>
+            <option value="INR">INR</option>
+            <option value="MXN">MXN</option>
+          </select>
+          <select id="swift_charge" style="height:30px;margin-right:5px;">
+            <option value="SHA">SHA shared</option>
+            <option value="OUR">OUR sender</option>
+            <option value="BEN">BEN beneficiary</option>
+          </select>
+          <button type="button" id="swift_add_btn" class="btn btn-primary">Add beneficiary</button>
+          <br><br>
+          <h5 style="color:white;">Send an international wire</h5>
+          <select id="swift_bene_select" style="height:30px;margin-right:5px;">
+            <option value="select">Select beneficiary</option>
+          </select>
+          <input type="text" id="swift_amount" placeholder="Amount" style="height:30px;width:100px;margin-right:5px;">
+          <select id="swift_purpose" style="height:30px;margin-right:5px;">
+            <option value="other">Other</option>
+            <option value="family">Family</option>
+            <option value="goods">Goods</option>
+            <option value="payroll">Payroll</option>
+            <option value="tax">Tax</option>
+            <option value="loan">Loan</option>
+            <option value="rent">Rent</option>
+          </select>
+          <input type="text" id="swift_memo" placeholder="Memo" style="height:30px;width:140px;margin-right:5px;">
+          <button type="button" id="swift_preview_btn" class="btn btn-primary">Preview</button>
+          <button type="button" id="swift_send_btn" class="btn btn-primary">Send SWIFT</button>
+          <button type="button" id="swift_cancel_btn" class="btn btn-primary">Cancel open</button>
+          <button type="button" id="swift_pause_btn" class="btn btn-primary">Pause</button>
+          <button type="button" id="swift_resume_btn" class="btn btn-primary">Resume</button>
+          <button type="button" id="swift_archive_btn" class="btn btn-primary">Archive</button>
+          <p id="swift_result" style="color:yellow;margin-top:10px;"></p>
+          <hr>
+          <h5 style="color:white;">SWIFT history</h5>
+          <table class="table table-hover table-bordered table-color fixed-header" id="swift_history_tbl">
+            <thead>
+              <tr>
+                <th>Nickname</th>
+                <th>Amount</th>
+                <th>USD</th>
+                <th>Status</th>
+                <th>UETR</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+          <select id="swift_open_select" style="height:30px;margin-right:5px;">
+            <option value="select">Select open SWIFT</option>
           </select>
         </div>
         <div id="account_details_pane" style="display:none;">
