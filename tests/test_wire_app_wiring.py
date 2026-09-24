@@ -1,0 +1,237 @@
+"""Real app.py wiring for domestic wires — isolated Flask tests miss this.
+
+Routes close over the import-time service; loadCustomer/getCustomer read
+get_wire_service(); session usertype is trusted as the Fedwire actor role.
+"""
+import importlib
+import unittest
+from unittest.mock import patch
+
+import tests  # noqa: F401
+
+from utility.wire import MemoryWireStore, set_service
+
+
+def _load_app():
+    with patch("twilio.rest.Client"):
+        import app as app_module
+
+        importlib.reload(app_module)
+        app_module.app.config["TESTING"] = True
+        return app_module
+
+
+def _accounts(userid="alice"):
+    if userid == "bob":
+        return {
+            "checkin": {"Account": 2001, "Balance": 80},
+            "savings": {"Account": 2002, "Balance": 10},
+            "credit": "None",
+        }
+    return {
+        "checkin": {"Account": 1001, "Balance": 5000},
+        "savings": {"Account": 1002, "Balance": 10},
+        "credit": "None",
+    }
+
+
+class WireAppWiringTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.app_module = _load_app()
+        cls.app = cls.app_module.app
+        cls.client = cls.app.test_client()
+
+    def setUp(self):
+        with self.client.session_transaction() as sess:
+            sess.clear()
+        self.service = self.app_module.wire_service
+        self.service.store = MemoryWireStore()
+        set_service(self.service)
+
+    def _session(self, userid="alice", usertype="customer"):
+        with self.client.session_transaction() as sess:
+            sess["userid"] = userid
+            sess["usertype"] = usertype
+
+    def _bene_payload(self, **overrides):
+        body = {
+            "userid": "alice",
+            "nickname": "Chase",
+            "legal_name": "Ada Lovelace",
+            "aba": "021000021",
+            "account_number": "77881234",
+            "street": "1 Federal St",
+            "city": "New York",
+            "state": "NY",
+            "postal": "10004",
+            "default_account": "1001",
+        }
+        body.update(overrides)
+        return body
+
+    def test_load_customer_includes_wires_without_account_number(self):
+        self._session()
+        with patch("app.Customers") as customers_cls:
+            customers_cls.return_value.get_all_account.return_value = _accounts()
+            customers_cls.return_value.get_customer_details.return_value = {"first_name": "Ada"}
+            customers_cls.return_value.get_funds_requests.return_value = "None"
+            added = self.client.post("/addWireBeneficiary", json=self._bene_payload())
+            self.assertEqual(added.status_code, 201)
+            self.assertNotIn("account_number", added.get_json()["beneficiary"])
+            response = self.client.post("/loadCustomer")
+        self.assertEqual(response.status_code, 200)
+        wires = response.get_json()["Wires"]
+        self.assertEqual(wires["beneficiaries"][0]["nickname"], "Chase")
+        self.assertNotIn("account_number", wires["beneficiaries"][0])
+        self.assertTrue(wires["enabled"])
+
+    def test_get_customer_includes_wires_for_staff(self):
+        self._session()
+        with patch("app.Customers") as customers_cls:
+            customers_cls.return_value.get_all_account.return_value = _accounts()
+            added = self.client.post("/addWireBeneficiary", json=self._bene_payload())
+        self.assertEqual(added.status_code, 201)
+        self._session("teller", "tier1")
+        with patch("app.Customers") as customers_cls:
+            customers_cls.return_value.get_all_account.return_value = _accounts()
+            customers_cls.return_value.get_customer_details.return_value = {"first_name": "Ada"}
+            response = self.client.post(
+                "/getCustomer",
+                json={"userid": "teller", "customer_id": "alice"},
+            )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json()["Wires"]["beneficiaries"][0]["nickname"], "Chase")
+
+    def test_customer_list_ignores_foreign_customer_id(self):
+        self._session()
+        with patch("app.Customers") as customers_cls:
+            customers_cls.return_value.get_all_account.return_value = _accounts()
+            self.client.post("/addWireBeneficiary", json=self._bene_payload())
+            listed = self.client.post(
+                "/listWires",
+                json={"userid": "alice", "customer_id": "bob"},
+            )
+        self.assertEqual(listed.status_code, 200)
+        wires = listed.get_json()["Wires"]["beneficiaries"]
+        self.assertEqual(len(wires), 1)
+        self.assertEqual(wires[0]["userid"], "alice")
+
+    def test_claimed_admin_session_can_wire_another_customer(self):
+        # /login stores client-supplied usertype; wire routes trust it as staff.
+        self._session("alice", "admin")
+        with patch("app.Customers") as customers_cls:
+            customers_cls.return_value.get_all_account.side_effect = _accounts
+            customers_cls.return_value.debit_request.return_value = "Amount Debited"
+            added = self.client.post(
+                "/addWireBeneficiary",
+                json=self._bene_payload(
+                    userid="alice",
+                    customer_id="bob",
+                    default_account="2001",
+                    nickname="BobsChase",
+                ),
+            )
+            self.assertEqual(added.status_code, 201)
+            self.assertEqual(added.get_json()["beneficiary"]["userid"], "bob")
+            sent = self.client.post(
+                "/sendWire",
+                json={
+                    "userid": "alice",
+                    "customer_id": "bob",
+                    "beneficiary_id": added.get_json()["beneficiary"]["beneficiary_id"],
+                    "amount": "20.00",
+                    "trace_id": "claimed-admin-wire",
+                },
+            )
+        self.assertEqual(sent.status_code, 201)
+        self.assertEqual(sent.get_json()["wire"]["userid"], "bob")
+        listed = self.client.post(
+            "/listWires",
+            json={"userid": "alice", "customer_id": "bob"},
+        )
+        self.assertEqual(listed.status_code, 200)
+        self.assertEqual(listed.get_json()["Wires"]["wires"][0]["userid"], "bob")
+
+    def test_accounts_helper_failure_allows_any_account_number(self):
+        self._session()
+        with patch("app.Customers") as customers_cls:
+            customers_cls.return_value.get_all_account.side_effect = RuntimeError("db down")
+            added = self.client.post(
+                "/addWireBeneficiary",
+                json=self._bene_payload(default_account="9999"),
+            )
+        self.assertEqual(added.status_code, 201)
+        self.assertEqual(added.get_json()["beneficiary"]["default_account"], "9999")
+
+    def test_get_add_and_send_still_mutate(self):
+        self._session()
+        with patch("app.Customers") as customers_cls:
+            customers_cls.return_value.get_all_account.return_value = _accounts()
+            customers_cls.return_value.debit_request.return_value = "Amount Debited"
+            added = self.client.get("/addWireBeneficiary", json=self._bene_payload())
+            self.assertEqual(added.status_code, 201)
+            bene_id = added.get_json()["beneficiary"]["beneficiary_id"]
+            sent = self.client.get(
+                "/sendWire",
+                json={
+                    "userid": "alice",
+                    "beneficiary_id": bene_id,
+                    "amount": "20.00",
+                    "trace_id": "get-send-1",
+                },
+            )
+        self.assertEqual(sent.status_code, 201)
+        customers_cls.return_value.debit_request.assert_called()
+        args, kwargs = customers_cls.return_value.debit_request.call_args_list[0]
+        self.assertEqual(args[0], "1001")
+        self.assertEqual(args[1], "20.00")
+        self.assertIn("wire to Chase", kwargs.get("remark") or args[2])
+
+    def test_snapshot_none_service_does_not_disable_closed_over_routes(self):
+        self._session()
+        set_service(None)
+        with patch("app.Customers") as customers_cls:
+            customers_cls.return_value.get_all_account.return_value = _accounts()
+            customers_cls.return_value.get_customer_details.return_value = {"first_name": "Ada"}
+            customers_cls.return_value.get_funds_requests.return_value = "None"
+            added = self.client.post("/addWireBeneficiary", json=self._bene_payload())
+            self.assertEqual(added.status_code, 201)
+            dash = self.client.post("/loadCustomer")
+        self.assertEqual(dash.status_code, 200)
+        self.assertEqual(dash.get_json()["Wires"]["enabled"], False)
+        self.assertEqual(dash.get_json()["Wires"]["beneficiaries"], [])
+
+    def test_staff_missing_customer_id_on_add_is_400(self):
+        self._session("teller", "tier1")
+        response = self.client.post(
+            "/addWireBeneficiary",
+            json=self._bene_payload(userid="teller"),
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.get_json()["error"], "missing_customer_id")
+
+    def test_customer_cannot_send_from_foreign_beneficiary(self):
+        self._session()
+        with patch("app.Customers") as customers_cls:
+            customers_cls.return_value.get_all_account.return_value = _accounts()
+            added = self.client.post("/addWireBeneficiary", json=self._bene_payload())
+        bene_id = added.get_json()["beneficiary"]["beneficiary_id"]
+        self._session("bob", "customer")
+        with patch("app.Customers") as customers_cls:
+            customers_cls.return_value.get_all_account.return_value = _accounts("bob")
+            stolen = self.client.post(
+                "/sendWire",
+                json={
+                    "userid": "bob",
+                    "beneficiary_id": bene_id,
+                    "amount": "20.00",
+                    "trace_id": "stolen-bene",
+                },
+            )
+        self.assertEqual(stolen.status_code, 403)
+        self.assertEqual(stolen.get_json()["error"], "wire_forbidden")
+
+
+if __name__ == "__main__":
+    unittest.main()
