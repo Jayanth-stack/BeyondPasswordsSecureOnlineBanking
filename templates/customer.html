@@ -111,6 +111,15 @@
         </button>
 
         <button type="button" class="btn btn-primary btn-block"
+        id="sdd_menu">
+        <span class="glyphicon glyphicon-import gi-3x"
+        style="color: white" aria-hidden="true">
+        </span>
+        <br />
+        SEPA DD
+        </button>
+
+        <button type="button" class="btn btn-primary btn-block"
         id="service_requests_menu">
         <span class="glyphicon glyphicon-edit gi-3x"
         style="color: white" aria-hidden="true">
@@ -351,6 +360,87 @@
           </table>
           <select id="wire_open_select" style="height:30px;margin-right:5px;">
             <option value="select">Select open wire</option>
+          </select>
+        </div>
+        <div id="sdd_pane" style="display:none;">
+          <p id="sdd_summary" style="color:white;">Active: 0 &middot; mandates: 0 &middot; open: 0 &middot; YTD collected: $0.00 &middot; fees: $0.00</p>
+          <p id="sdd_clock" style="color:white;">TARGET2 cutoff 16:00 &middot; value date --</p>
+          <p id="sdd_creditor" style="color:white;">Creditor ID: --</p>
+          <table class="table table-hover table-bordered table-color fixed-header" id="sdd_debtor_tbl">
+            <thead>
+              <tr>
+                <th>Nickname</th>
+                <th>Name</th>
+                <th>IBAN</th>
+                <th>Scheme</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+          <hr>
+          <h5 style="color:white;">Add a SEPA debtor</h5>
+          <input type="text" id="sdd_nickname" placeholder="Nickname" style="height:30px;width:140px;margin-right:5px;">
+          <input type="text" id="sdd_legal_name" placeholder="Legal name" style="height:30px;width:160px;margin-right:5px;">
+          <input type="text" id="sdd_iban" placeholder="IBAN" style="height:30px;width:220px;margin-right:5px;">
+          <input type="text" id="sdd_bic" placeholder="BIC (optional)" style="height:30px;width:130px;margin-right:5px;">
+          <select id="sdd_default_account" style="height:30px;margin-right:5px;">
+            <option value="select">Internal account</option>
+          </select>
+          <br><br>
+          <input type="text" id="sdd_city" placeholder="City" style="height:30px;width:120px;margin-right:5px;">
+          <input type="text" id="sdd_country" placeholder="DE" maxlength="2" style="height:30px;width:50px;margin-right:5px;">
+          <select id="sdd_scheme" style="height:30px;margin-right:5px;">
+            <option value="core">Core</option>
+            <option value="b2b">B2B</option>
+          </select>
+          <button type="button" id="sdd_add_btn" class="btn btn-primary">Add debtor</button>
+          <br><br>
+          <h5 style="color:white;">Mandate and collect</h5>
+          <select id="sdd_debtor_select" style="height:30px;margin-right:5px;">
+            <option value="select">Select debtor</option>
+          </select>
+          <input type="text" id="sdd_umr" placeholder="Mandate ref" style="height:30px;width:140px;margin-right:5px;">
+          <button type="button" id="sdd_mandate_btn" class="btn btn-primary">Create mandate</button>
+          <select id="sdd_mandate_select" style="height:30px;margin-right:5px;">
+            <option value="select">Select mandate</option>
+          </select>
+          <input type="text" id="sdd_amount" placeholder="EUR amount" style="height:30px;width:100px;margin-right:5px;">
+          <select id="sdd_purpose" style="height:30px;margin-right:5px;">
+            <option value="other">Other</option>
+            <option value="rent">Rent</option>
+            <option value="subscription">Subscription</option>
+            <option value="goods">Goods</option>
+            <option value="payroll">Payroll</option>
+            <option value="loan">Loan</option>
+          </select>
+          <button type="button" id="sdd_preview_btn" class="btn btn-primary">Preview</button>
+          <button type="button" id="sdd_collect_btn" class="btn btn-primary">Collect</button>
+          <button type="button" id="sdd_cancel_btn" class="btn btn-primary">Cancel open</button>
+          <button type="button" id="sdd_refund_btn" class="btn btn-primary">Request refund</button>
+          <button type="button" id="sdd_pause_btn" class="btn btn-primary">Pause</button>
+          <button type="button" id="sdd_resume_btn" class="btn btn-primary">Resume</button>
+          <button type="button" id="sdd_archive_btn" class="btn btn-primary">Archive</button>
+          <p id="sdd_result" style="color:yellow;margin-top:10px;"></p>
+          <hr>
+          <h5 style="color:white;">Collection history</h5>
+          <table class="table table-hover table-bordered table-color fixed-header" id="sdd_history_tbl">
+            <thead>
+              <tr>
+                <th>Nickname</th>
+                <th>EUR</th>
+                <th>USD</th>
+                <th>Status</th>
+                <th>Seq</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+          <select id="sdd_open_select" style="height:30px;margin-right:5px;">
+            <option value="select">Select open collection</option>
+          </select>
+          <select id="sdd_settled_select" style="height:30px;margin-right:5px;">
+            <option value="select">Select settled collection</option>
           </select>
         </div>
         <div id="account_details_pane" style="display:none;">
