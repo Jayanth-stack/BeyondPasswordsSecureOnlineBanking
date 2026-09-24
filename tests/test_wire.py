@@ -4,6 +4,9 @@ import unittest
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
+import tests  # noqa: F401
+
+from utility.crypto_receipt import generate_receipt
 from utility.wire import (
     AmountError,
     MemoryWireStore,
@@ -304,6 +307,114 @@ class WireServiceTests(unittest.TestCase):
         with self.assertRaises(WireError) as ctx:
             self.service.cancel_wire(wire_id=live.wire_id, actor='alice', actor_type='customer')
         self.assertEqual(ctx.exception.code, 'not_cancelable')
+
+    def test_trace_id_is_global_so_bob_can_replay_alices_wire(self):
+        def accounts_fn(userid):
+            if userid == 'bob':
+                return {
+                    'checkin': {'Account': 2001, 'Balance': 5000},
+                    'savings': {'Account': 2002, 'Balance': 80},
+                    'credit': 'None',
+                }
+            return {
+                'checkin': {'Account': 1001, 'Balance': 5000},
+                'savings': {'Account': 1002, 'Balance': 80},
+                'credit': {'Account': 1003, 'Balance': -20},
+            }
+
+        self.service.accounts_fn = accounts_fn
+        alice_bene = self._add()
+        bob_bene = self.service.add_beneficiary(
+            owner_userid='bob', actor='bob', actor_type='customer',
+            nickname='Ally', legal_name='Bob Builder', aba='021000021',
+            account_number='11223344', street='2 Federal St', city='New York',
+            state='NY', postal='10004', default_account='2001',
+        )
+        first, created = self.service.originate(
+            owner_userid='alice', actor='alice', actor_type='customer',
+            beneficiary_id=alice_bene.beneficiary_id, amount='40.00', trace_id='shared-w',
+        )
+        self.assertTrue(created)
+        replay, created_again = self.service.originate(
+            owner_userid='bob', actor='bob', actor_type='customer',
+            beneficiary_id=bob_bene.beneficiary_id, amount='90.00', trace_id='shared-w',
+        )
+        self.assertFalse(created_again)
+        self.assertEqual(replay.wire_id, first.wire_id)
+        self.assertEqual(replay.userid, 'alice')
+        self.assertEqual(len([row for row in self.debits if row[1] == '40.00']), 1)
+        self.assertEqual(len([row for row in self.debits if row[1] == '90.00']), 0)
+
+    def test_empty_account_directory_skips_ownership_and_credit_checks(self):
+        self.service.accounts_fn = lambda userid: {}
+        stolen = self._add(default_account='9999')
+        self.assertEqual(stolen.default_account, '9999')
+        credit = self._add(nickname='Visa', default_account='1003', account_number='41111111')
+        self.assertEqual(credit.default_account, '1003')
+
+    def test_hmac_receipt_from_debit_is_treated_as_failed_wire(self):
+        self.service.debit_fn = lambda account, amount, remark: generate_receipt({
+            'from_account': account, 'amount': amount, 'status': 'done',
+        })
+        bene = self._add()
+        with self.assertRaises(WireError) as ctx:
+            self.service.originate(
+                owner_userid='alice', actor='alice', actor_type='customer',
+                beneficiary_id=bene.beneficiary_id, amount='30.00', trace_id='rcpt-w',
+            )
+        self.assertEqual(ctx.exception.code, 'failed')
+        stored = self.service.store.get_wire_by_trace('rcpt-w')
+        self.assertEqual(stored.status, 'failed')
+        self.assertEqual(stored.imad, '')
+
+    def test_principal_ok_fee_nsf_still_marks_sent(self):
+        def debit(account, amount, remark):
+            self.debits.append((account, amount, remark))
+            if 'wire fee' in remark:
+                return 'Insufficient Balance'
+            return 'Amount Debited'
+
+        self.service.debit_fn = debit
+        bene = self._add()
+        wire, _ = self.service.originate(
+            owner_userid='alice', actor='alice', actor_type='customer',
+            beneficiary_id=bene.beneficiary_id, amount='30.00', trace_id='fee-nsf',
+        )
+        self.assertEqual(wire.status, 'sent')
+        self.assertTrue(wire.imad)
+        self.assertEqual(wire.fee_status, 'nsf')
+        self.assertEqual(self.debits[0][1], '30.00')
+        self.assertEqual(self.debits[1][1], '25.00')
+
+    def test_pending_release_transmits_after_cutoff(self):
+        bene = self._add()
+        wire, _ = self.service.originate(
+            owner_userid='alice', actor='maker', actor_type='tier1',
+            beneficiary_id=bene.beneficiary_id, amount='10000.00', trace_id='hv-late',
+        )
+        self.assertEqual(wire.status, 'pending_release')
+        self.assertEqual(self.debits, [])
+        self.now[0] = ts(2024, 6, 14, 17, 30)
+        released = self.service.release_wire(
+            wire_id=wire.wire_id, actor='checker', actor_type='tier2',
+        )
+        self.assertEqual(released.status, 'sent')
+        self.assertTrue(released.imad)
+        self.assertEqual(self.debits[0][1], '10000.00')
+
+    def test_queued_release_after_cutoff_requeues(self):
+        self.now[0] = ts(2024, 6, 14, 17, 30)
+        bene = self._add()
+        wire, _ = self.service.originate(
+            owner_userid='alice', actor='alice', actor_type='customer',
+            beneficiary_id=bene.beneficiary_id, amount='50.00', trace_id='q-re',
+        )
+        self.assertEqual(wire.status, 'queued')
+        again = self.service.release_wire(
+            wire_id=wire.wire_id, actor='teller', actor_type='tier2',
+        )
+        self.assertEqual(again.status, 'queued')
+        self.assertEqual(self.debits, [])
 
     def test_sqlite_roundtrip_masks_account(self):
         handle, path = tempfile.mkstemp(suffix='.sqlite')

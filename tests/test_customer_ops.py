@@ -301,11 +301,16 @@ class DenyFundsAndLookupTests(unittest.TestCase):
         self.cursor.fetchall.side_effect = None
 
     def test_deny_marks_transaction_closed(self):
-        self.assertEqual(self.Customers().deny_funds_requested(42), "Request Cancelled")
-        sql = self.cursor.execute.call_args.args[0]
+        self.cursor.rowcount = 1
+        self.assertEqual(
+            self.Customers().deny_funds_requested(42, "cust1"),
+            "Request Cancelled",
+        )
+        sql, params = self.cursor.execute.call_args[0]
         self.assertIn("Request Denied", sql)
         self.assertIn("status=0", sql)
-        self.assertIn("42", sql)
+        self.assertIn("approver1_id", sql)
+        self.assertEqual(params, (42, "cust1"))
         self.db.commit.assert_called()
 
     def test_get_all_account_maps_types(self):
