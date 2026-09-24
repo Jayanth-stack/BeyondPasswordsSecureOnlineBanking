@@ -506,7 +506,10 @@ class MoneyIntegrityGapTests(unittest.TestCase):
 
     def test_deny_funds_commit_failure_rolls_back(self):
         self.cust_db.commit.side_effect = RuntimeError("disk full")
-        self.assertEqual(self.Customers().deny_funds_requested(42), "Please try again later")
+        self.assertEqual(
+            self.Customers().deny_funds_requested(42, "cust1"),
+            "Please try again later",
+        )
         self.cust_db.rollback.assert_called()
 
     def test_reset_password_commit_failure_rolls_back(self):
