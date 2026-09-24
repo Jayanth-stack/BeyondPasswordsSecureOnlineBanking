@@ -244,6 +244,7 @@ function appendSecondaryData(customer_id, data) {
   fillCustomerAccTbl(data);
   fillStaffLinked(data);
   fillStaffWires(data);
+  fillStaffSdd(data);
   if($('#cust_details_card').css('display')=='none'){
     $('#cust_details_card').show();
   }
@@ -372,6 +373,73 @@ function fillStaffWires(data) {
     option.innerHTML = wires[j].nickname + ' $' + wires[j].amount + ' (' + wires[j].status + ')';
     selection.options.add(option);
   }
+}
+
+function fillStaffSdd(data) {
+  var snapshot = data.Sdd || {};
+  var card = document.getElementById('staff_sdd_card');
+  if (!card) {
+    return;
+  }
+  card.style.display = 'block';
+  var summary = document.getElementById('staff_sdd_summary');
+  if (summary) {
+    summary.innerHTML = 'YTD collected: $' + (snapshot.ytd_collected || '0.00') +
+      ' &middot; fees: $' + (snapshot.ytd_fees || '0.00') +
+      ' &middot; refunded: $' + (snapshot.refunded_ytd || '0.00');
+  }
+  var debtorTable = document.getElementById('staff_sdd_debtor_tbl');
+  var debtorBody = debtorTable.getElementsByTagName('tbody')[0];
+  debtorBody.innerHTML = '';
+  var debtors = snapshot.debtors || [];
+  for (var i = 0; i < debtors.length; i++) {
+    var row = debtorBody.insertRow(-1);
+    row.insertCell(0).innerHTML = debtors[i].nickname;
+    row.insertCell(1).innerHTML = debtors[i].legal_name;
+    row.insertCell(2).innerHTML = debtors[i].iban_masked;
+    row.insertCell(3).innerHTML = debtors[i].status;
+  }
+  var table = document.getElementById('staff_sdd_tbl');
+  var body = table.getElementsByTagName('tbody')[0];
+  body.innerHTML = '';
+  var selection = document.getElementById('staff_sdd_id');
+  selection.options.length = 1;
+  var rows = snapshot.collections || [];
+  for (var j = 0; j < rows.length; j++) {
+    var crow = body.insertRow(-1);
+    crow.insertCell(0).innerHTML = rows[j].nickname;
+    crow.insertCell(1).innerHTML = '€' + rows[j].amount_eur;
+    crow.insertCell(2).innerHTML = rows[j].status;
+    crow.insertCell(3).innerHTML = (rows[j].msgid || rows[j].collection_id).slice(0, 16);
+    if (['held', 'queued', 'pending_release', 'sent', 'settled'].indexOf(rows[j].status) < 0) {
+      continue;
+    }
+    var option = document.createElement('OPTION');
+    option.value = rows[j].collection_id;
+    option.innerHTML = rows[j].nickname + ' €' + rows[j].amount_eur + ' (' + rows[j].status + ')';
+    selection.options.add(option);
+  }
+}
+
+function postStaffSdd(path, payload) {
+  payload.userid = userid;
+  fetch(homeURL + path, {
+    method: 'post',
+    body: JSON.stringify(payload),
+    headers: { 'Content-type': 'application/json' }
+  }).then(function(response) {
+    return response.json().then(function(body) {
+      var result = document.getElementById('staff_sdd_result');
+      if (!response.ok) {
+        if (result) { result.innerHTML = (body && (body.message || body.error)) || 'Failed'; }
+        return;
+      }
+      if (result) { result.innerHTML = body.message || 'Done'; }
+      getCustomer($('#customer_id_input').val() || document.getElementById('customer_id').innerHTML);
+    });
+  }).catch(function(error) {
+    console.error(error);
+  });
 }
 
 function postStaffWire(path, payload) {
@@ -803,6 +871,7 @@ $(document).ready(function() {
       $('#cust_accounts_tbl').hide();
       $('#staff_linked_card').hide();
       $('#staff_wire_card').hide();
+      $('#staff_sdd_card').hide();
     });
     $('#staff_la_force_btn').on('click', function(){
       if($('#staff_la_link_id').val() == 'select'){ window.alert('Select a pending link.'); return; }
@@ -843,6 +912,26 @@ $(document).ready(function() {
     $('#staff_wire_recall_btn').on('click', function(){
       if($('#staff_wire_id').val() == 'select'){ window.alert('Select a wire.'); return; }
       postStaffWire('recallWire', { wire_id: $('#staff_wire_id').val() });
+    });
+    $('#staff_sdd_override_btn').on('click', function(){
+      if($('#staff_sdd_id').val() == 'select'){ window.alert('Select a collection.'); return; }
+      postStaffSdd('overrideSddOfac', { collection_id: $('#staff_sdd_id').val() });
+    });
+    $('#staff_sdd_release_btn').on('click', function(){
+      if($('#staff_sdd_id').val() == 'select'){ window.alert('Select a collection.'); return; }
+      postStaffSdd('releaseSdd', { collection_id: $('#staff_sdd_id').val() });
+    });
+    $('#staff_sdd_reject_btn').on('click', function(){
+      if($('#staff_sdd_id').val() == 'select'){ window.alert('Select a collection.'); return; }
+      postStaffSdd('rejectSdd', { collection_id: $('#staff_sdd_id').val() });
+    });
+    $('#staff_sdd_settle_btn').on('click', function(){
+      if($('#staff_sdd_id').val() == 'select'){ window.alert('Select a collection.'); return; }
+      postStaffSdd('settleSdd', { collection_id: $('#staff_sdd_id').val() });
+    });
+    $('#staff_sdd_return_btn').on('click', function(){
+      if($('#staff_sdd_id').val() == 'select'){ window.alert('Select a collection.'); return; }
+      postStaffSdd('returnSdd', { collection_id: $('#staff_sdd_id').val() });
     });
     $('#approve_trans_btn').on('click', function(){
       if($('#customer_trans_no').val() == 'select'){
