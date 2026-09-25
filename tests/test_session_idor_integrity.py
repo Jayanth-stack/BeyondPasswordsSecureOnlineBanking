@@ -33,36 +33,43 @@ class LoginShapedSessionGateTests(unittest.TestCase):
             sess["userid"] = userid
             sess["usertype"] = usertype
 
-    def test_deny_request_login_session_does_not_match_userid_in_session_keys(self):
-        # Gate is `values['userid'] in session` (keys), not session['userid'] == values['userid'].
+    def test_deny_request_login_session_matches_userid(self):
+        # PR #71 binds deny to session['userid'] + customer usertype.
         self._login_shaped()
         with patch("app.Customers") as customers_cls:
+            customers_cls.return_value.deny_funds_requested.return_value = "Request Cancelled"
             response = self.client.post(
                 "/denyRequest",
                 json={"userid": "cust1", "transaction_no": 9},
             )
-        self.assertIn(response.status_code, (301, 302))
-        customers_cls.return_value.deny_funds_requested.assert_not_called()
+        self.assertEqual(response.status_code, 200)
+        customers_cls.return_value.deny_funds_requested.assert_called_once_with(9, "cust1")
 
-    def test_approve_request_login_session_without_customer_id_redirects(self):
-        # Login never sets session['customer_id']; the route requires that key.
+    def test_approve_request_login_session_uses_userid_not_customer_id_key(self):
+        # PR #71 compares session['userid'] to JSON customer_id.
         self._login_shaped()
         with patch("app.Employee") as emp_cls, patch("app.Customers") as customers_cls:
+            customers_cls.return_value.owns_pending_transaction.return_value = True
+            emp_cls.return_value.get_amount_of_transaction.return_value = 50
+            emp_cls.return_value.get_fromAccount_of_transaction.return_value = 10
+            emp_cls.return_value.get_toAccount_of_transaction.return_value = 20
+            emp_cls.return_value.get_transaction_status.return_value = 1
+            customers_cls.return_value.fund_transfers.return_value = {"amount": 50}
             response = self.client.post(
                 "/approveRequest",
                 json={"customer_id": "cust1", "transaction_no": 8},
             )
-        self.assertIn(response.status_code, (301, 302))
-        emp_cls.return_value.get_amount_of_transaction.assert_not_called()
-        customers_cls.return_value.fund_transfers.assert_not_called()
+        self.assertEqual(response.status_code, 200)
+        customers_cls.return_value.owns_pending_transaction.assert_called_once_with("cust1", 8)
+        customers_cls.return_value.fund_transfers.assert_called_once_with(10, 20, 50, 8)
 
-    def test_logout_leaves_session_userid(self):
+    def test_logout_clears_session_userid(self):
         self._login_shaped()
         response = self.client.post("/logout", json={"userid": "cust1"})
         self.assertIn(response.status_code, (301, 302))
         with self.client.session_transaction() as sess:
-            self.assertEqual(sess.get("userid"), "cust1")
-            self.assertEqual(sess.get("usertype"), "customer")
+            self.assertNotIn("userid", sess)
+            self.assertNotIn("usertype", sess)
 
 
 class AccountIdorRouteTests(unittest.TestCase):
@@ -249,9 +256,9 @@ class AccountIdorRouteTests(unittest.TestCase):
 
     def test_approve_request_missing_amount_is_not_none_string(self):
         # Helper returns -1 for missing txn; route only treats the string 'None' as missing.
-        with self.client.session_transaction() as sess:
-            sess["customer_id"] = "cust1"
+        self._session("cust1", "customer")
         with patch("app.Employee") as emp_cls, patch("app.Customers") as customers_cls:
+            customers_cls.return_value.owns_pending_transaction.return_value = True
             emp = emp_cls.return_value
             emp.get_amount_of_transaction.return_value = -1
             emp.get_fromAccount_of_transaction.return_value = -1
