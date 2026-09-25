@@ -332,6 +332,41 @@
               <button type="button" id="staff_wire_recall_btn" class="btn btn-primary">Recall</button>
               <p id="staff_wire_result" style="color:yellow;margin-top:8px;"></p>
             </div>
+            <div id="staff_ukpay_card" style="display:none;">
+              <h4 class="header_text" style="color:white;">UK Payments</h4>
+              <p id="staff_ukpay_summary" style="color:white;">YTD sent: $0.00 &middot; fees: $0.00</p>
+              <table class="table table-hover table-bordered table-color" id="staff_ukpay_bene_tbl">
+                <thead>
+                  <tr>
+                    <th>Nickname</th>
+                    <th>Name</th>
+                    <th>Sort</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+              <table class="table table-hover table-bordered table-color" id="staff_ukpay_tbl">
+                <thead>
+                  <tr>
+                    <th>Nickname</th>
+                    <th>Scheme</th>
+                    <th>USD</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+              <select id="staff_ukpay_id" style="height:30px;margin-right:5px;">
+                <option value="select">Select open/sent UK payment</option>
+              </select>
+              <button type="button" id="staff_ukpay_override_btn" class="btn btn-primary">Override OFAC</button>
+              <button type="button" id="staff_ukpay_release_btn" class="btn btn-primary">Release</button>
+              <button type="button" id="staff_ukpay_reject_btn" class="btn btn-primary">Reject</button>
+              <button type="button" id="staff_ukpay_complete_btn" class="btn btn-primary">Complete</button>
+              <button type="button" id="staff_ukpay_recall_btn" class="btn btn-primary">Recall</button>
+              <p id="staff_ukpay_result" style="color:yellow;margin-top:8px;"></p>
+            </div>
           </div>
 
           <div id="account_details_pane" style="display: none">
