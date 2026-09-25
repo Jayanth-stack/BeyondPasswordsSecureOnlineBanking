@@ -111,6 +111,15 @@
         </button>
 
         <button type="button" class="btn btn-primary btn-block"
+        id="ukpay_menu">
+        <span class="glyphicon glyphicon-globe gi-3x"
+        style="color: white" aria-hidden="true">
+        </span>
+        <br />
+        UK Pay
+        </button>
+
+        <button type="button" class="btn btn-primary btn-block"
         id="service_requests_menu">
         <span class="glyphicon glyphicon-edit gi-3x"
         style="color: white" aria-hidden="true">
@@ -351,6 +360,81 @@
           </table>
           <select id="wire_open_select" style="height:30px;margin-right:5px;">
             <option value="select">Select open wire</option>
+          </select>
+        </div>
+        <div id="ukpay_pane" style="display:none;">
+          <p id="ukpay_summary" style="color:white;">Active: 0 &middot; open: 0 &middot; YTD sent: $0.00 &middot; fees: $0.00</p>
+          <p id="ukpay_clock" style="color:white;">CHAPS cutoff 17:00 &middot; value date --</p>
+          <table class="table table-hover table-bordered table-color fixed-header" id="ukpay_bene_tbl">
+            <thead>
+              <tr>
+                <th>Nickname</th>
+                <th>Name</th>
+                <th>Sort</th>
+                <th>Last4</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+          <hr>
+          <h5 style="color:white;">Add a UK beneficiary</h5>
+          <input type="text" id="ukpay_nickname" placeholder="Nickname" style="height:30px;width:140px;margin-right:5px;">
+          <input type="text" id="ukpay_legal_name" placeholder="Legal name" style="height:30px;width:160px;margin-right:5px;">
+          <input type="text" id="ukpay_sort_code" placeholder="Sort code" maxlength="8" style="height:30px;width:100px;margin-right:5px;">
+          <input type="text" id="ukpay_account_number" placeholder="Account no." maxlength="8" style="height:30px;width:120px;margin-right:5px;">
+          <select id="ukpay_default_account" style="height:30px;margin-right:5px;">
+            <option value="select">Internal account</option>
+          </select>
+          <br><br>
+          <input type="text" id="ukpay_city" placeholder="City" style="height:30px;width:120px;margin-right:5px;">
+          <input type="text" id="ukpay_postcode" placeholder="Postcode" style="height:30px;width:110px;margin-right:5px;">
+          <input type="text" id="ukpay_iban" placeholder="GB IBAN (optional)" style="height:30px;width:220px;margin-right:5px;">
+          <button type="button" id="ukpay_add_btn" class="btn btn-primary">Add beneficiary</button>
+          <br><br>
+          <h5 style="color:white;">Send a UK payment</h5>
+          <select id="ukpay_bene_select" style="height:30px;margin-right:5px;">
+            <option value="select">Select beneficiary</option>
+          </select>
+          <input type="text" id="ukpay_amount" placeholder="Amount GBP" style="height:30px;width:110px;margin-right:5px;">
+          <select id="ukpay_scheme" style="height:30px;margin-right:5px;">
+            <option value="fps">Faster Payments</option>
+            <option value="chaps">CHAPS</option>
+            <option value="bacs">BACS</option>
+          </select>
+          <select id="ukpay_purpose" style="height:30px;margin-right:5px;">
+            <option value="other">Other</option>
+            <option value="family">Family</option>
+            <option value="goods">Goods</option>
+            <option value="payroll">Payroll</option>
+            <option value="tax">Tax</option>
+            <option value="loan">Loan</option>
+            <option value="rent">Rent</option>
+          </select>
+          <input type="text" id="ukpay_memo" placeholder="Memo" style="height:30px;width:140px;margin-right:5px;">
+          <button type="button" id="ukpay_preview_btn" class="btn btn-primary">Preview</button>
+          <button type="button" id="ukpay_send_btn" class="btn btn-primary">Send</button>
+          <button type="button" id="ukpay_cancel_btn" class="btn btn-primary">Cancel open</button>
+          <button type="button" id="ukpay_pause_btn" class="btn btn-primary">Pause</button>
+          <button type="button" id="ukpay_resume_btn" class="btn btn-primary">Resume</button>
+          <button type="button" id="ukpay_archive_btn" class="btn btn-primary">Archive</button>
+          <p id="ukpay_result" style="color:yellow;margin-top:10px;"></p>
+          <hr>
+          <h5 style="color:white;">UK payment history</h5>
+          <table class="table table-hover table-bordered table-color fixed-header" id="ukpay_history_tbl">
+            <thead>
+              <tr>
+                <th>Nickname</th>
+                <th>Scheme</th>
+                <th>GBP</th>
+                <th>USD</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+          <select id="ukpay_open_select" style="height:30px;margin-right:5px;">
+            <option value="select">Select open payment</option>
           </select>
         </div>
         <div id="account_details_pane" style="display:none;">
