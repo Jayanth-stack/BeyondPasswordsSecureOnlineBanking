@@ -31,6 +31,12 @@ class SessionAuthRegressionTests(unittest.TestCase):
             sess["usertype"] = "tier2"
             sess["emp_tier"] = 2
 
+    def _login_admin_session(self, userid="admin1"):
+        with self.client.session_transaction() as sess:
+            sess["userid"] = userid
+            sess["usertype"] = "admin"
+            sess["emp_tier"] = 3
+
     def test_deny_request_rejects_session_key_spoof(self):
         self._login_customer_session()
 
@@ -55,6 +61,20 @@ class SessionAuthRegressionTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.get_json()["message"], "Request Cancelled")
         customers_cls.return_value.deny_funds_requested.assert_called_once_with(99, "alice")
+
+    @patch("app.Employee")
+    def test_deny_request_allows_tier2_employee(self, employee_cls):
+        employee_cls.return_value.deny_funds_requested.return_value = "Request Cancelled"
+        self._login_tier2_session("tier2emp")
+
+        response = self.client.post(
+            "/denyRequest",
+            json={"userid": "tier2emp", "transaction_no": 99},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json()["message"], "Request Cancelled")
+        employee_cls.return_value.deny_funds_requested.assert_called_once_with("tier2emp", 99)
 
     @patch("app.Customers")
     def test_deny_request_rejects_foreign_transaction(self, customers_cls):
@@ -175,6 +195,19 @@ class SessionAuthRegressionTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         employee_cls.return_value.deactivate_account.assert_called_once_with("tier2emp", 42)
+
+    @patch("app.Employee")
+    def test_deactivate_employee_passes_actor_userid(self, employee_cls):
+        employee_cls.return_value.deactivate_employee.return_value = "Employee deactivated"
+        self._login_admin_session("admin1")
+
+        response = self.client.post(
+            "/deactivateEmployee",
+            json={"userid": "admin1", "emp_id": "emp42"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        employee_cls.return_value.deactivate_employee.assert_called_once_with("admin1", "emp42")
 
 
 class TransactionOwnershipQueryTests(unittest.TestCase):
