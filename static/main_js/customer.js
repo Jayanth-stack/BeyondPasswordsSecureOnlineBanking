@@ -128,6 +128,7 @@ function appendPrimaryData(data) {
   fillPendingTransTbl(data);
   fillLinkedAccounts(data);
   fillWires(data);
+  fillInWires(data);
 }
 
 function fillLinkedAccountSelect(selectId) {
@@ -252,6 +253,69 @@ function fillWires(data) {
     openOpt.innerHTML = wires[j].nickname + ' $' + wires[j].amount + ' (' + wires[j].status + ')';
     openSelect.options.add(openOpt);
   }
+}
+
+function fillInWires(data) {
+  var snapshot = data.InWires || {};
+  var summary = document.getElementById('inwire_summary');
+  if (summary) {
+    summary.innerHTML = 'Open: ' + (snapshot.open_count || 0) +
+      ' &middot; posted: ' + (snapshot.posted_count || 0) +
+      ' &middot; YTD posted: $' + (snapshot.ytd_posted || '0.00') +
+      ' &middot; returned: $' + (snapshot.ytd_returned || '0.00');
+  }
+  var hist = document.getElementById('inwire_history_tbl');
+  if (!hist) {
+    return;
+  }
+  var histBody = hist.getElementsByTagName('tbody')[0];
+  histBody.innerHTML = '';
+  var openSelect = document.getElementById('inwire_open_select');
+  openSelect.options.length = 1;
+  var rows = snapshot.inbounds || [];
+  for (var i = 0; i < rows.length; i++) {
+    var row = histBody.insertRow(-1);
+    row.insertCell(0).innerHTML = rows[i].originator_name;
+    row.insertCell(1).innerHTML = '$' + rows[i].amount;
+    row.insertCell(2).innerHTML = rows[i].status;
+    row.insertCell(3).innerHTML = (rows[i].imad || '').slice(0, 16);
+    if (!rows[i].returnable || rows[i].status === 'returned' || rows[i].status === 'rejected') {
+      continue;
+    }
+    var option = document.createElement('OPTION');
+    option.value = rows[i].inbound_id;
+    option.innerHTML = rows[i].originator_name + ' $' + rows[i].amount + ' (' + rows[i].status + ')';
+    openSelect.options.add(option);
+  }
+}
+
+function postInWire(path, payload, okMsg) {
+  payload.userid = userid;
+  fetch(homeURL + path, {
+    method: 'post',
+    body: JSON.stringify(payload),
+    headers: { 'Content-type': 'application/json' }
+  }).then(function(response) {
+    return response.json().then(function(body) {
+      var result = document.getElementById('inwire_result');
+      if (!response.ok) {
+        if (result) { result.innerHTML = (body && (body.message || body.error)) || 'Failed'; }
+        window.alert((body && (body.message || body.error)) || 'Request failed');
+        if (body && body.InWires) {
+          fillInWires({ InWires: body.InWires });
+        }
+        return;
+      }
+      if (result) { result.innerHTML = okMsg || body.message || 'Done'; }
+      if (body && body.InWires) {
+        fillInWires({ InWires: body.InWires });
+      } else {
+        getUser();
+      }
+    });
+  }).catch(function(error) {
+    console.error(error);
+  });
 }
 
 function postWire(path, payload, okMsg) {
@@ -1164,6 +1228,10 @@ $(document).ready(function() {
     $('#wire_archive_btn').on('click', function(){
       if($('#wire_bene_select').val() == 'select'){ window.alert('Select a beneficiary.'); return; }
       postWire('archiveWireBeneficiary', { beneficiary_id: $('#wire_bene_select').val() }, 'Archived');
+    });
+    $('#inwire_return_btn').on('click', function(){
+      if($('#inwire_open_select').val() == 'select'){ window.alert('Select an inbound wire.'); return; }
+      postInWire('requestInWireReturn', { inbound_id: $('#inwire_open_select').val(), reason: 'cust' }, 'Return requested');
     });
     $('#la_add_btn').on('click', function(){
       if($('#la_nickname').val() == '' || $('#la_default_account').val() == 'select'){

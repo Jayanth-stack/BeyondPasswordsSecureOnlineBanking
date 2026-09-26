@@ -352,6 +352,25 @@
           <select id="wire_open_select" style="height:30px;margin-right:5px;">
             <option value="select">Select open wire</option>
           </select>
+          <hr>
+          <h5 style="color:white;">Incoming wires</h5>
+          <p id="inwire_summary" style="color:white;">Open: 0 &middot; posted: 0 &middot; YTD posted: $0.00</p>
+          <table class="table table-hover table-bordered table-color fixed-header" id="inwire_history_tbl">
+            <thead>
+              <tr>
+                <th>Originator</th>
+                <th>Amount</th>
+                <th>Status</th>
+                <th>IMAD</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+          <select id="inwire_open_select" style="height:30px;margin-right:5px;">
+            <option value="select">Select inbound wire</option>
+          </select>
+          <button type="button" id="inwire_return_btn" class="btn btn-primary">Request return</button>
+          <p id="inwire_result" style="color:yellow;margin-top:10px;"></p>
         </div>
         <div id="account_details_pane" style="display:none;">
 					<label class="details_lbl" for="first_name">First name:</label>
