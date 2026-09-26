@@ -74,6 +74,47 @@ class ChequeDepositTests(unittest.TestCase):
         self.assertFalse(any("UPDATE Cheque SET active=0" in sql for sql in executed))
         self.db.commit.assert_not_called()
 
+    def test_live_receipt_leaves_cheque_active_and_retryable(self):
+        # PR #7 added is_successful_transfer; master reverted it. A live
+        # fund_transfers receipt is still != 'done', so the cheque stays active.
+        self.cursor.fetchall.side_effect = [
+            [(20, 10, 75.0, 1)],
+            [(1,)],
+            [(0,)],
+            [(1000.0, 1, "checkin")],
+        ]
+        result = self.Customers().deposit_check("cust1", 5)
+        self.assertIsInstance(result, dict)
+        self.assertIn("signature", result)
+        self.assertEqual(result["from_account"], 10)
+        self.assertEqual(result["to_account"], 20)
+        executed = [str(call.args[0]) for call in self.cursor.execute.call_args_list]
+        self.assertFalse(any("UPDATE Cheque SET active=0" in sql for sql in executed))
+
+    def test_live_receipt_second_deposit_moves_money_again(self):
+        # Cheque stays active after a receipt, so a retry hits fund_transfers again.
+        self.cursor.fetchall.side_effect = [
+            [(20, 10, 75.0, 1)],
+            [(1,)],
+            [(0,)],
+            [(1000.0, 1, "checkin")],
+            [(20, 10, 75.0, 1)],
+            [(1,)],
+            [(0,)],
+            [(1000.0, 1, "checkin")],
+        ]
+        customer = self.Customers()
+        first = customer.deposit_check("cust1", 5)
+        second = customer.deposit_check("cust1", 5)
+        self.assertIsInstance(first, dict)
+        self.assertIsInstance(second, dict)
+        self.assertIn("signature", first)
+        self.assertIn("signature", second)
+        executed = [str(call.args[0]) for call in self.cursor.execute.call_args_list]
+        self.assertFalse(any("UPDATE Cheque SET active=0" in sql for sql in executed))
+        balance_updates = [sql for sql in executed if "SET balance=" in sql]
+        self.assertGreaterEqual(len(balance_updates), 4)
+
     def test_commit_failure_after_done_does_not_report_success(self):
         self.cursor.fetchall.return_value = [(20, 10, 75.0, 1)]
         self.db.commit.side_effect = RuntimeError("disk full")

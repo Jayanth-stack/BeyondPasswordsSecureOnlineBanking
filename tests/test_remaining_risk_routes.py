@@ -185,18 +185,17 @@ class RemainingRiskRouteTests(unittest.TestCase):
         self.assertIn(response.status_code, (301, 302))
         self.assertIn("/tier2", response.headers.get("Location", ""))
 
-    def test_deny_request_allows_userid_session_key(self):
-        # Gate is `values['userid'] in session` (session keys), not session['userid'].
+    def test_deny_request_rejects_userid_session_key_spoof(self):
+        # PR #71 binds deny to session['userid']; a key named after the victim is not enough.
         with self.client.session_transaction() as sess:
             sess["cust1"] = "cust1"
         with patch("app.Customers") as customers_cls:
-            customers_cls.return_value.deny_funds_requested.return_value = "Request Cancelled"
             response = self.client.post(
                 "/denyRequest",
                 json={"userid": "cust1", "transaction_no": 9},
             )
-        self.assertEqual(response.status_code, 200)
-        customers_cls.return_value.deny_funds_requested.assert_called_once_with(9)
+        self.assertIn(response.status_code, (301, 302))
+        customers_cls.return_value.deny_funds_requested.assert_not_called()
 
     def test_get_customer_rejects_admin_usertype(self):
         self._session("admin1", "admin", emp_tier=3)
@@ -258,7 +257,7 @@ class RemainingRiskRouteTests(unittest.TestCase):
             )
         self.assertIn(response.status_code, (301, 302))
         cust.create_customer_id.assert_called_once()
-        self.assertEqual(url_for.call_args.args[0], "get_customer_dashboard_ui")
+        self.assertEqual(url_for.call_args.args[0], "get_customer_dash_ui")
 
     def test_register_customer_create_failure(self):
         with patch("app.Customers") as customers_cls:
@@ -337,7 +336,7 @@ class RemainingRiskRouteTests(unittest.TestCase):
     def test_reset_password_employee_store_without_requester(self):
         with patch("app.Employee") as emp_cls, patch("app.twilio_client") as twilio:
             emp_cls.return_value.retrieve_phone_number.return_value = "+14155552671"
-            emp_cls.return_value.reset_password.return_value = "Password Updated"
+            emp_cls.return_value.reset_fpassword.return_value = "Password Updated"
             twilio.verify.v2.services.return_value.verification_checks.create.return_value.status = (
                 "approved"
             )
@@ -346,7 +345,8 @@ class RemainingRiskRouteTests(unittest.TestCase):
                 json={"userid": "emp1", "newPassword": "n3w", "otp": "123456"},
             )
         self.assertEqual(response.status_code, 200)
-        emp_cls.return_value.reset_password.assert_called_once_with("emp1", "n3w")
+        emp_cls.return_value.reset_fpassword.assert_called_once_with("emp1", "n3w")
+        emp_cls.return_value.reset_password.assert_not_called()
 
     def test_make_appointment_staff_can_book_for_any_customer(self):
         self._session("emp1", "employee", emp_tier=1)
