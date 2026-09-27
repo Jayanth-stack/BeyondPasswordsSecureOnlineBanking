@@ -21,6 +21,12 @@ from utility.wire import (
     get_service as get_wire_service,
     set_service as set_wire_service,
 )
+from utility.inrtp import (
+    attach_inrtp_routes,
+    build_service as build_inrtp_service,
+    get_service as get_inrtp_service,
+    set_service as set_inrtp_service,
+)
 
 load_dotenv()
 
@@ -278,6 +284,7 @@ def get_customer_data():
             'FundsRequests': c.get_funds_requests(customer_id),
             'LinkedAccounts': _link_snapshot(customer_id, actor=customer_id, actor_type='customer'),
             'Wires': _wire_snapshot(customer_id, actor=customer_id, actor_type='customer'),
+            'InRtps': _inrtp_snapshot(customer_id, actor=customer_id, actor_type='customer'),
         }
         return jsonify(response), 200
     except Exception as e:
@@ -918,6 +925,9 @@ def get_customer():
                 'Wires': _wire_snapshot(
                     values['customer_id'], actor=session['userid'], actor_type=session.get('usertype') or 'employee',
                 ),
+                'InRtps': _inrtp_snapshot(
+                    values['customer_id'], actor=session['userid'], actor_type=session.get('usertype') or 'employee',
+                ),
             }
             return jsonify(response), 200
         except Exception as e:
@@ -1382,6 +1392,36 @@ wire_service = build_wire_service(
 )
 set_wire_service(wire_service)
 attach_wire_routes(app, wire_service)
+
+
+def _inrtp_lookup(account):
+    try:
+        result = Customers().get_customerID_from_account(int(str(account).strip()))
+        if result in (None, -1, 0, ''):
+            return None
+        return str(result)
+    except Exception:
+        return None
+
+
+def _inrtp_snapshot(userid, actor=None, actor_type='customer'):
+    service = get_inrtp_service()
+    if service is None:
+        return {'enabled': False, 'inbounds': []}
+    try:
+        return service.snapshot(userid, actor=actor, actor_type=actor_type)
+    except Exception:
+        return {'enabled': False, 'inbounds': []}
+
+
+inrtp_service = build_inrtp_service(
+    debit_fn=_link_debit,
+    credit_fn=_link_credit,
+    accounts_fn=_link_accounts,
+    lookup_fn=_inrtp_lookup,
+)
+set_inrtp_service(inrtp_service)
+attach_inrtp_routes(app, inrtp_service)
 
 app.config['SESSION_COOKIE_SECURE'] = True
 app.config['SESSION_COOKIE_HTTPONLY'] = True
