@@ -332,6 +332,36 @@
               <button type="button" id="staff_wire_recall_btn" class="btn btn-primary">Recall</button>
               <p id="staff_wire_result" style="color:yellow;margin-top:8px;"></p>
             </div>
+            <div id="staff_inrtp_card">
+              <h4 class="header_text" style="color:white;">Inbound FedNow / RTP</h4>
+              <p id="staff_inrtp_summary" style="color:white;">24x7 instant &middot; unmatched: 0</p>
+              <textarea id="staff_inrtp_file" placeholder="pacs.008 XML or paste operator file" style="width:100%;height:80px;"></textarea>
+              <button type="button" id="staff_inrtp_ingest_btn" class="btn btn-primary">Ingest file</button>
+              <button type="button" id="staff_inrtp_unmatched_btn" class="btn btn-primary">List unmatched</button>
+              <br><br>
+              <table class="table table-hover table-bordered table-color" id="staff_inrtp_tbl">
+                <thead>
+                  <tr>
+                    <th>Rail</th>
+                    <th>From</th>
+                    <th>Amount</th>
+                    <th>Status</th>
+                    <th>UETR</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+              <select id="staff_inrtp_id" style="height:30px;margin-right:5px;">
+                <option value="select">Select inbound</option>
+              </select>
+              <input type="text" id="staff_inrtp_assign_account" placeholder="Assign account" style="height:30px;width:120px;margin-right:5px;">
+              <button type="button" id="staff_inrtp_assign_btn" class="btn btn-primary">Assign</button>
+              <button type="button" id="staff_inrtp_override_btn" class="btn btn-primary">Override OFAC</button>
+              <button type="button" id="staff_inrtp_release_btn" class="btn btn-primary">Release</button>
+              <button type="button" id="staff_inrtp_reject_btn" class="btn btn-primary">Reject</button>
+              <button type="button" id="staff_inrtp_return_btn" class="btn btn-primary">Return</button>
+              <p id="staff_inrtp_result" style="color:yellow;margin-top:8px;"></p>
+            </div>
           </div>
 
           <div id="account_details_pane" style="display: none">

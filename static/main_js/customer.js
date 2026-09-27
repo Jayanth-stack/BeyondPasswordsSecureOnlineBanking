@@ -128,6 +128,7 @@ function appendPrimaryData(data) {
   fillPendingTransTbl(data);
   fillLinkedAccounts(data);
   fillWires(data);
+  fillInRtps(data);
 }
 
 function fillLinkedAccountSelect(selectId) {
@@ -252,6 +253,78 @@ function fillWires(data) {
     openOpt.innerHTML = wires[j].nickname + ' $' + wires[j].amount + ' (' + wires[j].status + ')';
     openSelect.options.add(openOpt);
   }
+}
+
+function fillInRtps(data) {
+  var snapshot = data.InRtps || {};
+  var summary = document.getElementById('inrtp_summary');
+  if (summary) {
+    summary.innerHTML = 'Open: ' + (snapshot.open_count || 0) +
+      ' &middot; posted: ' + (snapshot.posted_count || 0) +
+      ' &middot; YTD posted: $' + (snapshot.ytd_posted || '0.00') +
+      ' &middot; returned: $' + (snapshot.ytd_returned || '0.00');
+  }
+  var clockEl = document.getElementById('inrtp_clock');
+  if (clockEl && snapshot.clock) {
+    clockEl.innerHTML = 'FedNow / RTP &middot; ' + (snapshot.clock.rail_hours || '24x7') +
+      ' &middot; value ' + (snapshot.clock.value_date || '--');
+  }
+  var table = document.getElementById('inrtp_tbl');
+  if (table) {
+    table.tBodies[0].innerHTML = '';
+  }
+  var selection = document.getElementById('inrtp_open_select');
+  if (selection) {
+    selection.options.length = 1;
+  }
+  var rows = snapshot.inbounds || [];
+  for (var i = 0; i < rows.length; i++) {
+    if (table) {
+      var row = table.tBodies[0].insertRow(-1);
+      row.insertCell(0).innerHTML = rows[i].rail;
+      row.insertCell(1).innerHTML = rows[i].originator_name;
+      row.insertCell(2).innerHTML = '$' + rows[i].amount;
+      row.insertCell(3).innerHTML = rows[i].status;
+      row.insertCell(4).innerHTML = (rows[i].uetr || '').slice(0, 18);
+    }
+    if (selection && rows[i].returnable) {
+      var option = document.createElement('OPTION');
+      option.value = rows[i].inbound_id;
+      option.innerHTML = rows[i].rail + ' $' + rows[i].amount + ' (' + rows[i].status + ')';
+      selection.options.add(option);
+    }
+  }
+}
+
+function postInRtp(path, payload, okMsg) {
+  payload.userid = userid;
+  fetch(homeURL + path, {
+    method: 'post',
+    body: JSON.stringify(payload),
+    headers: { 'Content-type': 'application/json' }
+  }).then(function(response) {
+    return response.json().then(function(body) {
+      var result = document.getElementById('inrtp_result');
+      if (!response.ok) {
+        if (result) { result.innerHTML = (body && (body.message || body.error)) || 'Failed'; }
+        window.alert((body && (body.message || body.error)) || 'Request failed');
+        if (body && body.InRtps) {
+          fillInRtps({ InRtps: body.InRtps });
+        }
+        return;
+      }
+      if (result) {
+        result.innerHTML = okMsg || body.message || 'Done';
+      }
+      if (body && body.InRtps) {
+        fillInRtps({ InRtps: body.InRtps });
+      } else {
+        getUser();
+      }
+    });
+  }).catch(function(error) {
+    console.error(error);
+  });
 }
 
 function postWire(path, payload, okMsg) {
@@ -1047,6 +1120,7 @@ $(document).ready(function() {
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#inrtp_menu').css('background-color','maroon');
     });
     $('#service_requests_menu').on('click', function(){
       if($('#service_requests_pane').css('display')=='none'){
@@ -1057,6 +1131,7 @@ $(document).ready(function() {
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#inrtp_menu').css('background-color','maroon');
     });
     $('#my_accounts_menu').on('click', function(){
       getUser();
@@ -1077,6 +1152,7 @@ $(document).ready(function() {
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#inrtp_menu').css('background-color','maroon');
     });
     $('#pending_transaction_requests_menu').on('click', function(){
       if($('#pending_transaction_requests_pane').css('display')=='none'){
@@ -1087,6 +1163,7 @@ $(document).ready(function() {
       $('#service_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#inrtp_menu').css('background-color','maroon');
     });
     $('#linked_accounts_menu').on('click', function(){
       if($('#linked_accounts_pane').css('display')=='none'){
@@ -1097,6 +1174,7 @@ $(document).ready(function() {
       $('#service_requests_menu').css('background-color','maroon');
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#inrtp_menu').css('background-color','maroon');
     });
     $('#wires_menu').on('click', function(){
       if($('#wires_pane').css('display')=='none'){
@@ -1107,6 +1185,22 @@ $(document).ready(function() {
       $('#service_requests_menu').css('background-color','maroon');
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
+      $('#inrtp_menu').css('background-color','maroon');
+    });
+    $('#inrtp_menu').on('click', function(){
+      if($('#inrtp_pane').css('display')=='none'){
+          $('#inrtp_pane').show().siblings('div').hide();
+      }
+      $('#inrtp_menu').css('background-color','#FF6600');
+      $('#wires_menu').css('background-color','maroon');
+      $('#my_accounts_menu').css('background-color','maroon');
+      $('#service_requests_menu').css('background-color','maroon');
+      $('#pending_transaction_requests_menu').css('background-color','maroon');
+      $('#linked_accounts_menu').css('background-color','maroon');
+    });
+    $('#inrtp_return_btn').on('click', function(){
+      if($('#inrtp_open_select').val() == 'select'){ window.alert('Select an inbound payment.'); return; }
+      postInRtp('requestInRtpReturn', { inbound_id: $('#inrtp_open_select').val(), reason: 'CUST' }, 'Return requested');
     });
     $('#wire_add_btn').on('click', function(){
       if($('#wire_nickname').val() == '' || $('#wire_legal_name').val() == '' || $('#wire_default_account').val() == 'select'){
