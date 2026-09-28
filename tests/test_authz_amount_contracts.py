@@ -96,7 +96,7 @@ class StaffGateHoleTests(unittest.TestCase):
         self._session("attacker", "customer")
         with patch("app.Customers") as customers_cls, patch("app.twilio_client") as twilio:
             customers_cls.return_value.retrieve_phone_number.return_value = "+14155552671"
-            customers_cls.return_value.reset_password.return_value = "Password Updated"
+            customers_cls.return_value.reset_fpassword.return_value = "Password Updated"
             twilio.verify.v2.services.return_value.verification_checks.create.return_value.status = (
                 "approved"
             )
@@ -110,7 +110,8 @@ class StaffGateHoleTests(unittest.TestCase):
                 },
             )
         self.assertEqual(response.status_code, 200)
-        customers_cls.return_value.reset_password.assert_called_once_with("cust1", "n3w")
+        customers_cls.return_value.reset_fpassword.assert_called_once_with("cust1", "n3w")
+        customers_cls.return_value.reset_password.assert_not_called()
 
     def test_dashboard_html_is_served_without_session(self):
         for path in ("/", "/customer_dash", "/admin", "/tier1", "/tier2", "/otp_page"):
