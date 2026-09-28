@@ -128,6 +128,7 @@ function appendPrimaryData(data) {
   fillPendingTransTbl(data);
   fillLinkedAccounts(data);
   fillWires(data);
+  fillInUks(data);
 }
 
 function fillLinkedAccountSelect(selectId) {
@@ -252,6 +253,77 @@ function fillWires(data) {
     openOpt.innerHTML = wires[j].nickname + ' $' + wires[j].amount + ' (' + wires[j].status + ')';
     openSelect.options.add(openOpt);
   }
+}
+
+function fillInUks(data) {
+  var snapshot = data.InUks || {};
+  var summary = document.getElementById('inuk_summary');
+  if (summary) {
+    summary.innerHTML = 'Open: ' + (snapshot.open_count || 0) +
+      ' &middot; posted: ' + (snapshot.posted_count || 0) +
+      ' &middot; YTD posted: $' + (snapshot.ytd_posted || '0.00') +
+      ' &middot; returned: $' + (snapshot.ytd_returned || '0.00');
+  }
+  var clockEl = document.getElementById('inuk_clock');
+  if (clockEl && snapshot.clock) {
+    clockEl.innerHTML = 'FPS 24x7 &middot; CHAPS BoE &middot; value ' + (snapshot.clock.value_date || '--');
+  }
+  var table = document.getElementById('inuk_tbl');
+  if (table) {
+    table.tBodies[0].innerHTML = '';
+  }
+  var selection = document.getElementById('inuk_open_select');
+  if (selection) {
+    selection.options.length = 1;
+  }
+  var rows = snapshot.inbounds || [];
+  for (var i = 0; i < rows.length; i++) {
+    if (table) {
+      var row = table.tBodies[0].insertRow(-1);
+      row.insertCell(0).innerHTML = rows[i].scheme;
+      row.insertCell(1).innerHTML = rows[i].originator_name;
+      row.insertCell(2).innerHTML = '&pound;' + rows[i].amount_gbp;
+      row.insertCell(3).innerHTML = '$' + rows[i].amount_usd;
+      row.insertCell(4).innerHTML = rows[i].status;
+    }
+    if (selection && rows[i].returnable) {
+      var option = document.createElement('OPTION');
+      option.value = rows[i].inbound_id;
+      option.innerHTML = rows[i].scheme + ' &pound;' + rows[i].amount_gbp + ' (' + rows[i].status + ')';
+      selection.options.add(option);
+    }
+  }
+}
+
+function postInUk(path, payload, okMsg) {
+  payload.userid = userid;
+  fetch(homeURL + path, {
+    method: 'post',
+    body: JSON.stringify(payload),
+    headers: { 'Content-type': 'application/json' }
+  }).then(function(response) {
+    return response.json().then(function(body) {
+      var result = document.getElementById('inuk_result');
+      if (!response.ok) {
+        if (result) { result.innerHTML = (body && (body.message || body.error)) || 'Failed'; }
+        window.alert((body && (body.message || body.error)) || 'Request failed');
+        if (body && body.InUks) {
+          fillInUks({ InUks: body.InUks });
+        }
+        return;
+      }
+      if (result) {
+        result.innerHTML = okMsg || body.message || 'Done';
+      }
+      if (body && body.InUks) {
+        fillInUks({ InUks: body.InUks });
+      } else {
+        getUser();
+      }
+    });
+  }).catch(function(error) {
+    console.error(error);
+  });
 }
 
 function postWire(path, payload, okMsg) {
@@ -1047,6 +1119,7 @@ $(document).ready(function() {
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#inuk_menu').css('background-color','maroon');
     });
     $('#service_requests_menu').on('click', function(){
       if($('#service_requests_pane').css('display')=='none'){
@@ -1057,6 +1130,7 @@ $(document).ready(function() {
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#inuk_menu').css('background-color','maroon');
     });
     $('#my_accounts_menu').on('click', function(){
       getUser();
@@ -1077,6 +1151,7 @@ $(document).ready(function() {
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#inuk_menu').css('background-color','maroon');
     });
     $('#pending_transaction_requests_menu').on('click', function(){
       if($('#pending_transaction_requests_pane').css('display')=='none'){
@@ -1087,6 +1162,7 @@ $(document).ready(function() {
       $('#service_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#inuk_menu').css('background-color','maroon');
     });
     $('#linked_accounts_menu').on('click', function(){
       if($('#linked_accounts_pane').css('display')=='none'){
@@ -1097,6 +1173,7 @@ $(document).ready(function() {
       $('#service_requests_menu').css('background-color','maroon');
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#inuk_menu').css('background-color','maroon');
     });
     $('#wires_menu').on('click', function(){
       if($('#wires_pane').css('display')=='none'){
@@ -1107,6 +1184,22 @@ $(document).ready(function() {
       $('#service_requests_menu').css('background-color','maroon');
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
+      $('#inuk_menu').css('background-color','maroon');
+    });
+    $('#inuk_menu').on('click', function(){
+      if($('#inuk_pane').css('display')=='none'){
+          $('#inuk_pane').show().siblings('div').hide();
+      }
+      $('#inuk_menu').css('background-color','#FF6600');
+      $('#wires_menu').css('background-color','maroon');
+      $('#my_accounts_menu').css('background-color','maroon');
+      $('#service_requests_menu').css('background-color','maroon');
+      $('#pending_transaction_requests_menu').css('background-color','maroon');
+      $('#linked_accounts_menu').css('background-color','maroon');
+    });
+    $('#inuk_return_btn').on('click', function(){
+      if($('#inuk_open_select').val() == 'select'){ window.alert('Select an inbound payment.'); return; }
+      postInUk('requestInUkReturn', { inbound_id: $('#inuk_open_select').val(), reason: 'CUST' }, 'Return requested');
     });
     $('#wire_add_btn').on('click', function(){
       if($('#wire_nickname').val() == '' || $('#wire_legal_name').val() == '' || $('#wire_default_account').val() == 'select'){
