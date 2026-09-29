@@ -332,6 +332,36 @@
               <button type="button" id="staff_wire_recall_btn" class="btn btn-primary">Recall</button>
               <p id="staff_wire_result" style="color:yellow;margin-top:8px;"></p>
             </div>
+            <div id="staff_inbacs_card">
+              <h4 class="header_text" style="color:white;">Inbound BACS</h4>
+              <p id="staff_inbacs_summary" style="color:white;">BACS T+2 &middot; BoE 16:00 cutoff &middot; unmatched: 0</p>
+              <textarea id="staff_inbacs_file" placeholder="Standard 18 operator file" style="width:100%;height:80px;"></textarea>
+              <button type="button" id="staff_inbacs_ingest_btn" class="btn btn-primary">Ingest file</button>
+              <button type="button" id="staff_inbacs_unmatched_btn" class="btn btn-primary">List unmatched</button>
+              <br><br>
+              <table class="table table-hover table-bordered table-color" id="staff_inbacs_tbl">
+                <thead>
+                  <tr>
+                    <th>From</th>
+                    <th>GBP</th>
+                    <th>USD</th>
+                    <th>Status</th>
+                    <th>Value</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+              <select id="staff_inbacs_id" style="height:30px;margin-right:5px;">
+                <option value="select">Select inbound</option>
+              </select>
+              <input type="text" id="staff_inbacs_assign_account" placeholder="Assign account" style="height:30px;width:120px;margin-right:5px;">
+              <button type="button" id="staff_inbacs_assign_btn" class="btn btn-primary">Assign</button>
+              <button type="button" id="staff_inbacs_override_btn" class="btn btn-primary">Override OFAC</button>
+              <button type="button" id="staff_inbacs_release_btn" class="btn btn-primary">Release</button>
+              <button type="button" id="staff_inbacs_reject_btn" class="btn btn-primary">Reject</button>
+              <button type="button" id="staff_inbacs_return_btn" class="btn btn-primary">Return</button>
+              <p id="staff_inbacs_result" style="color:yellow;margin-top:8px;"></p>
+            </div>
           </div>
 
           <div id="account_details_pane" style="display: none">

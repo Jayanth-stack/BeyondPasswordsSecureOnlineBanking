@@ -111,6 +111,15 @@
         </button>
 
         <button type="button" class="btn btn-primary btn-block"
+        id="inbacs_menu">
+        <span class="glyphicon glyphicon-import gi-3x"
+        style="color: white" aria-hidden="true">
+        </span>
+        <br />
+        BACS In
+        </button>
+
+        <button type="button" class="btn btn-primary btn-block"
         id="service_requests_menu">
         <span class="glyphicon glyphicon-edit gi-3x"
         style="color: white" aria-hidden="true">
@@ -352,6 +361,27 @@
           <select id="wire_open_select" style="height:30px;margin-right:5px;">
             <option value="select">Select open wire</option>
           </select>
+        </div>
+        <div id="inbacs_pane" style="display:none;">
+          <p id="inbacs_summary" style="color:white;">Open: 0 &middot; posted: 0 &middot; YTD posted: $0.00 &middot; returned: $0.00</p>
+          <p id="inbacs_clock" style="color:white;">BACS T+2 &middot; Bank of England 16:00 cutoff</p>
+          <table class="table table-hover table-bordered table-color fixed-header" id="inbacs_tbl">
+            <thead>
+              <tr>
+                <th>From</th>
+                <th>GBP</th>
+                <th>USD</th>
+                <th>Status</th>
+                <th>Value</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+          <select id="inbacs_open_select" style="height:30px;margin-right:5px;">
+            <option value="select">Select inbound to return</option>
+          </select>
+          <button type="button" id="inbacs_return_btn" class="btn btn-primary">Request return</button>
+          <p id="inbacs_result" style="color:yellow;margin-top:10px;"></p>
         </div>
         <div id="account_details_pane" style="display:none;">
 					<label class="details_lbl" for="first_name">First name:</label>
