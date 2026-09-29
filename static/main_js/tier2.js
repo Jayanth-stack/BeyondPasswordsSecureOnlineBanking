@@ -244,6 +244,7 @@ function appendSecondaryData(customer_id, data) {
   fillCustomerAccTbl(data);
   fillStaffLinked(data);
   fillStaffWires(data);
+  fillStaffInBacs(data);
   if($('#cust_details_card').css('display')=='none'){
     $('#cust_details_card').show();
   }
@@ -388,6 +389,76 @@ function postStaffWire(path, payload) {
         return;
       }
       if (result) { result.innerHTML = body.message || 'Done'; }
+      getCustomer($('#customer_id_input').val() || document.getElementById('customer_id').innerHTML);
+    });
+  }).catch(function(error) {
+    console.error(error);
+  });
+}
+
+function fillStaffInBacs(data) {
+  var snapshot = data.InBacs || {};
+  var card = document.getElementById('staff_inbacs_card');
+  if (!card) {
+    return;
+  }
+  card.style.display = 'block';
+  var summary = document.getElementById('staff_inbacs_summary');
+  if (summary) {
+    summary.innerHTML = 'BACS T+2 &middot; cutoff ' + ((snapshot.clock && snapshot.clock.cutoff) || '16:00') +
+      ' &middot; open: ' + (snapshot.open_count || 0) +
+      ' &middot; posted: $' + (snapshot.ytd_posted || '0.00');
+  }
+  var table = document.getElementById('staff_inbacs_tbl');
+  var body = table.getElementsByTagName('tbody')[0];
+  body.innerHTML = '';
+  var selection = document.getElementById('staff_inbacs_id');
+  selection.options.length = 1;
+  var rows = snapshot.inbounds || [];
+  for (var i = 0; i < rows.length; i++) {
+    var row = body.insertRow(-1);
+    row.insertCell(0).innerHTML = rows[i].originator_name;
+    row.insertCell(1).innerHTML = '&pound;' + rows[i].amount_gbp;
+    row.insertCell(2).innerHTML = '$' + rows[i].amount_usd;
+    row.insertCell(3).innerHTML = rows[i].status;
+    row.insertCell(4).innerHTML = rows[i].value_date || '';
+    var option = document.createElement('OPTION');
+    option.value = rows[i].inbound_id;
+    option.innerHTML = rows[i].originator_name + ' (' + rows[i].status + ')';
+    selection.options.add(option);
+  }
+}
+
+function postStaffInBacs(path, payload) {
+  payload.userid = userid;
+  fetch(homeURL + path, {
+    method: 'post',
+    body: JSON.stringify(payload),
+    headers: { 'Content-type': 'application/json' }
+  }).then(function(response) {
+    return response.json().then(function(body) {
+      var result = document.getElementById('staff_inbacs_result');
+      if (!response.ok) {
+        if (result) { result.innerHTML = (body && (body.message || body.error)) || 'Failed'; }
+        return;
+      }
+      if (result) {
+        if (body.accepted_count != null) {
+          result.innerHTML = 'Accepted ' + body.accepted_count + ' &middot; dup ' + (body.duplicate_count || 0) +
+            ' &middot; err ' + (body.error_count || 0);
+        } else {
+          result.innerHTML = body.message || 'Done';
+        }
+      }
+      if (body && body.InBacs && body.InBacs.unmatched) {
+        fillStaffInBacs({ InBacs: {
+          inbounds: body.InBacs.unmatched,
+          open_count: body.InBacs.unmatched_count,
+          clock: {},
+          ytd_posted: '0.00'
+        }});
+        return;
+      }
       getCustomer($('#customer_id_input').val() || document.getElementById('customer_id').innerHTML);
     });
   }).catch(function(error) {
@@ -803,6 +874,7 @@ $(document).ready(function() {
       $('#cust_accounts_tbl').hide();
       $('#staff_linked_card').hide();
       $('#staff_wire_card').hide();
+      $('#staff_inbacs_card').hide();
     });
     $('#staff_la_force_btn').on('click', function(){
       if($('#staff_la_link_id').val() == 'select'){ window.alert('Select a pending link.'); return; }
@@ -843,6 +915,38 @@ $(document).ready(function() {
     $('#staff_wire_recall_btn').on('click', function(){
       if($('#staff_wire_id').val() == 'select'){ window.alert('Select a wire.'); return; }
       postStaffWire('recallWire', { wire_id: $('#staff_wire_id').val() });
+    });
+    $('#staff_inbacs_ingest_btn').on('click', function(){
+      var file = $('#staff_inbacs_file').val();
+      if (!file) { window.alert('Paste a Standard 18 file.'); return; }
+      postStaffInBacs('ingestInBacsFile', { file: file });
+    });
+    $('#staff_inbacs_unmatched_btn').on('click', function(){
+      postStaffInBacs('listUnmatchedInBacs', {});
+    });
+    $('#staff_inbacs_assign_btn').on('click', function(){
+      if($('#staff_inbacs_id').val() == 'select'){ window.alert('Select an inbound.'); return; }
+      postStaffInBacs('assignInBacs', {
+        inbound_id: $('#staff_inbacs_id').val(),
+        customer_id: $('#customer_id_input').val() || document.getElementById('customer_id').innerHTML,
+        account: $('#staff_inbacs_assign_account').val()
+      });
+    });
+    $('#staff_inbacs_override_btn').on('click', function(){
+      if($('#staff_inbacs_id').val() == 'select'){ window.alert('Select an inbound.'); return; }
+      postStaffInBacs('overrideInBacsOfac', { inbound_id: $('#staff_inbacs_id').val() });
+    });
+    $('#staff_inbacs_release_btn').on('click', function(){
+      if($('#staff_inbacs_id').val() == 'select'){ window.alert('Select an inbound.'); return; }
+      postStaffInBacs('releaseInBacs', { inbound_id: $('#staff_inbacs_id').val() });
+    });
+    $('#staff_inbacs_reject_btn').on('click', function(){
+      if($('#staff_inbacs_id').val() == 'select'){ window.alert('Select an inbound.'); return; }
+      postStaffInBacs('rejectInBacs', { inbound_id: $('#staff_inbacs_id').val(), reason: '0' });
+    });
+    $('#staff_inbacs_return_btn').on('click', function(){
+      if($('#staff_inbacs_id').val() == 'select'){ window.alert('Select an inbound.'); return; }
+      postStaffInBacs('returnInBacs', { inbound_id: $('#staff_inbacs_id').val(), reason: '1' });
     });
     $('#approve_trans_btn').on('click', function(){
       if($('#customer_trans_no').val() == 'select'){
