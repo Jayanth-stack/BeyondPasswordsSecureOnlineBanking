@@ -27,19 +27,19 @@ class CustomerLookupTests(unittest.TestCase):
         customer = self.Customers()
         # receiver active, deposit=0, sender credit over limit
         self.cursor.fetchall.side_effect = [[(1,)], [(0,)], [(0.0, 1, "credit")]]
-        with patch.object(customer, "deny_funds_requested") as deny:
+        with patch.object(customer, "_cancel_pending_transaction") as cancel:
             self.assertEqual(
                 customer.fund_transfers(10, 20, 5001.0, transaction_no=55),
                 "Insufficient Balance in Credit Card",
             )
-            deny.assert_called_once_with(55)
+            cancel.assert_called_once_with(55)
 
     def test_credit_overdraft_without_pending_txn_does_not_deny(self):
         customer = self.Customers()
         self.cursor.fetchall.side_effect = [[(1,)], [(0,)], [(0.0, 1, "credit")]]
-        with patch.object(customer, "deny_funds_requested") as deny:
+        with patch.object(customer, "_cancel_pending_transaction") as cancel:
             customer.fund_transfers(10, 20, 5001.0)
-            deny.assert_not_called()
+            cancel.assert_not_called()
 
     def test_make_appointment_inserts_open_row(self):
         self.assertEqual(
