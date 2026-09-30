@@ -21,6 +21,12 @@ from utility.wire import (
     get_service as get_wire_service,
     set_service as set_wire_service,
 )
+from utility.insepa import (
+    attach_insepa_routes,
+    build_service as build_insepa_service,
+    get_service as get_insepa_service,
+    set_service as set_insepa_service,
+)
 
 load_dotenv()
 
@@ -278,6 +284,7 @@ def get_customer_data():
             'FundsRequests': c.get_funds_requests(customer_id),
             'LinkedAccounts': _link_snapshot(customer_id, actor=customer_id, actor_type='customer'),
             'Wires': _wire_snapshot(customer_id, actor=customer_id, actor_type='customer'),
+            'InSepas': _insepa_snapshot(customer_id, actor=customer_id, actor_type='customer'),
         }
         return jsonify(response), 200
     except Exception as e:
@@ -918,6 +925,9 @@ def get_customer():
                 'Wires': _wire_snapshot(
                     values['customer_id'], actor=session['userid'], actor_type=session.get('usertype') or 'employee',
                 ),
+                'InSepas': _insepa_snapshot(
+                    values['customer_id'], actor=session['userid'], actor_type=session.get('usertype') or 'employee',
+                ),
             }
             return jsonify(response), 200
         except Exception as e:
@@ -1382,6 +1392,36 @@ wire_service = build_wire_service(
 )
 set_wire_service(wire_service)
 attach_wire_routes(app, wire_service)
+
+
+def _insepa_lookup(account):
+    try:
+        found = Customers().get_customerID_from_account(int(account))
+    except Exception:
+        return None
+    if found in (None, '', -1, 0):
+        return None
+    return str(found)
+
+
+def _insepa_snapshot(userid, actor=None, actor_type='customer'):
+    service = get_insepa_service()
+    if service is None:
+        return {'enabled': False, 'inbounds': []}
+    try:
+        return service.snapshot(userid, actor=actor, actor_type=actor_type)
+    except Exception:
+        return {'enabled': False, 'inbounds': []}
+
+
+insepa_service = build_insepa_service(
+    debit_fn=_link_debit,
+    credit_fn=_link_credit,
+    accounts_fn=_link_accounts,
+    lookup_fn=_insepa_lookup,
+)
+set_insepa_service(insepa_service)
+attach_insepa_routes(app, insepa_service)
 
 app.config['SESSION_COOKIE_SECURE'] = True
 app.config['SESSION_COOKIE_HTTPONLY'] = True
