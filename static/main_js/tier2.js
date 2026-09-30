@@ -244,6 +244,7 @@ function appendSecondaryData(customer_id, data) {
   fillCustomerAccTbl(data);
   fillStaffLinked(data);
   fillStaffWires(data);
+  fillStaffInSepas(data);
   if($('#cust_details_card').css('display')=='none'){
     $('#cust_details_card').show();
   }
@@ -372,6 +373,77 @@ function fillStaffWires(data) {
     option.innerHTML = wires[j].nickname + ' $' + wires[j].amount + ' (' + wires[j].status + ')';
     selection.options.add(option);
   }
+}
+
+function fillStaffInSepas(data) {
+  var snapshot = data.InSepas || {};
+  var card = document.getElementById('staff_insepa_card');
+  if (!card) {
+    return;
+  }
+  card.style.display = 'block';
+  var summary = document.getElementById('staff_insepa_summary');
+  if (summary) {
+    summary.innerHTML = 'SCT Inst 24x7 &middot; SCT cutoff ' +
+      ((snapshot.sct_clock && snapshot.sct_clock.cutoff) || '16:00') +
+      ' &middot; open: ' + (snapshot.open_count || 0) +
+      ' &middot; posted: $' + (snapshot.ytd_posted || '0.00');
+  }
+  var table = document.getElementById('staff_insepa_tbl');
+  var body = table.getElementsByTagName('tbody')[0];
+  body.innerHTML = '';
+  var selection = document.getElementById('staff_insepa_id');
+  selection.options.length = 1;
+  var rows = snapshot.inbounds || [];
+  for (var i = 0; i < rows.length; i++) {
+    var row = body.insertRow(-1);
+    row.insertCell(0).innerHTML = rows[i].originator_name;
+    row.insertCell(1).innerHTML = '&euro;' + rows[i].amount_eur;
+    row.insertCell(2).innerHTML = '$' + rows[i].amount_usd;
+    row.insertCell(3).innerHTML = rows[i].status;
+    row.insertCell(4).innerHTML = rows[i].value_date || '';
+    var option = document.createElement('OPTION');
+    option.value = rows[i].inbound_id;
+    option.innerHTML = rows[i].originator_name + ' (' + rows[i].status + ')';
+    selection.options.add(option);
+  }
+}
+
+function postStaffInSepa(path, payload) {
+  payload.userid = userid;
+  fetch(homeURL + path, {
+    method: 'post',
+    body: JSON.stringify(payload),
+    headers: { 'Content-type': 'application/json' }
+  }).then(function(response) {
+    return response.json().then(function(body) {
+      var result = document.getElementById('staff_insepa_result');
+      if (!response.ok) {
+        if (result) { result.innerHTML = (body && (body.message || body.error)) || 'Failed'; }
+        return;
+      }
+      if (result) {
+        if (body.accepted_count != null) {
+          result.innerHTML = 'Accepted ' + body.accepted_count + ' &middot; dup ' + (body.duplicate_count || 0) +
+            ' &middot; err ' + (body.error_count || 0);
+        } else {
+          result.innerHTML = body.message || 'Done';
+        }
+      }
+      if (body && body.InSepas && body.InSepas.unmatched) {
+        fillStaffInSepas({ InSepas: {
+          inbounds: body.InSepas.unmatched,
+          open_count: body.InSepas.unmatched_count,
+          sct_clock: {},
+          ytd_posted: '0.00'
+        }});
+        return;
+      }
+      getCustomer($('#customer_id_input').val() || document.getElementById('customer_id').innerHTML);
+    });
+  }).catch(function(error) {
+    console.error(error);
+  });
 }
 
 function postStaffWire(path, payload) {
@@ -803,6 +875,7 @@ $(document).ready(function() {
       $('#cust_accounts_tbl').hide();
       $('#staff_linked_card').hide();
       $('#staff_wire_card').hide();
+      $('#staff_insepa_card').hide();
     });
     $('#staff_la_force_btn').on('click', function(){
       if($('#staff_la_link_id').val() == 'select'){ window.alert('Select a pending link.'); return; }
@@ -843,6 +916,38 @@ $(document).ready(function() {
     $('#staff_wire_recall_btn').on('click', function(){
       if($('#staff_wire_id').val() == 'select'){ window.alert('Select a wire.'); return; }
       postStaffWire('recallWire', { wire_id: $('#staff_wire_id').val() });
+    });
+    $('#staff_insepa_ingest_btn').on('click', function(){
+      var file = $('#staff_insepa_file').val();
+      if (!file) { window.alert('Paste a pacs.008 file.'); return; }
+      postStaffInSepa('ingestInSepaFile', { file: file });
+    });
+    $('#staff_insepa_unmatched_btn').on('click', function(){
+      postStaffInSepa('listUnmatchedInSepas', {});
+    });
+    $('#staff_insepa_assign_btn').on('click', function(){
+      if($('#staff_insepa_id').val() == 'select'){ window.alert('Select an inbound.'); return; }
+      postStaffInSepa('assignInSepa', {
+        inbound_id: $('#staff_insepa_id').val(),
+        customer_id: $('#customer_id_input').val() || document.getElementById('customer_id').innerHTML,
+        account: $('#staff_insepa_assign_account').val()
+      });
+    });
+    $('#staff_insepa_override_btn').on('click', function(){
+      if($('#staff_insepa_id').val() == 'select'){ window.alert('Select an inbound.'); return; }
+      postStaffInSepa('overrideInSepaOfac', { inbound_id: $('#staff_insepa_id').val() });
+    });
+    $('#staff_insepa_release_btn').on('click', function(){
+      if($('#staff_insepa_id').val() == 'select'){ window.alert('Select an inbound.'); return; }
+      postStaffInSepa('releaseInSepa', { inbound_id: $('#staff_insepa_id').val() });
+    });
+    $('#staff_insepa_reject_btn').on('click', function(){
+      if($('#staff_insepa_id').val() == 'select'){ window.alert('Select an inbound.'); return; }
+      postStaffInSepa('rejectInSepa', { inbound_id: $('#staff_insepa_id').val(), reason: 'MS03' });
+    });
+    $('#staff_insepa_return_btn').on('click', function(){
+      if($('#staff_insepa_id').val() == 'select'){ window.alert('Select an inbound.'); return; }
+      postStaffInSepa('returnInSepa', { inbound_id: $('#staff_insepa_id').val(), reason: 'AC03' });
     });
     $('#approve_trans_btn').on('click', function(){
       if($('#customer_trans_no').val() == 'select'){
