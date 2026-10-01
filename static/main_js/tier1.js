@@ -321,6 +321,7 @@ function appendSecondaryData(customer_id, data) {
   fillCustomerAccTbl(data);
   fillStaffLinked(data);
   fillStaffWires(data);
+  fillStaffInSwifts(data);
   if($('#cust_details_card').css('display')=='none'){
     $('#cust_details_card').show();
   }
@@ -449,6 +450,77 @@ function fillStaffWires(data) {
     option.innerHTML = wires[j].nickname + ' $' + wires[j].amount + ' (' + wires[j].status + ')';
     selection.options.add(option);
   }
+}
+
+function fillStaffInSwifts(data) {
+  var snapshot = data.InSwifts || {};
+  var card = document.getElementById('staff_inswift_card');
+  if (!card) {
+    return;
+  }
+  card.style.display = 'block';
+  var summary = document.getElementById('staff_inswift_summary');
+  if (summary) {
+    summary.innerHTML = 'gpi 24x7 &middot; MT cutoff ' +
+      ((snapshot.mt_clock && snapshot.mt_clock.cutoff) || '16:00') +
+      ' &middot; open: ' + (snapshot.open_count || 0) +
+      ' &middot; posted: $' + (snapshot.ytd_posted || '0.00');
+  }
+  var table = document.getElementById('staff_inswift_tbl');
+  var body = table.getElementsByTagName('tbody')[0];
+  body.innerHTML = '';
+  var selection = document.getElementById('staff_inswift_id');
+  selection.options.length = 1;
+  var rows = snapshot.inbounds || [];
+  for (var i = 0; i < rows.length; i++) {
+    var row = body.insertRow(-1);
+    row.insertCell(0).innerHTML = rows[i].originator_name;
+    row.insertCell(1).innerHTML = rows[i].amount + ' ' + rows[i].currency;
+    row.insertCell(2).innerHTML = '$' + rows[i].amount_usd;
+    row.insertCell(3).innerHTML = rows[i].status;
+    row.insertCell(4).innerHTML = rows[i].value_date || '';
+    var option = document.createElement('OPTION');
+    option.value = rows[i].inbound_id;
+    option.innerHTML = rows[i].originator_name + ' (' + rows[i].status + ')';
+    selection.options.add(option);
+  }
+}
+
+function postStaffInSwift(path, payload) {
+  payload.userid = userid;
+  fetch(homeURL + path, {
+    method: 'post',
+    body: JSON.stringify(payload),
+    headers: { 'Content-type': 'application/json' }
+  }).then(function(response) {
+    return response.json().then(function(body) {
+      var result = document.getElementById('staff_inswift_result');
+      if (!response.ok) {
+        if (result) { result.innerHTML = (body && (body.message || body.error)) || 'Failed'; }
+        return;
+      }
+      if (result) {
+        if (body.accepted_count != null) {
+          result.innerHTML = 'Accepted ' + body.accepted_count + ' &middot; dup ' + (body.duplicate_count || 0) +
+            ' &middot; err ' + (body.error_count || 0);
+        } else {
+          result.innerHTML = body.message || 'Done';
+        }
+      }
+      if (body && body.InSwifts && body.InSwifts.unmatched) {
+        fillStaffInSwifts({ InSwifts: {
+          inbounds: body.InSwifts.unmatched,
+          open_count: body.InSwifts.unmatched_count,
+          mt_clock: {},
+          ytd_posted: '0.00'
+        }});
+        return;
+      }
+      getCustomer($('#customer_id_input').val() || document.getElementById('customer_id').innerHTML);
+    });
+  }).catch(function(error) {
+    console.error(error);
+  });
 }
 
 function postStaffWire(path, payload) {
@@ -877,6 +949,7 @@ $(document).ready(function() {
       $('#cust_accounts_tbl').hide();
       $('#staff_linked_card').hide();
       $('#staff_wire_card').hide();
+      $('#staff_inswift_card').hide();
     });
     $('#staff_la_force_btn').on('click', function(){
       if($('#staff_la_link_id').val() == 'select'){ window.alert('Select a pending link.'); return; }
@@ -917,6 +990,38 @@ $(document).ready(function() {
     $('#staff_wire_recall_btn').on('click', function(){
       if($('#staff_wire_id').val() == 'select'){ window.alert('Select a wire.'); return; }
       postStaffWire('recallWire', { wire_id: $('#staff_wire_id').val() });
+    });
+    $('#staff_inswift_ingest_btn').on('click', function(){
+      var file = $('#staff_inswift_file').val();
+      if (!file) { window.alert('Paste an MT103 file.'); return; }
+      postStaffInSwift('ingestInSwiftFile', { file: file });
+    });
+    $('#staff_inswift_unmatched_btn').on('click', function(){
+      postStaffInSwift('listUnmatchedInSwifts', {});
+    });
+    $('#staff_inswift_assign_btn').on('click', function(){
+      if($('#staff_inswift_id').val() == 'select'){ window.alert('Select an inbound.'); return; }
+      postStaffInSwift('assignInSwift', {
+        inbound_id: $('#staff_inswift_id').val(),
+        customer_id: $('#customer_id_input').val() || document.getElementById('customer_id').innerHTML,
+        account: $('#staff_inswift_assign_account').val()
+      });
+    });
+    $('#staff_inswift_override_btn').on('click', function(){
+      if($('#staff_inswift_id').val() == 'select'){ window.alert('Select an inbound.'); return; }
+      postStaffInSwift('overrideInSwiftOfac', { inbound_id: $('#staff_inswift_id').val() });
+    });
+    $('#staff_inswift_release_btn').on('click', function(){
+      if($('#staff_inswift_id').val() == 'select'){ window.alert('Select an inbound.'); return; }
+      postStaffInSwift('releaseInSwift', { inbound_id: $('#staff_inswift_id').val() });
+    });
+    $('#staff_inswift_reject_btn').on('click', function(){
+      if($('#staff_inswift_id').val() == 'select'){ window.alert('Select an inbound.'); return; }
+      postStaffInSwift('rejectInSwift', { inbound_id: $('#staff_inswift_id').val(), reason: 'MS03' });
+    });
+    $('#staff_inswift_return_btn').on('click', function(){
+      if($('#staff_inswift_id').val() == 'select'){ window.alert('Select an inbound.'); return; }
+      postStaffInSwift('returnInSwift', { inbound_id: $('#staff_inswift_id').val(), reason: 'AC03' });
     });
     $('#approve_req_btn').on('click', function(){
       if($('#customer_req_id').val() == 'select'){
