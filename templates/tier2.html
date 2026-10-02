@@ -332,6 +332,36 @@
               <button type="button" id="staff_wire_recall_btn" class="btn btn-primary">Recall</button>
               <p id="staff_wire_result" style="color:yellow;margin-top:8px;"></p>
             </div>
+            <div id="staff_inach_card" style="display:none;">
+              <h4 class="header_text" style="color:white;">Inbound ACH</h4>
+              <p id="staff_inach_summary" style="color:white;">Posted YTD: $0.00 &middot; open: 0</p>
+              <textarea id="staff_inach_file" placeholder="Paste NACHA file" style="width:100%;height:80px;margin-bottom:8px;"></textarea>
+              <select id="staff_inach_rail" style="height:30px;margin-right:5px;">
+                <option value="">Rail from file</option>
+                <option value="sameday">Same-Day</option>
+                <option value="standard">Standard T+1</option>
+              </select>
+              <button type="button" id="staff_inach_ingest_btn" class="btn btn-primary">Ingest file</button>
+              <table class="table table-hover table-bordered table-color" id="staff_inach_tbl">
+                <thead>
+                  <tr>
+                    <th>From</th>
+                    <th>Amount</th>
+                    <th>Status</th>
+                    <th>Trace</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+              <select id="staff_inach_id" style="height:30px;margin-right:5px;">
+                <option value="select">Select inbound ACH</option>
+              </select>
+              <button type="button" id="staff_inach_override_btn" class="btn btn-primary">Override OFAC</button>
+              <button type="button" id="staff_inach_release_btn" class="btn btn-primary">Release</button>
+              <button type="button" id="staff_inach_reject_btn" class="btn btn-primary">Reject</button>
+              <button type="button" id="staff_inach_return_btn" class="btn btn-primary">Return</button>
+              <p id="staff_inach_result" style="color:yellow;margin-top:8px;"></p>
+            </div>
           </div>
 
           <div id="account_details_pane" style="display: none">
