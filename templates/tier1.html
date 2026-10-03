@@ -300,6 +300,31 @@
               <button type="button" id="staff_wire_recall_btn" class="btn btn-primary">Recall</button>
               <p id="staff_wire_result" style="color:yellow;margin-top:8px;"></p>
             </div>
+            <div id="staff_insdd_card" style="display:none;">
+              <h4 class="header_text" style="color:white;">SEPA DD In</h4>
+              <p id="staff_insdd_summary" style="color:white;">YTD posted: $0.00</p>
+              <textarea id="staff_insdd_file" placeholder="pain.008 XML" style="width:100%;height:70px;"></textarea>
+              <button type="button" id="staff_insdd_ingest_btn" class="btn btn-primary">Ingest file</button>
+              <table class="table table-hover table-bordered table-color" id="staff_insdd_tbl">
+                <thead>
+                  <tr>
+                    <th>Creditor</th>
+                    <th>USD</th>
+                    <th>Status</th>
+                    <th>Scheme</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+              <select id="staff_insdd_id" style="height:30px;margin-right:5px;">
+                <option value="select">Select inbound SDD</option>
+              </select>
+              <button type="button" id="staff_insdd_override_btn" class="btn btn-primary">Override OFAC</button>
+              <button type="button" id="staff_insdd_release_btn" class="btn btn-primary">Release</button>
+              <button type="button" id="staff_insdd_reject_btn" class="btn btn-primary">Reject</button>
+              <button type="button" id="staff_insdd_return_btn" class="btn btn-primary">Return</button>
+              <p id="staff_insdd_result" style="color:yellow;margin-top:8px;"></p>
+            </div>
         </div>
         <div id="account_details_pane" style="display:none;">
           <label class="details_lbl" for="first_name">First name:</label>

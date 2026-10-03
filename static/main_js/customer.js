@@ -128,6 +128,7 @@ function appendPrimaryData(data) {
   fillPendingTransTbl(data);
   fillLinkedAccounts(data);
   fillWires(data);
+  fillInSdds(data);
 }
 
 function fillLinkedAccountSelect(selectId) {
@@ -252,6 +253,94 @@ function fillWires(data) {
     openOpt.innerHTML = wires[j].nickname + ' $' + wires[j].amount + ' (' + wires[j].status + ')';
     openSelect.options.add(openOpt);
   }
+}
+
+function fillInSdds(data) {
+  var snapshot = data.InSdds || {};
+  var summary = document.getElementById('insdd_summary');
+  if (summary) {
+    summary.innerHTML = 'Mandates: ' + (snapshot.mandate_count || 0) +
+      ' &middot; open: ' + (snapshot.open_count || 0) +
+      ' &middot; YTD posted: $' + (snapshot.ytd_posted || '0.00') +
+      ' &middot; refunded: $' + (snapshot.ytd_returned || '0.00');
+  }
+  var clockEl = document.getElementById('insdd_clock');
+  if (clockEl && snapshot.clock) {
+    clockEl.innerHTML = 'TARGET2 cutoff ' + (snapshot.clock.cutoff || '16:00') +
+      ' &middot; value date ' + (snapshot.clock.value_date || '--') +
+      (snapshot.clock.after_cutoff ? ' &middot; after cutoff' : '');
+  }
+  fillLinkedAccountSelect('insdd_account');
+  var mandateTable = document.getElementById('insdd_mandate_tbl');
+  if (!mandateTable) {
+    return;
+  }
+  var mandateBody = mandateTable.getElementsByTagName('tbody')[0];
+  mandateBody.innerHTML = '';
+  var mandateSelect = document.getElementById('insdd_mandate_select');
+  mandateSelect.options.length = 1;
+  var mandates = snapshot.mandates || [];
+  for (var i = 0; i < mandates.length; i++) {
+    var row = mandateBody.insertRow(-1);
+    row.insertCell(0).innerHTML = mandates[i].umr;
+    row.insertCell(1).innerHTML = mandates[i].creditor_name;
+    row.insertCell(2).innerHTML = mandates[i].scheme;
+    row.insertCell(3).innerHTML = mandates[i].status;
+    var option = document.createElement('OPTION');
+    option.value = mandates[i].mandate_id;
+    option.innerHTML = mandates[i].umr + ' (' + mandates[i].status + ')';
+    mandateSelect.options.add(option);
+  }
+  var hist = document.getElementById('insdd_history_tbl');
+  var histBody = hist.getElementsByTagName('tbody')[0];
+  histBody.innerHTML = '';
+  var openSelect = document.getElementById('insdd_open_select');
+  openSelect.options.length = 1;
+  var rows = snapshot.inbounds || [];
+  for (var j = 0; j < rows.length; j++) {
+    var irow = histBody.insertRow(-1);
+    irow.insertCell(0).innerHTML = rows[j].creditor_name;
+    irow.insertCell(1).innerHTML = '€' + rows[j].amount_eur;
+    irow.insertCell(2).innerHTML = '$' + rows[j].debit_usd;
+    irow.insertCell(3).innerHTML = rows[j].status;
+    irow.insertCell(4).innerHTML = rows[j].iban_masked;
+    if (!rows[j].returnable) {
+      continue;
+    }
+    var openOpt = document.createElement('OPTION');
+    openOpt.value = rows[j].inbound_id;
+    openOpt.innerHTML = rows[j].creditor_name + ' $' + rows[j].debit_usd + ' (' + rows[j].status + ')';
+    openSelect.options.add(openOpt);
+  }
+}
+
+function postInSdd(path, payload, okMsg) {
+  payload.userid = userid;
+  fetch(homeURL + path, {
+    method: 'post',
+    body: JSON.stringify(payload),
+    headers: { 'Content-type': 'application/json' }
+  }).then(function(response) {
+    return response.json().then(function(body) {
+      var result = document.getElementById('insdd_result');
+      if (!response.ok) {
+        if (result) { result.innerHTML = (body && (body.message || body.error)) || 'Failed'; }
+        window.alert((body && (body.message || body.error)) || 'Request failed');
+        if (body && body.InSdds) {
+          fillInSdds({ InSdds: body.InSdds });
+        }
+        return;
+      }
+      if (result) { result.innerHTML = okMsg || body.message || 'Done'; }
+      if (body && body.InSdds) {
+        fillInSdds({ InSdds: body.InSdds });
+      } else {
+        getUser();
+      }
+    });
+  }).catch(function(error) {
+    console.error(error);
+  });
 }
 
 function postWire(path, payload, okMsg) {
@@ -1047,6 +1136,7 @@ $(document).ready(function() {
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#insdd_menu').css('background-color','maroon');
     });
     $('#service_requests_menu').on('click', function(){
       if($('#service_requests_pane').css('display')=='none'){
@@ -1057,6 +1147,7 @@ $(document).ready(function() {
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#insdd_menu').css('background-color','maroon');
     });
     $('#my_accounts_menu').on('click', function(){
       getUser();
@@ -1077,6 +1168,7 @@ $(document).ready(function() {
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#insdd_menu').css('background-color','maroon');
     });
     $('#pending_transaction_requests_menu').on('click', function(){
       if($('#pending_transaction_requests_pane').css('display')=='none'){
@@ -1087,6 +1179,7 @@ $(document).ready(function() {
       $('#service_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#insdd_menu').css('background-color','maroon');
     });
     $('#linked_accounts_menu').on('click', function(){
       if($('#linked_accounts_pane').css('display')=='none'){
@@ -1097,6 +1190,7 @@ $(document).ready(function() {
       $('#service_requests_menu').css('background-color','maroon');
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#insdd_menu').css('background-color','maroon');
     });
     $('#wires_menu').on('click', function(){
       if($('#wires_pane').css('display')=='none'){
@@ -1107,6 +1201,51 @@ $(document).ready(function() {
       $('#service_requests_menu').css('background-color','maroon');
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
+      $('#insdd_menu').css('background-color','maroon');
+    });
+    $('#insdd_menu').on('click', function(){
+      if($('#insdd_pane').css('display')=='none'){
+          $('#insdd_pane').show().siblings('div').hide();
+      }
+      $('#insdd_menu').css('background-color','#FF6600');
+      $('#my_accounts_menu').css('background-color','maroon');
+      $('#service_requests_menu').css('background-color','maroon');
+      $('#pending_transaction_requests_menu').css('background-color','maroon');
+      $('#linked_accounts_menu').css('background-color','maroon');
+      $('#wires_menu').css('background-color','maroon');
+    });
+    $('#insdd_add_mandate_btn').on('click', function(){
+      if($('#insdd_umr').val() == '' || $('#insdd_creditor_id').val() == '' || $('#insdd_account').val() == 'select'){
+        window.alert('UMR, creditor id, and account are required.');
+        return;
+      }
+      postInSdd('addInSddMandate', {
+        umr: $('#insdd_umr').val(),
+        creditor_id: $('#insdd_creditor_id').val(),
+        creditor_name: $('#insdd_creditor_name').val(),
+        scheme: $('#insdd_scheme').val(),
+        account: $('#insdd_account').val()
+      }, 'Mandate registered');
+    });
+    $('#insdd_pause_btn').on('click', function(){
+      if($('#insdd_mandate_select').val() == 'select'){ window.alert('Select a mandate.'); return; }
+      postInSdd('pauseInSddMandate', { mandate_id: $('#insdd_mandate_select').val() }, 'Mandate paused');
+    });
+    $('#insdd_resume_btn').on('click', function(){
+      if($('#insdd_mandate_select').val() == 'select'){ window.alert('Select a mandate.'); return; }
+      postInSdd('resumeInSddMandate', { mandate_id: $('#insdd_mandate_select').val() }, 'Mandate resumed');
+    });
+    $('#insdd_cancel_mandate_btn').on('click', function(){
+      if($('#insdd_mandate_select').val() == 'select'){ window.alert('Select a mandate.'); return; }
+      postInSdd('cancelInSddMandate', { mandate_id: $('#insdd_mandate_select').val() }, 'Mandate cancelled');
+    });
+    $('#insdd_refuse_btn').on('click', function(){
+      if($('#insdd_open_select').val() == 'select'){ window.alert('Select a collection.'); return; }
+      postInSdd('requestInSddReturn', { inbound_id: $('#insdd_open_select').val(), reason: 'cust' }, 'Collection refused');
+    });
+    $('#insdd_refund_btn').on('click', function(){
+      if($('#insdd_open_select').val() == 'select'){ window.alert('Select a collection.'); return; }
+      postInSdd('requestInSddRefund', { inbound_id: $('#insdd_open_select').val(), reason: 'md06' }, 'Refund requested');
     });
     $('#wire_add_btn').on('click', function(){
       if($('#wire_nickname').val() == '' || $('#wire_legal_name').val() == '' || $('#wire_default_account').val() == 'select'){

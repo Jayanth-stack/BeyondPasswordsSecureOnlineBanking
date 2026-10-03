@@ -21,6 +21,12 @@ from utility.wire import (
     get_service as get_wire_service,
     set_service as set_wire_service,
 )
+from utility.insdd import (
+    attach_insdd_routes,
+    build_service as build_insdd_service,
+    get_service as get_insdd_service,
+    set_service as set_insdd_service,
+)
 
 load_dotenv()
 
@@ -278,6 +284,7 @@ def get_customer_data():
             'FundsRequests': c.get_funds_requests(customer_id),
             'LinkedAccounts': _link_snapshot(customer_id, actor=customer_id, actor_type='customer'),
             'Wires': _wire_snapshot(customer_id, actor=customer_id, actor_type='customer'),
+            'InSdds': _insdd_snapshot(customer_id, actor=customer_id, actor_type='customer'),
         }
         return jsonify(response), 200
     except Exception as e:
@@ -918,6 +925,9 @@ def get_customer():
                 'Wires': _wire_snapshot(
                     values['customer_id'], actor=session['userid'], actor_type=session.get('usertype') or 'employee',
                 ),
+                'InSdds': _insdd_snapshot(
+                    values['customer_id'], actor=session['userid'], actor_type=session.get('usertype') or 'employee',
+                ),
             }
             return jsonify(response), 200
         except Exception as e:
@@ -1382,6 +1392,36 @@ wire_service = build_wire_service(
 )
 set_wire_service(wire_service)
 attach_wire_routes(app, wire_service)
+
+
+def _insdd_lookup(account):
+    try:
+        found = Customers().get_customerID_from_account(int(account))
+        if found in (None, '', -1, 0):
+            return None
+        return str(found)
+    except Exception:
+        return None
+
+
+def _insdd_snapshot(userid, actor=None, actor_type='customer'):
+    service = get_insdd_service()
+    if service is None:
+        return {'enabled': False, 'inbounds': [], 'mandates': []}
+    try:
+        return service.snapshot(userid, actor=actor, actor_type=actor_type)
+    except Exception:
+        return {'enabled': False, 'inbounds': [], 'mandates': []}
+
+
+insdd_service = build_insdd_service(
+    debit_fn=_link_debit,
+    credit_fn=_link_credit,
+    accounts_fn=_link_accounts,
+    lookup_fn=_insdd_lookup,
+)
+set_insdd_service(insdd_service)
+attach_insdd_routes(app, insdd_service)
 
 app.config['SESSION_COOKIE_SECURE'] = True
 app.config['SESSION_COOKIE_HTTPONLY'] = True
