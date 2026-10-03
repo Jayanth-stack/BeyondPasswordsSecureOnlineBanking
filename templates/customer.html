@@ -111,6 +111,15 @@
         </button>
 
         <button type="button" class="btn btn-primary btn-block"
+        id="insdd_menu">
+        <span class="glyphicon glyphicon-import gi-3x"
+        style="color: white" aria-hidden="true">
+        </span>
+        <br />
+        SEPA DD In
+        </button>
+
+        <button type="button" class="btn btn-primary btn-block"
         id="service_requests_menu">
         <span class="glyphicon glyphicon-edit gi-3x"
         style="color: white" aria-hidden="true">
@@ -352,6 +361,58 @@
           <select id="wire_open_select" style="height:30px;margin-right:5px;">
             <option value="select">Select open wire</option>
           </select>
+        </div>
+        <div id="insdd_pane" style="display:none;">
+          <p id="insdd_summary" style="color:white;">Mandates: 0 &middot; open: 0 &middot; YTD posted: $0.00</p>
+          <p id="insdd_clock" style="color:white;">TARGET2 cutoff 16:00</p>
+          <table class="table table-hover table-bordered table-color fixed-header" id="insdd_mandate_tbl">
+            <thead>
+              <tr>
+                <th>UMR</th>
+                <th>Creditor</th>
+                <th>Scheme</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+          <h5 style="color:white;">Register a collection mandate</h5>
+          <input type="text" id="insdd_umr" placeholder="UMR" style="height:30px;width:140px;margin-right:5px;">
+          <input type="text" id="insdd_creditor_id" placeholder="Creditor ID" style="height:30px;width:180px;margin-right:5px;">
+          <input type="text" id="insdd_creditor_name" placeholder="Creditor name" style="height:30px;width:160px;margin-right:5px;">
+          <select id="insdd_scheme" style="height:30px;margin-right:5px;">
+            <option value="core">CORE</option>
+            <option value="b2b">B2B</option>
+          </select>
+          <select id="insdd_account" style="height:30px;margin-right:5px;">
+            <option value="select">Select account</option>
+          </select>
+          <button type="button" id="insdd_add_mandate_btn" class="btn btn-primary">Add mandate</button>
+          <button type="button" id="insdd_pause_btn" class="btn btn-primary">Pause</button>
+          <button type="button" id="insdd_resume_btn" class="btn btn-primary">Resume</button>
+          <button type="button" id="insdd_cancel_mandate_btn" class="btn btn-primary">Cancel mandate</button>
+          <select id="insdd_mandate_select" style="height:30px;margin-right:5px;">
+            <option value="select">Select mandate</option>
+          </select>
+          <h5 style="color:white;">Incoming collections</h5>
+          <table class="table table-hover table-bordered table-color fixed-header" id="insdd_history_tbl">
+            <thead>
+              <tr>
+                <th>Creditor</th>
+                <th>EUR</th>
+                <th>USD</th>
+                <th>Status</th>
+                <th>IBAN</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+          <select id="insdd_open_select" style="height:30px;margin-right:5px;">
+            <option value="select">Select collection</option>
+          </select>
+          <button type="button" id="insdd_refuse_btn" class="btn btn-primary">Refuse</button>
+          <button type="button" id="insdd_refund_btn" class="btn btn-primary">Request refund</button>
+          <p id="insdd_result" style="color:yellow;margin-top:10px;"></p>
         </div>
         <div id="account_details_pane" style="display:none;">
 					<label class="details_lbl" for="first_name">First name:</label>

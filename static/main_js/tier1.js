@@ -321,6 +321,7 @@ function appendSecondaryData(customer_id, data) {
   fillCustomerAccTbl(data);
   fillStaffLinked(data);
   fillStaffWires(data);
+  fillStaffInSdds(data);
   if($('#cust_details_card').css('display')=='none'){
     $('#cust_details_card').show();
   }
@@ -449,6 +450,62 @@ function fillStaffWires(data) {
     option.innerHTML = wires[j].nickname + ' $' + wires[j].amount + ' (' + wires[j].status + ')';
     selection.options.add(option);
   }
+}
+
+function fillStaffInSdds(data) {
+  var snapshot = data.InSdds || {};
+  var card = document.getElementById('staff_insdd_card');
+  if (!card) {
+    return;
+  }
+  card.style.display = 'block';
+  var summary = document.getElementById('staff_insdd_summary');
+  if (summary) {
+    summary.innerHTML = 'YTD posted: $' + (snapshot.ytd_posted || '0.00') +
+      ' &middot; refunded: $' + (snapshot.ytd_returned || '0.00') +
+      ' &middot; mandates: ' + (snapshot.mandate_count || 0);
+  }
+  var table = document.getElementById('staff_insdd_tbl');
+  var body = table.getElementsByTagName('tbody')[0];
+  body.innerHTML = '';
+  var selection = document.getElementById('staff_insdd_id');
+  selection.options.length = 1;
+  var rows = snapshot.inbounds || [];
+  for (var j = 0; j < rows.length; j++) {
+    var irow = body.insertRow(-1);
+    irow.insertCell(0).innerHTML = rows[j].creditor_name;
+    irow.insertCell(1).innerHTML = '$' + rows[j].debit_usd;
+    irow.insertCell(2).innerHTML = rows[j].status;
+    irow.insertCell(3).innerHTML = rows[j].scheme;
+    if (['held', 'queued', 'pending_release', 'posted', 'unmatched'].indexOf(rows[j].status) < 0) {
+      continue;
+    }
+    var option = document.createElement('OPTION');
+    option.value = rows[j].inbound_id;
+    option.innerHTML = rows[j].creditor_name + ' $' + rows[j].debit_usd + ' (' + rows[j].status + ')';
+    selection.options.add(option);
+  }
+}
+
+function postStaffInSdd(path, payload) {
+  payload.userid = userid;
+  fetch(homeURL + path, {
+    method: 'post',
+    body: JSON.stringify(payload),
+    headers: { 'Content-type': 'application/json' }
+  }).then(function(response) {
+    return response.json().then(function(body) {
+      var result = document.getElementById('staff_insdd_result');
+      if (!response.ok) {
+        if (result) { result.innerHTML = (body && (body.message || body.error)) || 'Failed'; }
+        return;
+      }
+      if (result) { result.innerHTML = body.message || 'Done'; }
+      getCustomer($('#customer_id_input').val() || document.getElementById('customer_id').innerHTML);
+    });
+  }).catch(function(error) {
+    console.error(error);
+  });
 }
 
 function postStaffWire(path, payload) {
@@ -877,6 +934,7 @@ $(document).ready(function() {
       $('#cust_accounts_tbl').hide();
       $('#staff_linked_card').hide();
       $('#staff_wire_card').hide();
+      $('#staff_insdd_card').hide();
     });
     $('#staff_la_force_btn').on('click', function(){
       if($('#staff_la_link_id').val() == 'select'){ window.alert('Select a pending link.'); return; }
@@ -917,6 +975,26 @@ $(document).ready(function() {
     $('#staff_wire_recall_btn').on('click', function(){
       if($('#staff_wire_id').val() == 'select'){ window.alert('Select a wire.'); return; }
       postStaffWire('recallWire', { wire_id: $('#staff_wire_id').val() });
+    });
+    $('#staff_insdd_ingest_btn').on('click', function(){
+      if($('#staff_insdd_file').val() == ''){ window.alert('Paste a pain.008 file.'); return; }
+      postStaffInSdd('ingestInSddFile', { file: $('#staff_insdd_file').val() });
+    });
+    $('#staff_insdd_override_btn').on('click', function(){
+      if($('#staff_insdd_id').val() == 'select'){ window.alert('Select an inbound SDD.'); return; }
+      postStaffInSdd('overrideInSddOfac', { inbound_id: $('#staff_insdd_id').val() });
+    });
+    $('#staff_insdd_release_btn').on('click', function(){
+      if($('#staff_insdd_id').val() == 'select'){ window.alert('Select an inbound SDD.'); return; }
+      postStaffInSdd('releaseInSdd', { inbound_id: $('#staff_insdd_id').val() });
+    });
+    $('#staff_insdd_reject_btn').on('click', function(){
+      if($('#staff_insdd_id').val() == 'select'){ window.alert('Select an inbound SDD.'); return; }
+      postStaffInSdd('rejectInSdd', { inbound_id: $('#staff_insdd_id').val(), reason: 'other' });
+    });
+    $('#staff_insdd_return_btn').on('click', function(){
+      if($('#staff_insdd_id').val() == 'select'){ window.alert('Select an inbound SDD.'); return; }
+      postStaffInSdd('returnInSdd', { inbound_id: $('#staff_insdd_id').val(), reason: 'cust' });
     });
     $('#approve_req_btn').on('click', function(){
       if($('#customer_req_id').val() == 'select'){
