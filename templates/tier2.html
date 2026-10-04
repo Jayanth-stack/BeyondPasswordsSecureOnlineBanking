@@ -332,6 +332,33 @@
               <button type="button" id="staff_wire_recall_btn" class="btn btn-primary">Recall</button>
               <p id="staff_wire_result" style="color:yellow;margin-top:8px;"></p>
             </div>
+            <div id="staff_chgbk_card" style="display:none;">
+              <h4 class="header_text" style="color:white;">Chargebacks</h4>
+              <p id="staff_chgbk_summary" style="color:white;">Clawed: $0.00 &middot; won: $0.00 &middot; lost: $0.00</p>
+              <table class="table table-hover table-bordered table-color" id="staff_chgbk_tbl">
+                <thead>
+                  <tr>
+                    <th>Merchant</th>
+                    <th>Amount</th>
+                    <th>Status</th>
+                    <th>ARN</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+              <input type="text" id="staff_chgbk_file" placeholder="CHGBK|VISA|ARN|..." style="height:30px;width:280px;margin-right:5px;">
+              <button type="button" id="staff_chgbk_ingest_btn" class="btn btn-primary">Ingest file</button>
+              <select id="staff_chgbk_id" style="height:30px;margin-right:5px;">
+                <option value="select">Select chargeback</option>
+              </select>
+              <button type="button" id="staff_chgbk_override_btn" class="btn btn-primary">Override OFAC</button>
+              <button type="button" id="staff_chgbk_release_btn" class="btn btn-primary">Release</button>
+              <button type="button" id="staff_chgbk_reject_btn" class="btn btn-primary">Reject</button>
+              <button type="button" id="staff_chgbk_represent_btn" class="btn btn-primary">Represent</button>
+              <button type="button" id="staff_chgbk_win_btn" class="btn btn-primary">Record win</button>
+              <button type="button" id="staff_chgbk_loss_btn" class="btn btn-primary">Record loss</button>
+              <p id="staff_chgbk_result" style="color:yellow;margin-top:8px;"></p>
+            </div>
           </div>
 
           <div id="account_details_pane" style="display: none">
