@@ -21,6 +21,12 @@ from utility.wire import (
     get_service as get_wire_service,
     set_service as set_wire_service,
 )
+from utility.chgbk import (
+    attach_chgbk_routes,
+    build_service as build_chgbk_service,
+    get_service as get_chgbk_service,
+    set_service as set_chgbk_service,
+)
 
 load_dotenv()
 
@@ -278,6 +284,7 @@ def get_customer_data():
             'FundsRequests': c.get_funds_requests(customer_id),
             'LinkedAccounts': _link_snapshot(customer_id, actor=customer_id, actor_type='customer'),
             'Wires': _wire_snapshot(customer_id, actor=customer_id, actor_type='customer'),
+            'Chargebacks': _chgbk_snapshot(customer_id, actor=customer_id, actor_type='customer'),
         }
         return jsonify(response), 200
     except Exception as e:
@@ -918,6 +925,9 @@ def get_customer():
                 'Wires': _wire_snapshot(
                     values['customer_id'], actor=session['userid'], actor_type=session.get('usertype') or 'employee',
                 ),
+                'Chargebacks': _chgbk_snapshot(
+                    values['customer_id'], actor=session['userid'], actor_type=session.get('usertype') or 'employee',
+                ),
             }
             return jsonify(response), 200
         except Exception as e:
@@ -1382,6 +1392,36 @@ wire_service = build_wire_service(
 )
 set_wire_service(wire_service)
 attach_wire_routes(app, wire_service)
+
+
+def _chgbk_directory(account):
+    try:
+        found = Customers().get_customerID_from_account(int(account))
+    except Exception:
+        return None
+    if found in (None, '', -1, '-1'):
+        return None
+    return found
+
+
+def _chgbk_snapshot(userid, actor=None, actor_type='customer'):
+    service = get_chgbk_service()
+    if service is None:
+        return {'enabled': False, 'cases': []}
+    try:
+        return service.snapshot(userid, actor=actor, actor_type=actor_type)
+    except Exception:
+        return {'enabled': False, 'cases': []}
+
+
+chgbk_service = build_chgbk_service(
+    debit_fn=_link_debit,
+    credit_fn=_link_credit,
+    accounts_fn=_link_accounts,
+    directory_fn=_chgbk_directory,
+)
+set_chgbk_service(chgbk_service)
+attach_chgbk_routes(app, chgbk_service)
 
 app.config['SESSION_COOKIE_SECURE'] = True
 app.config['SESSION_COOKIE_HTTPONLY'] = True

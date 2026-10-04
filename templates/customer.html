@@ -111,6 +111,15 @@
         </button>
 
         <button type="button" class="btn btn-primary btn-block"
+        id="chargebacks_menu">
+        <span class="glyphicon glyphicon-credit-card gi-3x"
+        style="color: white" aria-hidden="true">
+        </span>
+        <br />
+        Chargebacks
+        </button>
+
+        <button type="button" class="btn btn-primary btn-block"
         id="service_requests_menu">
         <span class="glyphicon glyphicon-edit gi-3x"
         style="color: white" aria-hidden="true">
@@ -352,6 +361,41 @@
           <select id="wire_open_select" style="height:30px;margin-right:5px;">
             <option value="select">Select open wire</option>
           </select>
+        </div>
+        <div id="chargebacks_pane" style="display:none;">
+          <p id="chgbk_summary" style="color:white;">Open: 0 &middot; clawed: $0.00 &middot; won: $0.00 &middot; lost: $0.00</p>
+          <table class="table table-hover table-bordered table-color fixed-header" id="chgbk_tbl">
+            <thead>
+              <tr>
+                <th>Merchant</th>
+                <th>Amount</th>
+                <th>Reason</th>
+                <th>Status</th>
+                <th>ARN</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+          <h5 style="color:white;">Merchant evidence</h5>
+          <select id="chgbk_case_select" style="height:30px;margin-right:5px;">
+            <option value="select">Select open chargeback</option>
+          </select>
+          <select id="chgbk_kind" style="height:30px;margin-right:5px;">
+            <option value="receipt">Receipt</option>
+            <option value="avs">AVS</option>
+            <option value="cvc">CVC</option>
+            <option value="delivery">Delivery</option>
+            <option value="threeds">3-D Secure</option>
+            <option value="correspondence">Correspondence</option>
+            <option value="refund">Refund</option>
+            <option value="other">Other</option>
+          </select>
+          <input type="text" id="chgbk_ref" placeholder="Document ref" style="height:30px;width:140px;margin-right:5px;">
+          <input type="text" id="chgbk_note" placeholder="Note" style="height:30px;width:140px;margin-right:5px;">
+          <button type="button" id="chgbk_evidence_btn" class="btn btn-primary">Add evidence</button>
+          <button type="button" id="chgbk_represent_btn" class="btn btn-primary">Represent</button>
+          <button type="button" id="chgbk_accept_btn" class="btn btn-primary">Accept liability</button>
+          <p id="chgbk_result" style="color:yellow;margin-top:10px;"></p>
         </div>
         <div id="account_details_pane" style="display:none;">
 					<label class="details_lbl" for="first_name">First name:</label>
