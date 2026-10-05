@@ -332,6 +332,42 @@
               <button type="button" id="staff_wire_recall_btn" class="btn btn-primary">Recall</button>
               <p id="staff_wire_result" style="color:yellow;margin-top:8px;"></p>
             </div>
+            <div id="staff_interac_card" style="display:none;">
+              <h4 class="header_text" style="color:white;">Interac In</h4>
+              <p id="staff_interac_summary" style="color:white;">YTD received: $0.00 &middot; open: 0</p>
+              <textarea id="staff_interac_file" placeholder="IET1 file" style="width:90%;height:70px;"></textarea><br>
+              <button type="button" id="staff_interac_ingest_btn" class="btn btn-primary">Ingest file</button>
+              <table class="table table-hover table-bordered table-color" id="staff_interac_alias_tbl">
+                <thead>
+                  <tr>
+                    <th>Nickname</th>
+                    <th>Kind</th>
+                    <th>Alias</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+              <table class="table table-hover table-bordered table-color" id="staff_interac_tbl">
+                <thead>
+                  <tr>
+                    <th>Sender</th>
+                    <th>USD</th>
+                    <th>Status</th>
+                    <th>Ref</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+              <select id="staff_interac_id" style="height:30px;margin-right:5px;">
+                <option value="select">Select inbound</option>
+              </select>
+              <button type="button" id="staff_interac_override_btn" class="btn btn-primary">Override OFAC</button>
+              <button type="button" id="staff_interac_release_btn" class="btn btn-primary">Release</button>
+              <button type="button" id="staff_interac_reject_btn" class="btn btn-primary">Reject</button>
+              <button type="button" id="staff_interac_return_btn" class="btn btn-primary">Return</button>
+              <p id="staff_interac_result" style="color:yellow;margin-top:8px;"></p>
+            </div>
           </div>
 
           <div id="account_details_pane" style="display: none">
