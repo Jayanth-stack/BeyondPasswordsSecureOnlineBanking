@@ -382,8 +382,7 @@ class ApprovalAndMfaRouteTests(unittest.TestCase):
                 json={"userid": "emp1", "account_no": 10},
             )
         self.assertEqual(response.status_code, 200)
-        # Route does not pass the acting userid into the helper.
-        emp_cls.return_value.deactivate_account.assert_called_once_with(10)
+        emp_cls.return_value.deactivate_account.assert_called_once_with("emp1", 10)
 
 
 if __name__ == "__main__":

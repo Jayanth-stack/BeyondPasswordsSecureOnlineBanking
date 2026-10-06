@@ -275,23 +275,27 @@ class CrashAndArityRouteTests(unittest.TestCase):
             if emp_tier is not None:
                 sess["emp_tier"] = emp_tier
 
-    def test_deactivate_account_authorized_is_500_wrong_arity(self):
+    def test_deactivate_account_authorized_forwards_actor(self):
         self._session("emp1", "tier2", emp_tier=2)
-        response = self.client.post(
-            "/deactivateAccount",
-            json={"userid": "emp1", "account_no": 10},
-        )
-        self.assertEqual(response.status_code, 500)
-        self.assertIn("Failed to deactivate account", response.get_json()["message"])
+        with patch("app.Employee") as emp_cls:
+            emp_cls.return_value.deactivate_account.return_value = "Account Closed"
+            response = self.client.post(
+                "/deactivateAccount",
+                json={"userid": "emp1", "account_no": 10},
+            )
+        self.assertEqual(response.status_code, 200)
+        emp_cls.return_value.deactivate_account.assert_called_once_with("emp1", 10)
 
-    def test_deactivate_customer_authorized_is_500_wrong_arity(self):
+    def test_deactivate_customer_authorized_forwards_actor(self):
         self._session("emp1", "tier2", emp_tier=2)
-        response = self.client.post(
-            "/deactivateCustomer",
-            json={"userid": "emp1", "customer_id": "cust1"},
-        )
-        self.assertEqual(response.status_code, 500)
-        self.assertIn("Failed to deactivate customer", response.get_json()["message"])
+        with patch("app.Employee") as emp_cls:
+            emp_cls.return_value.deactivate_customer.return_value = "Customer deactivated"
+            response = self.client.post(
+                "/deactivateCustomer",
+                json={"userid": "emp1", "customer_id": "cust1"},
+            )
+        self.assertEqual(response.status_code, 200)
+        emp_cls.return_value.deactivate_customer.assert_called_once_with("emp1", "cust1")
 
     def test_deactivate_employee_authorized_is_500_wrong_arity(self):
         self._session("admin1", "admin", emp_tier=3)
@@ -302,14 +306,16 @@ class CrashAndArityRouteTests(unittest.TestCase):
         self.assertEqual(response.status_code, 500)
         self.assertIn("Failed to deactivate employee", response.get_json()["message"])
 
-    def test_approve_update_info_authorized_is_500_wrong_arity(self):
+    def test_approve_update_info_authorized_forwards_actor(self):
         self._session("emp1", "employee", emp_tier=2)
-        response = self.client.post(
-            "/approveUpdateInfo",
-            json={"userid": "emp1", "update_req_no": 9},
-        )
-        self.assertEqual(response.status_code, 500)
-        self.assertIn("Failed to approve update info", response.get_json()["message"])
+        with patch("app.Employee") as emp_cls:
+            emp_cls.return_value.approve_update_info.return_value = "Customer Updated"
+            response = self.client.post(
+                "/approveUpdateInfo",
+                json={"userid": "emp1", "update_req_no": 9},
+            )
+        self.assertEqual(response.status_code, 200)
+        emp_cls.return_value.approve_update_info.assert_called_once_with("emp1", 9)
 
     def test_update_employee_authorized_is_500_bad_kwargs(self):
         self._session("admin1", "admin", emp_tier=3)
