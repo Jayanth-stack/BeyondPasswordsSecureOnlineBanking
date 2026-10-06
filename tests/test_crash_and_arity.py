@@ -331,19 +331,21 @@ class CrashAndArityRouteTests(unittest.TestCase):
         self.assertEqual(response.status_code, 500)
         self.assertIn("Failed to update employee", response.get_json()["message"])
 
-    def test_reset_password_approved_otp_typeerrors_on_arity(self):
-        # Route calls reset_password(userid, newPassword); helper requires oldPassword too.
+    def test_reset_password_approved_otp_uses_force_reset(self):
         with patch.object(
             self.app_module.Employee, "retrieve_phone_number", return_value="+14155552671"
-        ), patch("app.twilio_client") as twilio:
+        ), patch.object(
+            self.app_module.Employee, "reset_fpassword", return_value="Password Updated"
+        ) as reset, patch("app.twilio_client") as twilio:
             twilio.verify.v2.services.return_value.verification_checks.create.return_value.status = (
                 "approved"
             )
-            with self.assertRaises(TypeError):
-                self.client.post(
-                    "/resetPassword",
-                    json={"userid": "emp1", "newPassword": "n3w", "otp": "123456"},
-                )
+            response = self.client.post(
+                "/resetPassword",
+                json={"userid": "emp1", "newPassword": "n3w", "otp": "123456"},
+            )
+        self.assertEqual(response.status_code, 200)
+        reset.assert_called_once_with("emp1", "n3w")
 
     def test_send_otp_unauthenticated_still_sends(self):
         with patch("app.Employee") as emp_cls, patch("app.twilio_client") as twilio:
