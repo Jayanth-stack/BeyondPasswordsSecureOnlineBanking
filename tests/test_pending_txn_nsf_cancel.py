@@ -176,6 +176,49 @@ class MutatingGetAndStaffDenyRouteTests(unittest.TestCase):
         customers_cls.return_value.deny_funds_requested.assert_not_called()
         emp_cls.return_value.deny_funds_requested.assert_not_called()
 
+    def test_claimed_employee_get_update_info_still_queues(self):
+        # /updateInfo checks session userid, not usertype.
+        self._session("cust1", "employee", emp_tier=1)
+        with patch("app.Customers") as customers_cls:
+            customers_cls.return_value.update_info_reqest.return_value = (
+                "Update Info Request Placed"
+            )
+            response = self.client.get(
+                "/updateInfo",
+                json={
+                    "userid": "cust1",
+                    "email": "evil@x.com",
+                    "contact_no": "1",
+                    "address": "x",
+                    "requester": "Employee",
+                },
+            )
+        self.assertEqual(response.status_code, 200)
+        customers_cls.return_value.update_info_reqest.assert_called_once_with(
+            "Employee", "cust1", "evil@x.com", "1", "x"
+        )
+
+    def test_claimed_employee_get_transaction_history_is_forbidden(self):
+        self._session("cust1", "employee", emp_tier=1)
+        with patch("app.Customers") as customers_cls:
+            response = self.client.get(
+                "/getTransactionHistory",
+                json={"userid": "cust1", "account_no": 555},
+            )
+        self.assertEqual(response.status_code, 403)
+        customers_cls.return_value.get_transaction_history.assert_not_called()
+
+    def test_claimed_employee_get_send_otp_for_another_user(self):
+        self._session("mallory", "employee", emp_tier=1)
+        with patch("app.Employee") as emp_cls, patch("app.twilio_client") as twilio:
+            emp_cls.return_value.retrieve_phone_number.return_value = "+14155552671"
+            twilio.verify.v2.services.return_value.verifications.create.return_value.sid = (
+                "VA9"
+            )
+            response = self.client.get("/sendOTP", json={"userid": "alice"})
+        self.assertEqual(response.status_code, 200)
+        emp_cls.return_value.retrieve_phone_number.assert_called_once_with("alice")
+
 
 if __name__ == "__main__":
     unittest.main()
