@@ -128,6 +128,7 @@ function appendPrimaryData(data) {
   fillPendingTransTbl(data);
   fillLinkedAccounts(data);
   fillWires(data);
+  fillIet(data);
 }
 
 function fillLinkedAccountSelect(selectId) {
@@ -252,6 +253,104 @@ function fillWires(data) {
     openOpt.innerHTML = wires[j].nickname + ' $' + wires[j].amount + ' (' + wires[j].status + ')';
     openSelect.options.add(openOpt);
   }
+}
+
+function fillIet(data) {
+  var snapshot = data.Iet || {};
+  var summary = document.getElementById('iet_summary');
+  if (summary) {
+    summary.innerHTML = 'Active: ' + (snapshot.active_count || 0) +
+      ' &middot; open: ' + (snapshot.open_count || 0) +
+      ' &middot; YTD sent: $' + (snapshot.ytd_sent || '0.00') +
+      ' &middot; fees: $' + (snapshot.ytd_fees || '0.00');
+  }
+  var clockEl = document.getElementById('iet_clock');
+  if (clockEl && snapshot.clock) {
+    clockEl.innerHTML = 'Interac ' + (snapshot.clock.cutoff || '24/7') +
+      ' &middot; CADUSD ' + (snapshot.cadusd || '0.740000') +
+      (snapshot.clock.business_day ? '' : ' &middot; holiday');
+  }
+  fillLinkedAccountSelect('iet_default_account');
+  var table = document.getElementById('iet_contact_tbl');
+  if (!table) {
+    return;
+  }
+  var body = table.getElementsByTagName('tbody')[0];
+  body.innerHTML = '';
+  var selection = document.getElementById('iet_contact_select');
+  selection.options.length = 1;
+  var contacts = snapshot.contacts || [];
+  for (var i = 0; i < contacts.length; i++) {
+    var row = body.insertRow(-1);
+    row.insertCell(0).innerHTML = contacts[i].nickname;
+    row.insertCell(1).innerHTML = contacts[i].legal_name;
+    row.insertCell(2).innerHTML = contacts[i].alias_masked;
+    row.insertCell(3).innerHTML = contacts[i].rail;
+    row.insertCell(4).innerHTML = contacts[i].status;
+    var option = document.createElement('OPTION');
+    option.value = contacts[i].contact_id;
+    option.innerHTML = contacts[i].nickname + ' (' + contacts[i].status + ')';
+    selection.options.add(option);
+  }
+  var hist = document.getElementById('iet_history_tbl');
+  var histBody = hist.getElementsByTagName('tbody')[0];
+  histBody.innerHTML = '';
+  var openSelect = document.getElementById('iet_open_select');
+  openSelect.options.length = 1;
+  var transfers = snapshot.transfers || [];
+  for (var j = 0; j < transfers.length; j++) {
+    var trow = histBody.insertRow(-1);
+    trow.insertCell(0).innerHTML = transfers[j].nickname;
+    trow.insertCell(1).innerHTML = 'C$' + transfers[j].amount_cad;
+    trow.insertCell(2).innerHTML = '$' + transfers[j].debit_usd;
+    trow.insertCell(3).innerHTML = transfers[j].status;
+    trow.insertCell(4).innerHTML = transfers[j].reference_masked || '';
+    if (!transfers[j].cancelable) {
+      continue;
+    }
+    var openOpt = document.createElement('OPTION');
+    openOpt.value = transfers[j].transfer_id;
+    openOpt.innerHTML = transfers[j].nickname + ' C$' + transfers[j].amount_cad + ' (' + transfers[j].status + ')';
+    openSelect.options.add(openOpt);
+  }
+}
+
+function postIet(path, payload, okMsg) {
+  payload.userid = userid;
+  fetch(homeURL + path, {
+    method: 'post',
+    body: JSON.stringify(payload),
+    headers: { 'Content-type': 'application/json' }
+  }).then(function(response) {
+    return response.json().then(function(body) {
+      var result = document.getElementById('iet_result');
+      if (!response.ok) {
+        if (result) { result.innerHTML = (body && (body.message || body.error)) || 'Failed'; }
+        window.alert((body && (body.message || body.error)) || 'Request failed');
+        if (body && body.Iet) {
+          fillIet({ Iet: body.Iet });
+        }
+        return;
+      }
+      if (result) {
+        if (body && body.preview) {
+          result.innerHTML = 'CAD ' + body.preview.amount_cad + ' &middot; debit $' + body.preview.debit_usd +
+            ' &middot; fee $' + body.preview.fee;
+        } else if (body && body.quote) {
+          result.innerHTML = 'C$' + body.quote.amount_cad + ' = $' + body.quote.amount_usd;
+        } else {
+          result.innerHTML = okMsg || body.message || 'Done';
+        }
+      }
+      if (body && body.Iet) {
+        fillIet({ Iet: body.Iet });
+      } else if (!body || !body.quote) {
+        getUser();
+      }
+    });
+  }).catch(function(error) {
+    console.error(error);
+  });
 }
 
 function postWire(path, payload, okMsg) {
@@ -1047,6 +1146,7 @@ $(document).ready(function() {
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#iet_menu').css('background-color','maroon');
     });
     $('#service_requests_menu').on('click', function(){
       if($('#service_requests_pane').css('display')=='none'){
@@ -1057,6 +1157,7 @@ $(document).ready(function() {
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#iet_menu').css('background-color','maroon');
     });
     $('#my_accounts_menu').on('click', function(){
       getUser();
@@ -1077,6 +1178,7 @@ $(document).ready(function() {
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#iet_menu').css('background-color','maroon');
     });
     $('#pending_transaction_requests_menu').on('click', function(){
       if($('#pending_transaction_requests_pane').css('display')=='none'){
@@ -1087,6 +1189,7 @@ $(document).ready(function() {
       $('#service_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#iet_menu').css('background-color','maroon');
     });
     $('#linked_accounts_menu').on('click', function(){
       if($('#linked_accounts_pane').css('display')=='none'){
@@ -1097,12 +1200,25 @@ $(document).ready(function() {
       $('#service_requests_menu').css('background-color','maroon');
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#iet_menu').css('background-color','maroon');
     });
     $('#wires_menu').on('click', function(){
       if($('#wires_pane').css('display')=='none'){
           $('#wires_pane').show().siblings('div').hide();
       }
       $('#wires_menu').css('background-color','#FF6600');
+      $('#iet_menu').css('background-color','maroon');
+      $('#my_accounts_menu').css('background-color','maroon');
+      $('#service_requests_menu').css('background-color','maroon');
+      $('#pending_transaction_requests_menu').css('background-color','maroon');
+      $('#linked_accounts_menu').css('background-color','maroon');
+    });
+    $('#iet_menu').on('click', function(){
+      if($('#iet_pane').css('display')=='none'){
+          $('#iet_pane').show().siblings('div').hide();
+      }
+      $('#iet_menu').css('background-color','#FF6600');
+      $('#wires_menu').css('background-color','maroon');
       $('#my_accounts_menu').css('background-color','maroon');
       $('#service_requests_menu').css('background-color','maroon');
       $('#pending_transaction_requests_menu').css('background-color','maroon');
@@ -1164,6 +1280,66 @@ $(document).ready(function() {
     $('#wire_archive_btn').on('click', function(){
       if($('#wire_bene_select').val() == 'select'){ window.alert('Select a beneficiary.'); return; }
       postWire('archiveWireBeneficiary', { beneficiary_id: $('#wire_bene_select').val() }, 'Archived');
+    });
+    $('#iet_add_btn').on('click', function(){
+      if($('#iet_nickname').val() == '' || $('#iet_legal_name').val() == '' || $('#iet_default_account').val() == 'select'){
+        window.alert('Nickname, legal name, and internal account are required.');
+        return;
+      }
+      postIet('addIetContact', {
+        nickname: $('#iet_nickname').val(),
+        legal_name: $('#iet_legal_name').val(),
+        kind: $('#iet_kind').val(),
+        alias: $('#iet_alias').val(),
+        rail: $('#iet_rail').val(),
+        question: $('#iet_question').val(),
+        answer: $('#iet_answer').val(),
+        default_account: $('#iet_default_account').val()
+      }, 'Contact added');
+    });
+    $('#iet_quote_btn').on('click', function(){
+      if($('#iet_amount').val() == ''){ window.alert('Enter a CAD amount.'); return; }
+      postIet('quoteIetFx', { amount: $('#iet_amount').val() }, 'Quoted');
+    });
+    $('#iet_preview_btn').on('click', function(){
+      if($('#iet_contact_select').val() == 'select' || $('#iet_amount').val() == ''){
+        window.alert('Select a contact and amount.');
+        return;
+      }
+      postIet('previewIet', {
+        contact_id: $('#iet_contact_select').val(),
+        amount: $('#iet_amount').val(),
+        account: $('#iet_default_account').val() == 'select' ? null : $('#iet_default_account').val()
+      }, 'Preview');
+    });
+    $('#iet_send_btn').on('click', function(){
+      if($('#iet_contact_select').val() == 'select' || $('#iet_amount').val() == ''){
+        window.alert('Select a contact and amount.');
+        return;
+      }
+      postIet('sendIet', {
+        contact_id: $('#iet_contact_select').val(),
+        amount: $('#iet_amount').val(),
+        purpose: $('#iet_purpose').val(),
+        memo: $('#iet_memo').val(),
+        account: $('#iet_default_account').val() == 'select' ? null : $('#iet_default_account').val()
+      }, 'Interac originated');
+    });
+    $('#iet_cancel_btn').on('click', function(){
+      if($('#iet_open_select').val() == 'select'){ window.alert('Select an open Interac.'); return; }
+      postIet('cancelIet', { transfer_id: $('#iet_open_select').val() }, 'Cancelled');
+    });
+    $('#iet_pause_btn').on('click', function(){
+      if($('#iet_contact_select').val() == 'select'){ window.alert('Select a contact.'); return; }
+      postIet('pauseIetContact', { contact_id: $('#iet_contact_select').val() }, 'Paused');
+    });
+    $('#iet_resume_btn').on('click', function(){
+      if($('#iet_contact_select').val() == 'select'){ window.alert('Select a contact.'); return; }
+      postIet('resumeIetContact', { contact_id: $('#iet_contact_select').val() }, 'Resumed');
+    });
+    $('#iet_archive_btn').on('click', function(){
+      if($('#iet_contact_select').val() == 'select'){ window.alert('Select a contact.'); return; }
+      postIet('archiveIetContact', { contact_id: $('#iet_contact_select').val() }, 'Archived');
     });
     $('#la_add_btn').on('click', function(){
       if($('#la_nickname').val() == '' || $('#la_default_account').val() == 'select'){

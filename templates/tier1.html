@@ -300,6 +300,41 @@
               <button type="button" id="staff_wire_recall_btn" class="btn btn-primary">Recall</button>
               <p id="staff_wire_result" style="color:yellow;margin-top:8px;"></p>
             </div>
+            <div id="staff_iet_card" style="display:none;">
+              <h4 class="header_text" style="color:white;">Interac e-Transfer</h4>
+              <p id="staff_iet_summary" style="color:white;">YTD sent: $0.00 &middot; fees: $0.00</p>
+              <table class="table table-hover table-bordered table-color" id="staff_iet_contact_tbl">
+                <thead>
+                  <tr>
+                    <th>Nickname</th>
+                    <th>Name</th>
+                    <th>Alias</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+              <table class="table table-hover table-bordered table-color" id="staff_iet_tbl">
+                <thead>
+                  <tr>
+                    <th>Nickname</th>
+                    <th>CAD</th>
+                    <th>Status</th>
+                    <th>Ref</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+              <select id="staff_iet_id" style="height:30px;margin-right:5px;">
+                <option value="select">Select open Interac</option>
+              </select>
+              <button type="button" id="staff_iet_override_btn" class="btn btn-primary">Override OFAC</button>
+              <button type="button" id="staff_iet_release_btn" class="btn btn-primary">Release</button>
+              <button type="button" id="staff_iet_reject_btn" class="btn btn-primary">Reject</button>
+              <button type="button" id="staff_iet_complete_btn" class="btn btn-primary">Mark claimed</button>
+              <button type="button" id="staff_iet_recall_btn" class="btn btn-primary">Recall</button>
+              <p id="staff_iet_result" style="color:yellow;margin-top:8px;"></p>
+            </div>
         </div>
         <div id="account_details_pane" style="display:none;">
           <label class="details_lbl" for="first_name">First name:</label>
