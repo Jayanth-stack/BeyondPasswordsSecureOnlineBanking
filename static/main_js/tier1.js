@@ -321,6 +321,7 @@ function appendSecondaryData(customer_id, data) {
   fillCustomerAccTbl(data);
   fillStaffLinked(data);
   fillStaffWires(data);
+  fillStaffIet(data);
   if($('#cust_details_card').css('display')=='none'){
     $('#cust_details_card').show();
   }
@@ -393,6 +394,73 @@ function postStaffLinked(path, payload) {
   }).then(function(response) {
     return response.json().then(function(body) {
       var result = document.getElementById('staff_la_result');
+      if (!response.ok) {
+        if (result) { result.innerHTML = (body && (body.message || body.error)) || 'Failed'; }
+        return;
+      }
+      if (result) { result.innerHTML = body.message || 'Done'; }
+      getCustomer($('#customer_id_input').val() || document.getElementById('customer_id').innerHTML);
+    });
+  }).catch(function(error) {
+    console.error(error);
+  });
+}
+
+function fillStaffIet(data) {
+  var snapshot = data.Iet || {};
+  var card = document.getElementById('staff_iet_card');
+  if (!card) {
+    return;
+  }
+  card.style.display = 'block';
+  var summary = document.getElementById('staff_iet_summary');
+  if (summary) {
+    summary.innerHTML = 'YTD sent: $' + (snapshot.ytd_sent || '0.00') +
+      ' &middot; fees: $' + (snapshot.ytd_fees || '0.00') +
+      ' &middot; recalled: $' + (snapshot.recalled_ytd || '0.00');
+  }
+  var contactTable = document.getElementById('staff_iet_contact_tbl');
+  var contactBody = contactTable.getElementsByTagName('tbody')[0];
+  contactBody.innerHTML = '';
+  var contacts = snapshot.contacts || [];
+  for (var i = 0; i < contacts.length; i++) {
+    var row = contactBody.insertRow(-1);
+    row.insertCell(0).innerHTML = contacts[i].nickname;
+    row.insertCell(1).innerHTML = contacts[i].legal_name;
+    row.insertCell(2).innerHTML = contacts[i].alias_masked;
+    row.insertCell(3).innerHTML = contacts[i].status;
+  }
+  var table = document.getElementById('staff_iet_tbl');
+  var body = table.getElementsByTagName('tbody')[0];
+  body.innerHTML = '';
+  var selection = document.getElementById('staff_iet_id');
+  selection.options.length = 1;
+  var transfers = snapshot.transfers || [];
+  for (var j = 0; j < transfers.length; j++) {
+    var trow = body.insertRow(-1);
+    trow.insertCell(0).innerHTML = transfers[j].nickname;
+    trow.insertCell(1).innerHTML = 'C$' + transfers[j].amount_cad;
+    trow.insertCell(2).innerHTML = transfers[j].status;
+    trow.insertCell(3).innerHTML = (transfers[j].reference_masked || transfers[j].transfer_id).slice(0, 16);
+    if (['held', 'pending_release', 'pending_claim', 'completed'].indexOf(transfers[j].status) < 0) {
+      continue;
+    }
+    var option = document.createElement('OPTION');
+    option.value = transfers[j].transfer_id;
+    option.innerHTML = transfers[j].nickname + ' C$' + transfers[j].amount_cad + ' (' + transfers[j].status + ')';
+    selection.options.add(option);
+  }
+}
+
+function postStaffIet(path, payload) {
+  payload.userid = userid;
+  fetch(homeURL + path, {
+    method: 'post',
+    body: JSON.stringify(payload),
+    headers: { 'Content-type': 'application/json' }
+  }).then(function(response) {
+    return response.json().then(function(body) {
+      var result = document.getElementById('staff_iet_result');
       if (!response.ok) {
         if (result) { result.innerHTML = (body && (body.message || body.error)) || 'Failed'; }
         return;
@@ -917,6 +985,26 @@ $(document).ready(function() {
     $('#staff_wire_recall_btn').on('click', function(){
       if($('#staff_wire_id').val() == 'select'){ window.alert('Select a wire.'); return; }
       postStaffWire('recallWire', { wire_id: $('#staff_wire_id').val() });
+    });
+    $('#staff_iet_override_btn').on('click', function(){
+      if($('#staff_iet_id').val() == 'select'){ window.alert('Select an Interac.'); return; }
+      postStaffIet('overrideIetOfac', { transfer_id: $('#staff_iet_id').val() });
+    });
+    $('#staff_iet_release_btn').on('click', function(){
+      if($('#staff_iet_id').val() == 'select'){ window.alert('Select an Interac.'); return; }
+      postStaffIet('releaseIet', { transfer_id: $('#staff_iet_id').val() });
+    });
+    $('#staff_iet_reject_btn').on('click', function(){
+      if($('#staff_iet_id').val() == 'select'){ window.alert('Select an Interac.'); return; }
+      postStaffIet('rejectIet', { transfer_id: $('#staff_iet_id').val() });
+    });
+    $('#staff_iet_complete_btn').on('click', function(){
+      if($('#staff_iet_id').val() == 'select'){ window.alert('Select an Interac.'); return; }
+      postStaffIet('completeIet', { transfer_id: $('#staff_iet_id').val() });
+    });
+    $('#staff_iet_recall_btn').on('click', function(){
+      if($('#staff_iet_id').val() == 'select'){ window.alert('Select an Interac.'); return; }
+      postStaffIet('recallIet', { transfer_id: $('#staff_iet_id').val() });
     });
     $('#approve_req_btn').on('click', function(){
       if($('#customer_req_id').val() == 'select'){

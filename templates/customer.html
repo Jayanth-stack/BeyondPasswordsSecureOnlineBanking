@@ -111,6 +111,15 @@
         </button>
 
         <button type="button" class="btn btn-primary btn-block"
+        id="iet_menu">
+        <span class="glyphicon glyphicon-globe gi-3x"
+        style="color: white" aria-hidden="true">
+        </span>
+        <br />
+        Interac
+        </button>
+
+        <button type="button" class="btn btn-primary btn-block"
         id="service_requests_menu">
         <span class="glyphicon glyphicon-edit gi-3x"
         style="color: white" aria-hidden="true">
@@ -351,6 +360,80 @@
           </table>
           <select id="wire_open_select" style="height:30px;margin-right:5px;">
             <option value="select">Select open wire</option>
+          </select>
+        </div>
+        <div id="iet_pane" style="display:none;">
+          <p id="iet_summary" style="color:white;">Active: 0 &middot; open: 0 &middot; YTD sent: $0.00 &middot; fees: $0.00</p>
+          <p id="iet_clock" style="color:white;">Interac 24/7 &middot; CADUSD 0.740000</p>
+          <table class="table table-hover table-bordered table-color fixed-header" id="iet_contact_tbl">
+            <thead>
+              <tr>
+                <th>Nickname</th>
+                <th>Name</th>
+                <th>Alias</th>
+                <th>Rail</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+          <hr>
+          <h5 style="color:white;">Add an Interac contact</h5>
+          <input type="text" id="iet_nickname" placeholder="Nickname" style="height:30px;width:140px;margin-right:5px;">
+          <input type="text" id="iet_legal_name" placeholder="Legal name" style="height:30px;width:160px;margin-right:5px;">
+          <select id="iet_kind" style="height:30px;margin-right:5px;">
+            <option value="email">Email</option>
+            <option value="sms">SMS</option>
+          </select>
+          <input type="text" id="iet_alias" placeholder="email or phone" style="height:30px;width:180px;margin-right:5px;">
+          <select id="iet_rail" style="height:30px;margin-right:5px;">
+            <option value="autodeposit">Autodeposit</option>
+            <option value="question">Question</option>
+          </select>
+          <select id="iet_default_account" style="height:30px;margin-right:5px;">
+            <option value="select">Internal account</option>
+          </select>
+          <br><br>
+          <input type="text" id="iet_question" placeholder="Security question (SQA)" style="height:30px;width:220px;margin-right:5px;">
+          <input type="text" id="iet_answer" placeholder="Answer (SQA)" style="height:30px;width:140px;margin-right:5px;">
+          <button type="button" id="iet_add_btn" class="btn btn-primary">Add contact</button>
+          <br><br>
+          <h5 style="color:white;">Send an Interac e-Transfer</h5>
+          <select id="iet_contact_select" style="height:30px;margin-right:5px;">
+            <option value="select">Select contact</option>
+          </select>
+          <input type="text" id="iet_amount" placeholder="CAD amount" style="height:30px;width:100px;margin-right:5px;">
+          <select id="iet_purpose" style="height:30px;margin-right:5px;">
+            <option value="other">Other</option>
+            <option value="family">Family</option>
+            <option value="goods">Goods</option>
+            <option value="rent">Rent</option>
+          </select>
+          <input type="text" id="iet_memo" placeholder="Memo" style="height:30px;width:140px;margin-right:5px;">
+          <button type="button" id="iet_quote_btn" class="btn btn-primary">Quote FX</button>
+          <button type="button" id="iet_preview_btn" class="btn btn-primary">Preview</button>
+          <button type="button" id="iet_send_btn" class="btn btn-primary">Send Interac</button>
+          <button type="button" id="iet_cancel_btn" class="btn btn-primary">Cancel open</button>
+          <button type="button" id="iet_pause_btn" class="btn btn-primary">Pause</button>
+          <button type="button" id="iet_resume_btn" class="btn btn-primary">Resume</button>
+          <button type="button" id="iet_archive_btn" class="btn btn-primary">Archive</button>
+          <p id="iet_result" style="color:yellow;margin-top:10px;"></p>
+          <hr>
+          <h5 style="color:white;">Interac history</h5>
+          <table class="table table-hover table-bordered table-color fixed-header" id="iet_history_tbl">
+            <thead>
+              <tr>
+                <th>Nickname</th>
+                <th>CAD</th>
+                <th>USD debit</th>
+                <th>Status</th>
+                <th>Reference</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+          <select id="iet_open_select" style="height:30px;margin-right:5px;">
+            <option value="select">Select open Interac</option>
           </select>
         </div>
         <div id="account_details_pane" style="display:none;">
