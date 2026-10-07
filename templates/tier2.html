@@ -332,6 +332,31 @@
               <button type="button" id="staff_wire_recall_btn" class="btn btn-primary">Recall</button>
               <p id="staff_wire_result" style="color:yellow;margin-top:8px;"></p>
             </div>
+            <div id="staff_icl_card" style="display:none;">
+              <h4 class="header_text" style="color:white;">Check21 / X9.37 In</h4>
+              <p id="staff_icl_summary" style="color:white;">YTD paid: $0.00 &middot; returned: $0.00</p>
+              <textarea id="staff_icl_file" placeholder="Paste X9.37 ICL file" style="width:100%;height:70px;margin-bottom:8px;"></textarea>
+              <button type="button" id="staff_icl_ingest_btn" class="btn btn-primary">Ingest ICL</button>
+              <table class="table table-hover table-bordered table-color" id="staff_icl_tbl">
+                <thead>
+                  <tr>
+                    <th>Payee</th>
+                    <th>Amount</th>
+                    <th>Status</th>
+                    <th>ECE</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+              <select id="staff_icl_id" style="height:30px;margin-right:5px;">
+                <option value="select">Select open item</option>
+              </select>
+              <button type="button" id="staff_icl_override_btn" class="btn btn-primary">Override OFAC</button>
+              <button type="button" id="staff_icl_release_btn" class="btn btn-primary">Release</button>
+              <button type="button" id="staff_icl_reject_btn" class="btn btn-primary">Reject</button>
+              <button type="button" id="staff_icl_return_btn" class="btn btn-primary">Return</button>
+              <p id="staff_icl_result" style="color:yellow;margin-top:8px;"></p>
+            </div>
           </div>
 
           <div id="account_details_pane" style="display: none">

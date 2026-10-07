@@ -21,6 +21,12 @@ from utility.wire import (
     get_service as get_wire_service,
     set_service as set_wire_service,
 )
+from utility.icl import (
+    attach_icl_routes,
+    build_service as build_icl_service,
+    get_service as get_icl_service,
+    set_service as set_icl_service,
+)
 
 load_dotenv()
 
@@ -278,6 +284,7 @@ def get_customer_data():
             'FundsRequests': c.get_funds_requests(customer_id),
             'LinkedAccounts': _link_snapshot(customer_id, actor=customer_id, actor_type='customer'),
             'Wires': _wire_snapshot(customer_id, actor=customer_id, actor_type='customer'),
+            'Icls': _icl_snapshot(customer_id, actor=customer_id, actor_type='customer'),
         }
         return jsonify(response), 200
     except Exception as e:
@@ -918,6 +925,9 @@ def get_customer():
                 'Wires': _wire_snapshot(
                     values['customer_id'], actor=session['userid'], actor_type=session.get('usertype') or 'employee',
                 ),
+                'Icls': _icl_snapshot(
+                    values['customer_id'], actor=session['userid'], actor_type=session.get('usertype') or 'employee',
+                ),
             }
             return jsonify(response), 200
         except Exception as e:
@@ -1382,6 +1392,36 @@ wire_service = build_wire_service(
 )
 set_wire_service(wire_service)
 attach_wire_routes(app, wire_service)
+
+
+def _icl_lookup(account):
+    try:
+        result = Customers().get_customerID_from_account(int(str(account).strip()))
+        if result in (None, -1, 0, ''):
+            return None
+        return str(result)
+    except Exception:
+        return None
+
+
+def _icl_snapshot(userid, actor=None, actor_type='customer'):
+    service = get_icl_service()
+    if service is None:
+        return {'enabled': False, 'inbounds': []}
+    try:
+        return service.snapshot(userid, actor=actor, actor_type=actor_type)
+    except Exception:
+        return {'enabled': False, 'inbounds': []}
+
+
+icl_service = build_icl_service(
+    debit_fn=_link_debit,
+    credit_fn=_link_credit,
+    accounts_fn=_link_accounts,
+    lookup_fn=_icl_lookup,
+)
+set_icl_service(icl_service)
+attach_icl_routes(app, icl_service)
 
 app.config['SESSION_COOKIE_SECURE'] = True
 app.config['SESSION_COOKIE_HTTPONLY'] = True

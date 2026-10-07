@@ -111,6 +111,15 @@
         </button>
 
         <button type="button" class="btn btn-primary btn-block"
+        id="icl_menu">
+        <span class="glyphicon glyphicon-inbox gi-3x"
+        style="color: white" aria-hidden="true">
+        </span>
+        <br />
+        Check21 In
+        </button>
+
+        <button type="button" class="btn btn-primary btn-block"
         id="service_requests_menu">
         <span class="glyphicon glyphicon-edit gi-3x"
         style="color: white" aria-hidden="true">
@@ -352,6 +361,28 @@
           <select id="wire_open_select" style="height:30px;margin-right:5px;">
             <option value="select">Select open wire</option>
           </select>
+        </div>
+        <div id="icl_pane" style="display:none;">
+          <p id="icl_summary" style="color:white;">Open: 0 &middot; posted: 0 &middot; YTD paid: $0.00 &middot; returned: $0.00</p>
+          <p id="icl_clock" style="color:white;">Cutoff 14:00 &middot; value date --</p>
+          <h5 style="color:white;">Presented checks drawn on you</h5>
+          <table class="table table-hover table-bordered table-color fixed-header" id="icl_tbl">
+            <thead>
+              <tr>
+                <th>Payee</th>
+                <th>Amount</th>
+                <th>Status</th>
+                <th>ECE</th>
+                <th>Last4</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+          <select id="icl_open_select" style="height:30px;margin-right:5px;">
+            <option value="select">Select item</option>
+          </select>
+          <button type="button" id="icl_return_btn" class="btn btn-primary">Request return</button>
+          <p id="icl_result" style="color:yellow;margin-top:10px;"></p>
         </div>
         <div id="account_details_pane" style="display:none;">
 					<label class="details_lbl" for="first_name">First name:</label>
