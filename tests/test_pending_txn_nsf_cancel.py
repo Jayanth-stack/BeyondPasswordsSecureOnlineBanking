@@ -219,6 +219,225 @@ class MutatingGetAndStaffDenyRouteTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         emp_cls.return_value.retrieve_phone_number.assert_called_once_with("alice")
 
+    def test_get_deposit_amount_still_queues(self):
+        self._session("cust1", "customer")
+        with patch("app.Employee") as emp_cls:
+            emp_cls.return_value.add_transaction_deposit.return_value = (
+                "Request to be approved by tier1 employee"
+            )
+            response = self.client.get(
+                "/depositAmount",
+                json={"userid": "cust1", "account": 10, "amount": 40},
+            )
+        self.assertEqual(response.status_code, 200)
+        emp_cls.return_value.add_transaction_deposit.assert_called_once_with(10, 40)
+
+    def test_get_request_funds_still_inserts(self):
+        self._session("cust1", "customer")
+        with patch("app.Customers") as customers_cls:
+            customers_cls.return_value.fund_request.return_value = "Request Sent"
+            response = self.client.get(
+                "/requestFunds",
+                json={
+                    "userid": "cust1",
+                    "fromAccount": 10,
+                    "toAccount": 20,
+                    "amount": 15,
+                },
+            )
+        self.assertEqual(response.status_code, 200)
+        customers_cls.return_value.fund_request.assert_called_once_with(10, 20, 15)
+
+    def test_get_cashier_cheque_still_issues(self):
+        self._session("cust1", "customer")
+        with patch("app.Customers") as customers_cls:
+            customers_cls.return_value.make_cashier_check.return_value = "Success"
+            response = self.client.get(
+                "/getCashierCheque",
+                json={
+                    "userid": "cust1",
+                    "to_account": 20,
+                    "from_account": 10,
+                    "amount": 50,
+                },
+            )
+        self.assertEqual(response.status_code, 200)
+        customers_cls.return_value.make_cashier_check.assert_called_once_with(
+            "cust1", 20, 10, 50
+        )
+
+    def test_claimed_employee_get_deposit_amount_still_queues(self):
+        # depositAmount only matches session userid; claimed usertype is unused.
+        self._session("cust1", "employee", emp_tier=1)
+        with patch("app.Employee") as emp_cls:
+            emp_cls.return_value.add_transaction_deposit.return_value = "queued"
+            response = self.client.get(
+                "/depositAmount",
+                json={"userid": "cust1", "account": 999, "amount": 40},
+            )
+        self.assertEqual(response.status_code, 200)
+        emp_cls.return_value.add_transaction_deposit.assert_called_once_with(999, 40)
+
+    def test_get_register_customer_still_creates_without_session(self):
+        with patch("app.Customers") as customers_cls, patch(
+            "app.url_for", return_value="/customer_dash"
+        ):
+            cust = customers_cls.return_value
+            cust.check_user_id.return_value = 0
+            cust.check_existing_contact.return_value = 0
+            cust.check_existing_email.return_value = 0
+            cust.create_customer_id.return_value = 1
+            response = self.client.get(
+                "/registerCustomer",
+                json={
+                    "empid": "None",
+                    "userid": "cust9",
+                    "password": "pw",
+                    "email": "c9@b.com",
+                    "firstname": "A",
+                    "midname": "",
+                    "lastname": "B",
+                    "phone": "4155552671",
+                    "dob": "2000-01-01",
+                    "ssn": "123456789",
+                    "address": "x",
+                },
+            )
+        self.assertIn(response.status_code, (301, 302, 200))
+        cust.create_customer_id.assert_called_once()
+
+    def test_claimed_employee_get_register_customer_still_creates(self):
+        self._session("mallory", "employee", emp_tier=1)
+        with patch("app.Customers") as customers_cls:
+            cust = customers_cls.return_value
+            cust.check_user_id.return_value = 0
+            cust.check_existing_contact.return_value = 0
+            cust.check_existing_email.return_value = 0
+            cust.create_customer_id.return_value = 1
+            response = self.client.get(
+                "/registerCustomer",
+                json={
+                    "empid": "emp1",
+                    "userid": "victim",
+                    "password": "pw",
+                    "email": "v@b.com",
+                    "firstname": "A",
+                    "midname": "",
+                    "lastname": "B",
+                    "phone": "4155552671",
+                    "dob": "2000-01-01",
+                    "ssn": "123456789",
+                    "address": "x",
+                },
+            )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json()["message"], "Done")
+        cust.create_customer_id.assert_called_once()
+
+    def test_get_register_employee_still_creates_admin_tier(self):
+        with patch("app.Employee") as emp_cls:
+            emp = emp_cls.return_value
+            emp.check_user_id.return_value = 0
+            emp.check_existing_contact.return_value = 0
+            emp.check_existing_email.return_value = 0
+            emp.check_existing_ssn.return_value = 0
+            emp.create_employee.return_value = 1
+            response = self.client.get(
+                "/registerEmployee",
+                json={
+                    "userid": "admin9",
+                    "password": "pw",
+                    "email": "admin9@b.com",
+                    "firstname": "A",
+                    "midname": "",
+                    "lastname": "B",
+                    "phone": "4155552671",
+                    "dob": "2000-01-01",
+                    "ssn": "123456789",
+                    "address": "x",
+                    "tier": 3,
+                },
+            )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(emp.create_employee.call_args.args[0], "admin9")
+        self.assertEqual(emp.create_employee.call_args.args[9], 3)
+
+    def test_claimed_employee_get_register_employee_still_creates(self):
+        self._session("mallory", "employee", emp_tier=1)
+        with patch("app.Employee") as emp_cls:
+            emp = emp_cls.return_value
+            emp.check_user_id.return_value = 0
+            emp.check_existing_contact.return_value = 0
+            emp.check_existing_email.return_value = 0
+            emp.check_existing_ssn.return_value = 0
+            emp.create_employee.return_value = 1
+            response = self.client.get(
+                "/registerEmployee",
+                json={
+                    "userid": "newemp",
+                    "password": "pw",
+                    "email": "new@b.com",
+                    "firstname": "A",
+                    "midname": "",
+                    "lastname": "B",
+                    "phone": "4155552671",
+                    "dob": "2000-01-01",
+                    "ssn": "123456789",
+                    "address": "x",
+                    "tier": 3,
+                },
+            )
+        self.assertEqual(response.status_code, 200)
+        emp.create_employee.assert_called_once()
+        self.assertEqual(emp.create_employee.call_args.args[9], 3)
+
+    def test_claimed_employee_post_deactivate_employee_is_forbidden(self):
+        self._session("mallory", "employee", emp_tier=1)
+        with patch("app.Employee") as emp_cls:
+            response = self.client.post(
+                "/deactivateEmployee",
+                json={"userid": "mallory", "emp_id": "emp2"},
+            )
+        self.assertEqual(response.status_code, 403)
+        emp_cls.return_value.deactivate_employee.assert_not_called()
+
+    def test_claimed_employee_get_system_logs_redirects(self):
+        self._session("mallory", "employee", emp_tier=1)
+        with patch("app.send_from_directory") as send:
+            response = self.client.get("/getSystemLogs", json={"userid": "mallory"})
+        self.assertIn(response.status_code, (301, 302))
+        send.assert_not_called()
+
+    def test_claimed_admin_get_system_logs_still_sends_file(self):
+        # getSystemLogs trusts session['usertype'] == 'admin' with no DB check.
+        self._session("mallory", "admin")
+        with patch("app.os.path.exists", return_value=True), patch(
+            "app.send_from_directory"
+        ) as send:
+            send.return_value = "log-bytes"
+            self.client.get("/getSystemLogs", json={"userid": "mallory"})
+        send.assert_called_once()
+        args, kwargs = send.call_args
+        self.assertEqual(
+            kwargs.get("filename") or (args[1] if len(args) > 1 else None),
+            "bank.log",
+        )
+        self.assertTrue(kwargs.get("as_attachment"))
+
+    def test_claimed_employee_get_cheque_list_redirects(self):
+        self._session("cust1", "employee", emp_tier=1)
+        with patch("app.Customers") as customers_cls:
+            response = self.client.get("/getChequeList", json={"userid": "cust1"})
+        self.assertIn(response.status_code, (301, 302))
+        customers_cls.return_value.get_cheque_list.assert_not_called()
+
+    def test_claimed_employee_get_load_customer_is_unauthorized(self):
+        self._session("cust1", "employee", emp_tier=1)
+        with patch("app.Customers") as customers_cls:
+            response = self.client.get("/loadCustomer")
+        self.assertEqual(response.status_code, 401)
+        customers_cls.return_value.get_all_account.assert_not_called()
+
 
 if __name__ == "__main__":
     unittest.main()
