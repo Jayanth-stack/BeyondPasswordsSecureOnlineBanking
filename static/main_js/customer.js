@@ -128,6 +128,7 @@ function appendPrimaryData(data) {
   fillPendingTransTbl(data);
   fillLinkedAccounts(data);
   fillWires(data);
+  fillOcls(data);
 }
 
 function fillLinkedAccountSelect(selectId) {
@@ -252,6 +253,102 @@ function fillWires(data) {
     openOpt.innerHTML = wires[j].nickname + ' $' + wires[j].amount + ' (' + wires[j].status + ')';
     openSelect.options.add(openOpt);
   }
+}
+
+function fillOcls(data) {
+  var snapshot = data.Ocls || {};
+  var summary = document.getElementById('ocl_summary');
+  if (summary) {
+    summary.innerHTML = 'Active: ' + (snapshot.active_count || 0) +
+      ' &middot; open: ' + (snapshot.open_count || 0) +
+      ' &middot; YTD posted: $' + (snapshot.ytd_posted || '0.00') +
+      ' &middot; fees: $' + (snapshot.ytd_fees || '0.00');
+  }
+  var clockEl = document.getElementById('ocl_clock');
+  if (clockEl && snapshot.clock) {
+    clockEl.innerHTML = 'Cutoff ' + (snapshot.clock.cutoff || '14:00') +
+      ' &middot; value date ' + (snapshot.clock.value_date || '--') +
+      (snapshot.clock.after_cutoff ? ' &middot; after cutoff' : '');
+  }
+  fillLinkedAccountSelect('ocl_default_account');
+  var table = document.getElementById('ocl_profile_tbl');
+  if (!table) {
+    return;
+  }
+  var body = table.getElementsByTagName('tbody')[0];
+  body.innerHTML = '';
+  var selection = document.getElementById('ocl_profile_select');
+  selection.options.length = 1;
+  var profiles = snapshot.profiles || [];
+  for (var i = 0; i < profiles.length; i++) {
+    var row = body.insertRow(-1);
+    row.insertCell(0).innerHTML = profiles[i].nickname;
+    row.insertCell(1).innerHTML = profiles[i].payee_name;
+    row.insertCell(2).innerHTML = profiles[i].payor_aba;
+    row.insertCell(3).innerHTML = profiles[i].drawer_last4;
+    row.insertCell(4).innerHTML = profiles[i].status;
+    var option = document.createElement('OPTION');
+    option.value = profiles[i].profile_id;
+    option.innerHTML = profiles[i].nickname + ' (' + profiles[i].status + ')';
+    selection.options.add(option);
+  }
+  var hist = document.getElementById('ocl_history_tbl');
+  var histBody = hist.getElementsByTagName('tbody')[0];
+  histBody.innerHTML = '';
+  var openSelect = document.getElementById('ocl_open_select');
+  openSelect.options.length = 1;
+  var items = snapshot.outbounds || [];
+  for (var j = 0; j < items.length; j++) {
+    var wrow = histBody.insertRow(-1);
+    wrow.insertCell(0).innerHTML = items[j].nickname;
+    wrow.insertCell(1).innerHTML = '$' + items[j].amount;
+    wrow.insertCell(2).innerHTML = '$' + items[j].fee;
+    wrow.insertCell(3).innerHTML = items[j].status;
+    wrow.insertCell(4).innerHTML = items[j].ece_masked || '';
+    if (!items[j].cancelable) {
+      continue;
+    }
+    var openOpt = document.createElement('OPTION');
+    openOpt.value = items[j].outbound_id;
+    openOpt.innerHTML = items[j].nickname + ' $' + items[j].amount + ' (' + items[j].status + ')';
+    openSelect.options.add(openOpt);
+  }
+}
+
+function postOcl(path, payload, okMsg) {
+  payload.userid = userid;
+  fetch(homeURL + path, {
+    method: 'post',
+    body: JSON.stringify(payload),
+    headers: { 'Content-type': 'application/json' }
+  }).then(function(response) {
+    return response.json().then(function(body) {
+      var result = document.getElementById('ocl_result');
+      if (!response.ok) {
+        if (result) { result.innerHTML = (body && (body.message || body.error)) || 'Failed'; }
+        window.alert((body && (body.message || body.error)) || 'Request failed');
+        if (body && body.Ocls) {
+          fillOcls({ Ocls: body.Ocls });
+        }
+        return;
+      }
+      if (result) {
+        if (body && body.preview) {
+          result.innerHTML = 'Credit $' + body.preview.credit + ' &middot; fee $' + body.preview.fee +
+            ' &middot; value ' + ((body.preview.clock && body.preview.clock.value_date) || '');
+        } else {
+          result.innerHTML = okMsg || body.message || 'Done';
+        }
+      }
+      if (body && body.Ocls) {
+        fillOcls({ Ocls: body.Ocls });
+      } else {
+        getUser();
+      }
+    });
+  }).catch(function(error) {
+    console.error(error);
+  });
 }
 
 function postWire(path, payload, okMsg) {
@@ -1047,6 +1144,7 @@ $(document).ready(function() {
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#ocl_menu').css('background-color','maroon');
     });
     $('#service_requests_menu').on('click', function(){
       if($('#service_requests_pane').css('display')=='none'){
@@ -1057,6 +1155,7 @@ $(document).ready(function() {
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#ocl_menu').css('background-color','maroon');
     });
     $('#my_accounts_menu').on('click', function(){
       getUser();
@@ -1077,6 +1176,7 @@ $(document).ready(function() {
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#ocl_menu').css('background-color','maroon');
     });
     $('#pending_transaction_requests_menu').on('click', function(){
       if($('#pending_transaction_requests_pane').css('display')=='none'){
@@ -1087,6 +1187,7 @@ $(document).ready(function() {
       $('#service_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#ocl_menu').css('background-color','maroon');
     });
     $('#linked_accounts_menu').on('click', function(){
       if($('#linked_accounts_pane').css('display')=='none'){
@@ -1097,6 +1198,7 @@ $(document).ready(function() {
       $('#service_requests_menu').css('background-color','maroon');
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#ocl_menu').css('background-color','maroon');
     });
     $('#wires_menu').on('click', function(){
       if($('#wires_pane').css('display')=='none'){
@@ -1107,6 +1209,71 @@ $(document).ready(function() {
       $('#service_requests_menu').css('background-color','maroon');
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
+      $('#ocl_menu').css('background-color','maroon');
+    });
+    $('#ocl_menu').on('click', function(){
+      if($('#ocl_pane').css('display')=='none'){
+          $('#ocl_pane').show().siblings('div').hide();
+      }
+      $('#ocl_menu').css('background-color','#FF6600');
+      $('#my_accounts_menu').css('background-color','maroon');
+      $('#service_requests_menu').css('background-color','maroon');
+      $('#pending_transaction_requests_menu').css('background-color','maroon');
+      $('#linked_accounts_menu').css('background-color','maroon');
+      $('#wires_menu').css('background-color','maroon');
+    });
+    $('#ocl_add_btn').on('click', function(){
+      if($('#ocl_nickname').val() == '' || $('#ocl_payee_name').val() == '' || $('#ocl_default_account').val() == 'select'){
+        window.alert('Nickname, payee name, and internal account are required.');
+        return;
+      }
+      postOcl('addOclProfile', {
+        nickname: $('#ocl_nickname').val(),
+        payee_name: $('#ocl_payee_name').val(),
+        payor_aba: $('#ocl_payor_aba').val(),
+        drawer_account: $('#ocl_drawer_account').val(),
+        serial: $('#ocl_serial').val(),
+        default_account: $('#ocl_default_account').val()
+      }, 'Profile added');
+    });
+    $('#ocl_preview_btn').on('click', function(){
+      if($('#ocl_profile_select').val() == 'select' || $('#ocl_amount').val() == ''){
+        window.alert('Select a profile and amount.');
+        return;
+      }
+      postOcl('previewOcl', {
+        profile_id: $('#ocl_profile_select').val(),
+        amount: $('#ocl_amount').val(),
+        account: $('#ocl_default_account').val() == 'select' ? null : $('#ocl_default_account').val()
+      }, 'Preview');
+    });
+    $('#ocl_send_btn').on('click', function(){
+      if($('#ocl_profile_select').val() == 'select' || $('#ocl_amount').val() == ''){
+        window.alert('Select a profile and amount.');
+        return;
+      }
+      postOcl('sendOcl', {
+        profile_id: $('#ocl_profile_select').val(),
+        amount: $('#ocl_amount').val(),
+        memo: $('#ocl_memo').val(),
+        account: $('#ocl_default_account').val() == 'select' ? null : $('#ocl_default_account').val()
+      }, 'Check21 originated');
+    });
+    $('#ocl_cancel_btn').on('click', function(){
+      if($('#ocl_open_select').val() == 'select'){ window.alert('Select an open item.'); return; }
+      postOcl('cancelOcl', { outbound_id: $('#ocl_open_select').val() }, 'Cancelled');
+    });
+    $('#ocl_pause_btn').on('click', function(){
+      if($('#ocl_profile_select').val() == 'select'){ window.alert('Select a profile.'); return; }
+      postOcl('pauseOclProfile', { profile_id: $('#ocl_profile_select').val() }, 'Paused');
+    });
+    $('#ocl_resume_btn').on('click', function(){
+      if($('#ocl_profile_select').val() == 'select'){ window.alert('Select a profile.'); return; }
+      postOcl('resumeOclProfile', { profile_id: $('#ocl_profile_select').val() }, 'Resumed');
+    });
+    $('#ocl_archive_btn').on('click', function(){
+      if($('#ocl_profile_select').val() == 'select'){ window.alert('Select a profile.'); return; }
+      postOcl('archiveOclProfile', { profile_id: $('#ocl_profile_select').val() }, 'Archived');
     });
     $('#wire_add_btn').on('click', function(){
       if($('#wire_nickname').val() == '' || $('#wire_legal_name').val() == '' || $('#wire_default_account').val() == 'select'){
