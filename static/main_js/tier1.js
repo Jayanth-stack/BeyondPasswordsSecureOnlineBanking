@@ -321,6 +321,7 @@ function appendSecondaryData(customer_id, data) {
   fillCustomerAccTbl(data);
   fillStaffLinked(data);
   fillStaffWires(data);
+  fillStaffPosPay(data);
   if($('#cust_details_card').css('display')=='none'){
     $('#cust_details_card').show();
   }
@@ -449,6 +450,63 @@ function fillStaffWires(data) {
     option.innerHTML = wires[j].nickname + ' $' + wires[j].amount + ' (' + wires[j].status + ')';
     selection.options.add(option);
   }
+}
+
+function fillStaffPosPay(data) {
+  var snapshot = data.PosPay || {};
+  var card = document.getElementById('staff_pospay_card');
+  if (!card) {
+    return;
+  }
+  card.style.display = 'block';
+  var summary = document.getElementById('staff_pospay_summary');
+  if (summary) {
+    summary.innerHTML = 'YTD paid: $' + (snapshot.ytd_paid || '0.00') +
+      ' &middot; returned: $' + (snapshot.ytd_returned || '0.00') +
+      ' &middot; exceptions: ' + (snapshot.exception_count || 0);
+  }
+  var table = document.getElementById('staff_pospay_tbl');
+  var body = table.getElementsByTagName('tbody')[0];
+  body.innerHTML = '';
+  var selection = document.getElementById('staff_pospay_id');
+  selection.options.length = 1;
+  var items = snapshot.items || [];
+  for (var j = 0; j < items.length; j++) {
+    var wrow = body.insertRow(-1);
+    wrow.insertCell(0).innerHTML = items[j].serial;
+    wrow.insertCell(1).innerHTML = items[j].payee;
+    wrow.insertCell(2).innerHTML = '$' + items[j].amount;
+    wrow.insertCell(3).innerHTML = items[j].status;
+    if (['held', 'exception', 'pending_release', 'unmatched'].indexOf(items[j].status) < 0) {
+      continue;
+    }
+    var option = document.createElement('OPTION');
+    option.value = items[j].item_id;
+    option.innerHTML = items[j].serial + ' $' + items[j].amount + ' (' + items[j].status + ')';
+    selection.options.add(option);
+  }
+}
+
+function postStaffPosPay(path, payload) {
+  payload.userid = userid;
+  payload.customer_id = $('#customer_id_input').val() || document.getElementById('customer_id').innerHTML;
+  fetch(homeURL + path, {
+    method: 'post',
+    body: JSON.stringify(payload),
+    headers: { 'Content-type': 'application/json' }
+  }).then(function(response) {
+    return response.json().then(function(body) {
+      var result = document.getElementById('staff_pospay_result');
+      if (!response.ok) {
+        if (result) { result.innerHTML = (body && (body.message || body.error)) || 'Failed'; }
+        return;
+      }
+      if (result) { result.innerHTML = body.message || 'Done'; }
+      getCustomer($('#customer_id_input').val() || document.getElementById('customer_id').innerHTML);
+    });
+  }).catch(function(error) {
+    console.error(error);
+  });
 }
 
 function postStaffWire(path, payload) {
@@ -917,6 +975,30 @@ $(document).ready(function() {
     $('#staff_wire_recall_btn').on('click', function(){
       if($('#staff_wire_id').val() == 'select'){ window.alert('Select a wire.'); return; }
       postStaffWire('recallWire', { wire_id: $('#staff_wire_id').val() });
+    });
+    $('#staff_pospay_ingest_btn').on('click', function(){
+      if(!$('#staff_pospay_file').val()){ window.alert('Paste a PPAY1 file.'); return; }
+      postStaffPosPay('ingestPosPayFile', { file: $('#staff_pospay_file').val() });
+    });
+    $('#staff_pospay_override_btn').on('click', function(){
+      if($('#staff_pospay_id').val() == 'select'){ window.alert('Select a presentment.'); return; }
+      postStaffPosPay('overridePosPayOfac', { item_id: $('#staff_pospay_id').val() });
+    });
+    $('#staff_pospay_release_btn').on('click', function(){
+      if($('#staff_pospay_id').val() == 'select'){ window.alert('Select a presentment.'); return; }
+      postStaffPosPay('releasePosPay', { item_id: $('#staff_pospay_id').val() });
+    });
+    $('#staff_pospay_pay_btn').on('click', function(){
+      if($('#staff_pospay_id').val() == 'select'){ window.alert('Select a presentment.'); return; }
+      postStaffPosPay('payPosPay', { item_id: $('#staff_pospay_id').val() });
+    });
+    $('#staff_pospay_return_btn').on('click', function(){
+      if($('#staff_pospay_id').val() == 'select'){ window.alert('Select a presentment.'); return; }
+      postStaffPosPay('returnPosPay', { item_id: $('#staff_pospay_id').val() });
+    });
+    $('#staff_pospay_reject_btn').on('click', function(){
+      if($('#staff_pospay_id').val() == 'select'){ window.alert('Select a presentment.'); return; }
+      postStaffPosPay('rejectPosPay', { item_id: $('#staff_pospay_id').val() });
     });
     $('#approve_req_btn').on('click', function(){
       if($('#customer_req_id').val() == 'select'){

@@ -111,6 +111,15 @@
         </button>
 
         <button type="button" class="btn btn-primary btn-block"
+        id="pospay_menu">
+        <span class="glyphicon glyphicon-ok-circle gi-3x"
+        style="color: white" aria-hidden="true">
+        </span>
+        <br />
+        Positive Pay
+        </button>
+
+        <button type="button" class="btn btn-primary btn-block"
         id="service_requests_menu">
         <span class="glyphicon glyphicon-edit gi-3x"
         style="color: white" aria-hidden="true">
@@ -352,6 +361,85 @@
           <select id="wire_open_select" style="height:30px;margin-right:5px;">
             <option value="select">Select open wire</option>
           </select>
+        </div>
+        <div id="pospay_pane" style="display:none;">
+          <p id="pospay_summary" style="color:white;">Active: 0 &middot; open: 0 &middot; exceptions: 0 &middot; YTD paid: $0.00 &middot; returned: $0.00</p>
+          <p id="pospay_clock" style="color:white;">Decision cutoff 14:00 &middot; value date --</p>
+          <table class="table table-hover table-bordered table-color fixed-header" id="pospay_enroll_tbl">
+            <thead>
+              <tr>
+                <th>Account</th>
+                <th>Payee match</th>
+                <th>Default</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+          <hr>
+          <h5 style="color:white;">Enroll an account</h5>
+          <select id="pospay_enroll_account" style="height:30px;margin-right:5px;">
+            <option value="select">Internal account</option>
+          </select>
+          <select id="pospay_default_action" style="height:30px;margin-right:5px;">
+            <option value="return">Default return</option>
+            <option value="pay">Default pay</option>
+          </select>
+          <button type="button" id="pospay_enroll_btn" class="btn btn-primary">Enroll</button>
+          <button type="button" id="pospay_pause_btn" class="btn btn-primary">Pause</button>
+          <button type="button" id="pospay_resume_btn" class="btn btn-primary">Resume</button>
+          <button type="button" id="pospay_archive_btn" class="btn btn-primary">Archive</button>
+          <select id="pospay_enroll_select" style="height:30px;margin-left:5px;">
+            <option value="select">Select enrollment</option>
+          </select>
+          <hr>
+          <h5 style="color:white;">Issue a check</h5>
+          <select id="pospay_issue_account" style="height:30px;margin-right:5px;">
+            <option value="select">Account</option>
+          </select>
+          <input type="text" id="pospay_serial" placeholder="Serial" style="height:30px;width:90px;margin-right:5px;">
+          <input type="text" id="pospay_amount" placeholder="Amount" style="height:30px;width:90px;margin-right:5px;">
+          <input type="text" id="pospay_payee" placeholder="Payee" style="height:30px;width:160px;margin-right:5px;">
+          <input type="text" id="pospay_issue_date" placeholder="YYYYMMDD" maxlength="8" style="height:30px;width:100px;margin-right:5px;">
+          <button type="button" id="pospay_add_issue_btn" class="btn btn-primary">Add issue</button>
+          <button type="button" id="pospay_void_btn" class="btn btn-primary">Void</button>
+          <select id="pospay_issue_select" style="height:30px;margin-left:5px;">
+            <option value="select">Select issued check</option>
+          </select>
+          <p id="pospay_result" style="color:yellow;margin-top:10px;"></p>
+          <hr>
+          <h5 style="color:white;">Issued checks</h5>
+          <table class="table table-hover table-bordered table-color fixed-header" id="pospay_issue_tbl">
+            <thead>
+              <tr>
+                <th>Serial</th>
+                <th>Payee</th>
+                <th>Amount</th>
+                <th>Date</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+          <hr>
+          <h5 style="color:white;">Exceptions</h5>
+          <table class="table table-hover table-bordered table-color fixed-header" id="pospay_exception_tbl">
+            <thead>
+              <tr>
+                <th>Serial</th>
+                <th>Payee</th>
+                <th>Amount</th>
+                <th>Reason</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+          <select id="pospay_item_select" style="height:30px;margin-right:5px;">
+            <option value="select">Select exception</option>
+          </select>
+          <button type="button" id="pospay_pay_btn" class="btn btn-primary">Pay</button>
+          <button type="button" id="pospay_return_btn" class="btn btn-primary">Return</button>
         </div>
         <div id="account_details_pane" style="display:none;">
 					<label class="details_lbl" for="first_name">First name:</label>

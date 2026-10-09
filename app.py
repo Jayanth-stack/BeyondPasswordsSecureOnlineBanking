@@ -21,6 +21,12 @@ from utility.wire import (
     get_service as get_wire_service,
     set_service as set_wire_service,
 )
+from utility.pospay import (
+    attach_pospay_routes,
+    build_service as build_pospay_service,
+    get_service as get_pospay_service,
+    set_service as set_pospay_service,
+)
 
 load_dotenv()
 
@@ -278,6 +284,7 @@ def get_customer_data():
             'FundsRequests': c.get_funds_requests(customer_id),
             'LinkedAccounts': _link_snapshot(customer_id, actor=customer_id, actor_type='customer'),
             'Wires': _wire_snapshot(customer_id, actor=customer_id, actor_type='customer'),
+            'PosPay': _pospay_snapshot(customer_id, actor=customer_id, actor_type='customer'),
         }
         return jsonify(response), 200
     except Exception as e:
@@ -918,6 +925,9 @@ def get_customer():
                 'Wires': _wire_snapshot(
                     values['customer_id'], actor=session['userid'], actor_type=session.get('usertype') or 'employee',
                 ),
+                'PosPay': _pospay_snapshot(
+                    values['customer_id'], actor=session['userid'], actor_type=session.get('usertype') or 'employee',
+                ),
             }
             return jsonify(response), 200
         except Exception as e:
@@ -1382,6 +1392,25 @@ wire_service = build_wire_service(
 )
 set_wire_service(wire_service)
 attach_wire_routes(app, wire_service)
+
+
+def _pospay_snapshot(userid, actor=None, actor_type='customer'):
+    service = get_pospay_service()
+    if service is None:
+        return {'enabled': False, 'enrollments': [], 'issues': [], 'items': [], 'exceptions': []}
+    try:
+        return service.snapshot(userid, actor=actor, actor_type=actor_type)
+    except Exception:
+        return {'enabled': False, 'enrollments': [], 'issues': [], 'items': [], 'exceptions': []}
+
+
+pospay_service = build_pospay_service(
+    debit_fn=_link_debit,
+    credit_fn=_link_credit,
+    accounts_fn=_link_accounts,
+)
+set_pospay_service(pospay_service)
+attach_pospay_routes(app, pospay_service)
 
 app.config['SESSION_COOKIE_SECURE'] = True
 app.config['SESSION_COOKIE_HTTPONLY'] = True

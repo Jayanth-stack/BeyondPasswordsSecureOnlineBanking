@@ -300,6 +300,32 @@
               <button type="button" id="staff_wire_recall_btn" class="btn btn-primary">Recall</button>
               <p id="staff_wire_result" style="color:yellow;margin-top:8px;"></p>
             </div>
+            <div id="staff_pospay_card" style="display:none;">
+              <h4 class="header_text" style="color:white;">Positive Pay</h4>
+              <p id="staff_pospay_summary" style="color:white;">YTD paid: $0.00 &middot; returned: $0.00</p>
+              <textarea id="staff_pospay_file" placeholder="PPAY1|serial|cents|account|payee|trace|YYYYMMDD" style="width:95%;height:60px;"></textarea>
+              <button type="button" id="staff_pospay_ingest_btn" class="btn btn-primary">Ingest file</button>
+              <table class="table table-hover table-bordered table-color" id="staff_pospay_tbl">
+                <thead>
+                  <tr>
+                    <th>Serial</th>
+                    <th>Payee</th>
+                    <th>Amount</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+              <select id="staff_pospay_id" style="height:30px;margin-right:5px;">
+                <option value="select">Select presentment</option>
+              </select>
+              <button type="button" id="staff_pospay_override_btn" class="btn btn-primary">Override OFAC</button>
+              <button type="button" id="staff_pospay_release_btn" class="btn btn-primary">Release</button>
+              <button type="button" id="staff_pospay_pay_btn" class="btn btn-primary">Pay</button>
+              <button type="button" id="staff_pospay_return_btn" class="btn btn-primary">Return</button>
+              <button type="button" id="staff_pospay_reject_btn" class="btn btn-primary">Reject</button>
+              <p id="staff_pospay_result" style="color:yellow;margin-top:8px;"></p>
+            </div>
         </div>
         <div id="account_details_pane" style="display:none;">
           <label class="details_lbl" for="first_name">First name:</label>
