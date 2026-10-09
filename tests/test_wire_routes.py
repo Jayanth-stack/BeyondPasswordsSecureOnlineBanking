@@ -231,6 +231,67 @@ class WireRouteTests(unittest.TestCase):
         self.assertEqual(rejected.status_code, 200)
         self.assertEqual(rejected.get_json()['wire']['status'], 'rejected')
 
+    def test_get_send_wire_still_originates(self):
+        self.login()
+        added = self.client.post('/addWireBeneficiary', json=self._bene_payload(nickname='GetChase'))
+        self.assertEqual(added.status_code, 201)
+        bene_id = added.get_json()['beneficiary']['beneficiary_id']
+        sent = self.client.get('/sendWire', json={
+            'userid': 'alice', 'beneficiary_id': bene_id, 'amount': '18.00', 'trace_id': 'get-1',
+        })
+        self.assertEqual(sent.status_code, 201)
+        self.assertEqual(sent.get_json()['wire']['status'], 'sent')
+        self.assertEqual(self.debits[0], ('1001', '18.00', 'wire to GetChase'))
+
+    def test_claimed_employee_originates_wire_for_another_customer(self):
+        # /login stores client-supplied usertype; wire routes trust it as staff.
+        self.service.accounts_fn = lambda userid: {
+            'alice': {
+                'checkin': {'Account': 1001, 'Balance': 50},
+                'savings': {'Account': 1002, 'Balance': 10},
+                'credit': 'None',
+            },
+            'mallory': {
+                'checkin': {'Account': 9001, 'Balance': 50},
+                'savings': {'Account': 9002, 'Balance': 10},
+                'credit': 'None',
+            },
+        }[userid]
+        self.login('alice', 'customer')
+        added = self.client.post('/addWireBeneficiary', json=self._bene_payload(nickname='IdorChase'))
+        self.assertEqual(added.status_code, 201)
+        bene_id = added.get_json()['beneficiary']['beneficiary_id']
+
+        self.login('mallory', 'employee')
+        sent = self.client.post('/sendWire', json={
+            'userid': 'mallory',
+            'customer_id': 'alice',
+            'beneficiary_id': bene_id,
+            'amount': '40.00',
+            'trace_id': 'idor-wire',
+        })
+        self.assertEqual(sent.status_code, 201)
+        self.assertEqual(sent.get_json()['wire']['userid'], 'alice')
+        self.assertEqual(self.debits[0][0], '1001')
+        self.assertEqual(self.debits[0][1], '40.00')
+
+    def test_claimed_employee_can_complete_foreign_wire(self):
+        self.login()
+        added = self.client.post('/addWireBeneficiary', json=self._bene_payload(nickname='CompleteMe'))
+        self.assertEqual(added.status_code, 201)
+        bene_id = added.get_json()['beneficiary']['beneficiary_id']
+        sent = self.client.post('/sendWire', json={
+            'userid': 'alice', 'beneficiary_id': bene_id, 'amount': '11.00', 'trace_id': 'c-staff',
+        })
+        self.assertEqual(sent.status_code, 201)
+        wire_id = sent.get_json()['wire']['wire_id']
+
+        self.login('mallory', 'employee')
+        completed = self.client.post('/completeWire', json={'userid': 'mallory', 'wire_id': wire_id})
+        self.assertEqual(completed.status_code, 200)
+        self.assertEqual(completed.get_json()['wire']['status'], 'completed')
+
 
 if __name__ == '__main__':
     unittest.main()
+
