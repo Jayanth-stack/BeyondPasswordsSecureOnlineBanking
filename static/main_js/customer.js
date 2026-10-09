@@ -128,6 +128,7 @@ function appendPrimaryData(data) {
   fillPendingTransTbl(data);
   fillLinkedAccounts(data);
   fillWires(data);
+  fillPosPay(data);
 }
 
 function fillLinkedAccountSelect(selectId) {
@@ -252,6 +253,119 @@ function fillWires(data) {
     openOpt.innerHTML = wires[j].nickname + ' $' + wires[j].amount + ' (' + wires[j].status + ')';
     openSelect.options.add(openOpt);
   }
+}
+
+function fillPosPay(data) {
+  var snapshot = data.PosPay || {};
+  var summary = document.getElementById('pospay_summary');
+  if (summary) {
+    summary.innerHTML = 'Active: ' + (snapshot.active_count || 0) +
+      ' &middot; open: ' + (snapshot.open_count || 0) +
+      ' &middot; exceptions: ' + (snapshot.exception_count || 0) +
+      ' &middot; YTD paid: $' + (snapshot.ytd_paid || '0.00') +
+      ' &middot; returned: $' + (snapshot.ytd_returned || '0.00');
+  }
+  var clockEl = document.getElementById('pospay_clock');
+  if (clockEl && snapshot.clock) {
+    clockEl.innerHTML = 'Decision cutoff ' + (snapshot.clock.cutoff || '14:00') +
+      ' &middot; value date ' + (snapshot.clock.value_date || '--') +
+      (snapshot.clock.after_cutoff ? ' &middot; after cutoff' : '');
+  }
+  fillLinkedAccountSelect('pospay_enroll_account');
+  fillLinkedAccountSelect('pospay_issue_account');
+  var enrollTable = document.getElementById('pospay_enroll_tbl');
+  if (!enrollTable) {
+    return;
+  }
+  var enrollBody = enrollTable.getElementsByTagName('tbody')[0];
+  enrollBody.innerHTML = '';
+  var enrollSelect = document.getElementById('pospay_enroll_select');
+  enrollSelect.options.length = 1;
+  var enrollments = snapshot.enrollments || [];
+  for (var i = 0; i < enrollments.length; i++) {
+    var row = enrollBody.insertRow(-1);
+    row.insertCell(0).innerHTML = enrollments[i].account_last4;
+    row.insertCell(1).innerHTML = enrollments[i].match_payee ? 'yes' : 'no';
+    row.insertCell(2).innerHTML = enrollments[i].default_action;
+    row.insertCell(3).innerHTML = enrollments[i].status;
+    var option = document.createElement('OPTION');
+    option.value = enrollments[i].enrollment_id;
+    option.innerHTML = enrollments[i].account_last4 + ' (' + enrollments[i].status + ')';
+    enrollSelect.options.add(option);
+  }
+  var issueTable = document.getElementById('pospay_issue_tbl');
+  var issueBody = issueTable.getElementsByTagName('tbody')[0];
+  issueBody.innerHTML = '';
+  var issueSelect = document.getElementById('pospay_issue_select');
+  issueSelect.options.length = 1;
+  var issues = snapshot.issues || [];
+  for (var j = 0; j < issues.length; j++) {
+    var irow = issueBody.insertRow(-1);
+    irow.insertCell(0).innerHTML = issues[j].serial;
+    irow.insertCell(1).innerHTML = issues[j].payee;
+    irow.insertCell(2).innerHTML = '$' + issues[j].amount;
+    irow.insertCell(3).innerHTML = issues[j].issue_date;
+    irow.insertCell(4).innerHTML = issues[j].status;
+    if (!issues[j].voidable) {
+      continue;
+    }
+    var iopt = document.createElement('OPTION');
+    iopt.value = issues[j].issue_id;
+    iopt.innerHTML = issues[j].serial + ' $' + issues[j].amount;
+    issueSelect.options.add(iopt);
+  }
+  var exTable = document.getElementById('pospay_exception_tbl');
+  var exBody = exTable.getElementsByTagName('tbody')[0];
+  exBody.innerHTML = '';
+  var itemSelect = document.getElementById('pospay_item_select');
+  itemSelect.options.length = 1;
+  var items = snapshot.items || [];
+  for (var k = 0; k < items.length; k++) {
+    var erow = exBody.insertRow(-1);
+    erow.insertCell(0).innerHTML = items[k].serial;
+    erow.insertCell(1).innerHTML = items[k].payee;
+    erow.insertCell(2).innerHTML = '$' + items[k].amount;
+    erow.insertCell(3).innerHTML = items[k].reason || '';
+    erow.insertCell(4).innerHTML = items[k].status;
+    if (!items[k].decidable) {
+      continue;
+    }
+    var eopt = document.createElement('OPTION');
+    eopt.value = items[k].item_id;
+    eopt.innerHTML = items[k].serial + ' $' + items[k].amount + ' (' + items[k].reason + ')';
+    itemSelect.options.add(eopt);
+  }
+}
+
+function postPosPay(path, payload, okMsg) {
+  payload.userid = userid;
+  fetch(homeURL + path, {
+    method: 'post',
+    body: JSON.stringify(payload),
+    headers: { 'Content-type': 'application/json' }
+  }).then(function(response) {
+    return response.json().then(function(body) {
+      var result = document.getElementById('pospay_result');
+      if (!response.ok) {
+        if (result) { result.innerHTML = (body && (body.message || body.error)) || 'Failed'; }
+        window.alert((body && (body.message || body.error)) || 'Request failed');
+        if (body && body.PosPay) {
+          fillPosPay({ PosPay: body.PosPay });
+        }
+        return;
+      }
+      if (result) {
+        result.innerHTML = okMsg || body.message || 'Done';
+      }
+      if (body && body.PosPay) {
+        fillPosPay({ PosPay: body.PosPay });
+      } else {
+        getUser();
+      }
+    });
+  }).catch(function(error) {
+    console.error(error);
+  });
 }
 
 function postWire(path, payload, okMsg) {
@@ -1047,6 +1161,7 @@ $(document).ready(function() {
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#pospay_menu').css('background-color','maroon');
     });
     $('#service_requests_menu').on('click', function(){
       if($('#service_requests_pane').css('display')=='none'){
@@ -1057,6 +1172,7 @@ $(document).ready(function() {
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#pospay_menu').css('background-color','maroon');
     });
     $('#my_accounts_menu').on('click', function(){
       getUser();
@@ -1077,6 +1193,7 @@ $(document).ready(function() {
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#pospay_menu').css('background-color','maroon');
     });
     $('#pending_transaction_requests_menu').on('click', function(){
       if($('#pending_transaction_requests_pane').css('display')=='none'){
@@ -1087,6 +1204,7 @@ $(document).ready(function() {
       $('#service_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#pospay_menu').css('background-color','maroon');
     });
     $('#linked_accounts_menu').on('click', function(){
       if($('#linked_accounts_pane').css('display')=='none'){
@@ -1097,6 +1215,7 @@ $(document).ready(function() {
       $('#service_requests_menu').css('background-color','maroon');
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#pospay_menu').css('background-color','maroon');
     });
     $('#wires_menu').on('click', function(){
       if($('#wires_pane').css('display')=='none'){
@@ -1107,6 +1226,65 @@ $(document).ready(function() {
       $('#service_requests_menu').css('background-color','maroon');
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
+      $('#pospay_menu').css('background-color','maroon');
+    });
+    $('#pospay_menu').on('click', function(){
+      if($('#pospay_pane').css('display')=='none'){
+          $('#pospay_pane').show().siblings('div').hide();
+      }
+      $('#pospay_menu').css('background-color','#FF6600');
+      $('#my_accounts_menu').css('background-color','maroon');
+      $('#service_requests_menu').css('background-color','maroon');
+      $('#pending_transaction_requests_menu').css('background-color','maroon');
+      $('#linked_accounts_menu').css('background-color','maroon');
+      $('#wires_menu').css('background-color','maroon');
+    });
+    $('#pospay_enroll_btn').on('click', function(){
+      if($('#pospay_enroll_account').val() == 'select'){
+        window.alert('Select an account to enroll.');
+        return;
+      }
+      postPosPay('enrollPosPay', {
+        account: $('#pospay_enroll_account').val(),
+        default_action: $('#pospay_default_action').val()
+      }, 'Enrolled');
+    });
+    $('#pospay_pause_btn').on('click', function(){
+      if($('#pospay_enroll_select').val() == 'select'){ window.alert('Select an enrollment.'); return; }
+      postPosPay('pausePosPay', { enrollment_id: $('#pospay_enroll_select').val() }, 'Paused');
+    });
+    $('#pospay_resume_btn').on('click', function(){
+      if($('#pospay_enroll_select').val() == 'select'){ window.alert('Select an enrollment.'); return; }
+      postPosPay('resumePosPay', { enrollment_id: $('#pospay_enroll_select').val() }, 'Resumed');
+    });
+    $('#pospay_archive_btn').on('click', function(){
+      if($('#pospay_enroll_select').val() == 'select'){ window.alert('Select an enrollment.'); return; }
+      postPosPay('archivePosPay', { enrollment_id: $('#pospay_enroll_select').val() }, 'Archived');
+    });
+    $('#pospay_add_issue_btn').on('click', function(){
+      if($('#pospay_issue_account').val() == 'select' || $('#pospay_serial').val() == '' || $('#pospay_amount').val() == '' || $('#pospay_payee').val() == ''){
+        window.alert('Account, serial, amount, and payee are required.');
+        return;
+      }
+      postPosPay('addPosPayIssue', {
+        account: $('#pospay_issue_account').val(),
+        serial: $('#pospay_serial').val(),
+        amount: $('#pospay_amount').val(),
+        payee: $('#pospay_payee').val(),
+        issue_date: $('#pospay_issue_date').val()
+      }, 'Issued');
+    });
+    $('#pospay_void_btn').on('click', function(){
+      if($('#pospay_issue_select').val() == 'select'){ window.alert('Select an issued check.'); return; }
+      postPosPay('voidPosPayIssue', { issue_id: $('#pospay_issue_select').val() }, 'Voided');
+    });
+    $('#pospay_pay_btn').on('click', function(){
+      if($('#pospay_item_select').val() == 'select'){ window.alert('Select an exception.'); return; }
+      postPosPay('payPosPay', { item_id: $('#pospay_item_select').val() }, 'Paid');
+    });
+    $('#pospay_return_btn').on('click', function(){
+      if($('#pospay_item_select').val() == 'select'){ window.alert('Select an exception.'); return; }
+      postPosPay('returnPosPay', { item_id: $('#pospay_item_select').val() }, 'Returned');
     });
     $('#wire_add_btn').on('click', function(){
       if($('#wire_nickname').val() == '' || $('#wire_legal_name').val() == '' || $('#wire_default_account').val() == 'select'){
