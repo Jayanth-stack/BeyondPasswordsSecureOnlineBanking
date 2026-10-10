@@ -332,6 +332,49 @@
               <button type="button" id="staff_wire_recall_btn" class="btn btn-primary">Recall</button>
               <p id="staff_wire_result" style="color:yellow;margin-top:8px;"></p>
             </div>
+            <div id="staff_lockbox_card" style="display:none;">
+              <h4 class="header_text" style="color:white;">Lockbox / BAI2</h4>
+              <p id="staff_lockbox_summary" style="color:white;">YTD posted: $0.00 &middot; returned: $0.00</p>
+              <table class="table table-hover table-bordered table-color" id="staff_lockbox_enroll_tbl">
+                <thead>
+                  <tr>
+                    <th>Nickname</th>
+                    <th>Lockbox</th>
+                    <th>Last4</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+              <table class="table table-hover table-bordered table-color" id="staff_lockbox_tbl">
+                <thead>
+                  <tr>
+                    <th>Lockbox</th>
+                    <th>Remitter</th>
+                    <th>Amount</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+              <input type="text" id="staff_lb_lockbox_id" placeholder="Lockbox #" maxlength="7" style="height:30px;width:100px;margin-right:5px;">
+              <input type="text" id="staff_lb_amount" placeholder="Amount" style="height:30px;width:90px;margin-right:5px;">
+              <input type="text" id="staff_lb_remitter" placeholder="Remitter" style="height:30px;width:140px;margin-right:5px;">
+              <input type="text" id="staff_lb_invoice" placeholder="Invoice" style="height:30px;width:110px;margin-right:5px;">
+              <button type="button" id="staff_lb_ingest_btn" class="btn btn-primary">Ingest</button>
+              <br>
+              <textarea id="staff_lb_file" placeholder="BAI2 file" style="width:90%;height:70px;margin-top:8px;"></textarea>
+              <button type="button" id="staff_lb_file_btn" class="btn btn-primary">Ingest file</button>
+              <br>
+              <select id="staff_lb_item_id" style="height:30px;margin-right:5px;margin-top:8px;">
+                <option value="select">Select remittance</option>
+              </select>
+              <button type="button" id="staff_lb_override_btn" class="btn btn-primary">Override OFAC</button>
+              <button type="button" id="staff_lb_release_btn" class="btn btn-primary">Release</button>
+              <button type="button" id="staff_lb_reject_btn" class="btn btn-primary">Reject</button>
+              <button type="button" id="staff_lb_return_btn" class="btn btn-primary">Return</button>
+              <p id="staff_lockbox_result" style="color:yellow;margin-top:8px;"></p>
+            </div>
           </div>
 
           <div id="account_details_pane" style="display: none">

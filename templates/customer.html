@@ -111,6 +111,15 @@
         </button>
 
         <button type="button" class="btn btn-primary btn-block"
+        id="lockbox_menu">
+        <span class="glyphicon glyphicon-inbox gi-3x"
+        style="color: white" aria-hidden="true">
+        </span>
+        <br />
+        Lockbox
+        </button>
+
+        <button type="button" class="btn btn-primary btn-block"
         id="service_requests_menu">
         <span class="glyphicon glyphicon-edit gi-3x"
         style="color: white" aria-hidden="true">
@@ -352,6 +361,61 @@
           <select id="wire_open_select" style="height:30px;margin-right:5px;">
             <option value="select">Select open wire</option>
           </select>
+        </div>
+        <div id="lockbox_pane" style="display:none;">
+          <p id="lockbox_summary" style="color:white;">Active: 0 &middot; open: 0 &middot; YTD posted: $0.00 &middot; returned: $0.00</p>
+          <p id="lockbox_clock" style="color:white;">Cutoff 14:00 &middot; value date --</p>
+          <table class="table table-hover table-bordered table-color fixed-header" id="lockbox_enroll_tbl">
+            <thead>
+              <tr>
+                <th>Nickname</th>
+                <th>Lockbox</th>
+                <th>Last4</th>
+                <th>Invoice</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+          <hr>
+          <h5 style="color:white;">Enroll a lockbox</h5>
+          <input type="text" id="lb_nickname" placeholder="Nickname" style="height:30px;width:140px;margin-right:5px;">
+          <input type="text" id="lb_lockbox_id" placeholder="Lockbox #" maxlength="7" style="height:30px;width:110px;margin-right:5px;">
+          <select id="lb_credit_account" style="height:30px;margin-right:5px;">
+            <option value="select">Credit account</option>
+          </select>
+          <label style="color:white;margin-right:8px;"><input type="checkbox" id="lb_require_invoice"> Require invoice</label>
+          <button type="button" id="lb_enroll_btn" class="btn btn-primary">Enroll</button>
+          <br><br>
+          <h5 style="color:white;">Expected invoices</h5>
+          <select id="lb_box_select" style="height:30px;margin-right:5px;">
+            <option value="select">Select lockbox</option>
+          </select>
+          <input type="text" id="lb_invoice" placeholder="Invoice #" style="height:30px;width:120px;margin-right:5px;">
+          <input type="text" id="lb_invoice_amount" placeholder="Amount" style="height:30px;width:90px;margin-right:5px;">
+          <button type="button" id="lb_add_invoice_btn" class="btn btn-primary">Add invoice</button>
+          <button type="button" id="lb_pause_btn" class="btn btn-primary">Pause</button>
+          <button type="button" id="lb_resume_btn" class="btn btn-primary">Resume</button>
+          <button type="button" id="lb_archive_btn" class="btn btn-primary">Archive</button>
+          <p id="lb_result" style="color:yellow;margin-top:10px;"></p>
+          <hr>
+          <h5 style="color:white;">Remittances</h5>
+          <table class="table table-hover table-bordered table-color fixed-header" id="lockbox_item_tbl">
+            <thead>
+              <tr>
+                <th>Lockbox</th>
+                <th>Remitter</th>
+                <th>Amount</th>
+                <th>Invoice</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+          <select id="lb_item_select" style="height:30px;margin-right:5px;">
+            <option value="select">Select remittance</option>
+          </select>
+          <button type="button" id="lb_return_btn" class="btn btn-primary">Request return</button>
         </div>
         <div id="account_details_pane" style="display:none;">
 					<label class="details_lbl" for="first_name">First name:</label>
