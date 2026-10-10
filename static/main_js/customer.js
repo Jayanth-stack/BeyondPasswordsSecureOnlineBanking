@@ -128,6 +128,7 @@ function appendPrimaryData(data) {
   fillPendingTransTbl(data);
   fillLinkedAccounts(data);
   fillWires(data);
+  fillLockboxes(data);
 }
 
 function fillLinkedAccountSelect(selectId) {
@@ -252,6 +253,97 @@ function fillWires(data) {
     openOpt.innerHTML = wires[j].nickname + ' $' + wires[j].amount + ' (' + wires[j].status + ')';
     openSelect.options.add(openOpt);
   }
+}
+
+function fillLockboxes(data) {
+  var snapshot = data.Lockboxes || {};
+  var summary = document.getElementById('lockbox_summary');
+  if (summary) {
+    summary.innerHTML = 'Active: ' + (snapshot.active_count || 0) +
+      ' &middot; open: ' + (snapshot.open_count || 0) +
+      ' &middot; YTD posted: $' + (snapshot.ytd_posted || '0.00') +
+      ' &middot; returned: $' + (snapshot.ytd_returned || '0.00');
+  }
+  var clockEl = document.getElementById('lockbox_clock');
+  if (clockEl && snapshot.clock) {
+    clockEl.innerHTML = 'Cutoff ' + (snapshot.clock.cutoff || '14:00') +
+      ' &middot; value date ' + (snapshot.clock.value_date || '--') +
+      (snapshot.clock.after_cutoff ? ' &middot; after cutoff' : '');
+  }
+  fillLinkedAccountSelect('lb_credit_account');
+  var table = document.getElementById('lockbox_enroll_tbl');
+  if (!table) {
+    return;
+  }
+  var body = table.getElementsByTagName('tbody')[0];
+  body.innerHTML = '';
+  var selection = document.getElementById('lb_box_select');
+  selection.options.length = 1;
+  var boxes = snapshot.enrollments || [];
+  for (var i = 0; i < boxes.length; i++) {
+    var row = body.insertRow(-1);
+    row.insertCell(0).innerHTML = boxes[i].nickname;
+    row.insertCell(1).innerHTML = boxes[i].lockbox_id;
+    row.insertCell(2).innerHTML = boxes[i].account_last4;
+    row.insertCell(3).innerHTML = boxes[i].require_invoice ? 'required' : 'optional';
+    row.insertCell(4).innerHTML = boxes[i].status;
+    var option = document.createElement('OPTION');
+    option.value = boxes[i].enrollment_id;
+    option.innerHTML = boxes[i].nickname + ' (' + boxes[i].lockbox_id + ')';
+    selection.options.add(option);
+  }
+  var itemTable = document.getElementById('lockbox_item_tbl');
+  var itemBody = itemTable.getElementsByTagName('tbody')[0];
+  itemBody.innerHTML = '';
+  var itemSelect = document.getElementById('lb_item_select');
+  itemSelect.options.length = 1;
+  var items = snapshot.items || [];
+  for (var j = 0; j < items.length; j++) {
+    var irow = itemBody.insertRow(-1);
+    irow.insertCell(0).innerHTML = items[j].lockbox_id;
+    irow.insertCell(1).innerHTML = items[j].remitter_name;
+    irow.insertCell(2).innerHTML = '$' + items[j].amount;
+    irow.insertCell(3).innerHTML = items[j].invoice_number || items[j].customer_ref || '';
+    irow.insertCell(4).innerHTML = items[j].status;
+    if (!items[j].returnable) {
+      continue;
+    }
+    var itemOpt = document.createElement('OPTION');
+    itemOpt.value = items[j].item_id;
+    itemOpt.innerHTML = items[j].lockbox_id + ' $' + items[j].amount + ' (' + items[j].status + ')';
+    itemSelect.options.add(itemOpt);
+  }
+}
+
+function postLockbox(path, payload, okMsg) {
+  payload.userid = userid;
+  fetch(homeURL + path, {
+    method: 'post',
+    body: JSON.stringify(payload),
+    headers: { 'Content-type': 'application/json' }
+  }).then(function(response) {
+    return response.json().then(function(body) {
+      var result = document.getElementById('lb_result');
+      if (!response.ok) {
+        if (result) { result.innerHTML = (body && (body.message || body.error)) || 'Failed'; }
+        window.alert((body && (body.message || body.error)) || 'Request failed');
+        if (body && body.Lockboxes) {
+          fillLockboxes({ Lockboxes: body.Lockboxes });
+        }
+        return;
+      }
+      if (result) {
+        result.innerHTML = okMsg || body.message || 'Done';
+      }
+      if (body && body.Lockboxes) {
+        fillLockboxes({ Lockboxes: body.Lockboxes });
+      } else {
+        getUser();
+      }
+    });
+  }).catch(function(error) {
+    console.error(error);
+  });
 }
 
 function postWire(path, payload, okMsg) {
@@ -1047,6 +1139,7 @@ $(document).ready(function() {
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#lockbox_menu').css('background-color','maroon');
     });
     $('#service_requests_menu').on('click', function(){
       if($('#service_requests_pane').css('display')=='none'){
@@ -1057,6 +1150,7 @@ $(document).ready(function() {
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#lockbox_menu').css('background-color','maroon');
     });
     $('#my_accounts_menu').on('click', function(){
       getUser();
@@ -1077,6 +1171,7 @@ $(document).ready(function() {
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#lockbox_menu').css('background-color','maroon');
     });
     $('#pending_transaction_requests_menu').on('click', function(){
       if($('#pending_transaction_requests_pane').css('display')=='none'){
@@ -1087,6 +1182,7 @@ $(document).ready(function() {
       $('#service_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#lockbox_menu').css('background-color','maroon');
     });
     $('#linked_accounts_menu').on('click', function(){
       if($('#linked_accounts_pane').css('display')=='none'){
@@ -1097,6 +1193,7 @@ $(document).ready(function() {
       $('#service_requests_menu').css('background-color','maroon');
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#lockbox_menu').css('background-color','maroon');
     });
     $('#wires_menu').on('click', function(){
       if($('#wires_pane').css('display')=='none'){
@@ -1107,6 +1204,57 @@ $(document).ready(function() {
       $('#service_requests_menu').css('background-color','maroon');
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
+      $('#lockbox_menu').css('background-color','maroon');
+    });
+    $('#lockbox_menu').on('click', function(){
+      if($('#lockbox_pane').css('display')=='none'){
+          $('#lockbox_pane').show().siblings('div').hide();
+      }
+      $('#lockbox_menu').css('background-color','#FF6600');
+      $('#my_accounts_menu').css('background-color','maroon');
+      $('#service_requests_menu').css('background-color','maroon');
+      $('#pending_transaction_requests_menu').css('background-color','maroon');
+      $('#linked_accounts_menu').css('background-color','maroon');
+      $('#wires_menu').css('background-color','maroon');
+    });
+    $('#lb_enroll_btn').on('click', function(){
+      if($('#lb_nickname').val() == '' || $('#lb_lockbox_id').val() == '' || $('#lb_credit_account').val() == 'select'){
+        window.alert('Nickname, lockbox number, and credit account are required.');
+        return;
+      }
+      postLockbox('enrollLockbox', {
+        nickname: $('#lb_nickname').val(),
+        lockbox_id: $('#lb_lockbox_id').val(),
+        credit_account: $('#lb_credit_account').val(),
+        require_invoice: $('#lb_require_invoice').is(':checked')
+      }, 'Lockbox enrolled');
+    });
+    $('#lb_add_invoice_btn').on('click', function(){
+      if($('#lb_box_select').val() == 'select' || $('#lb_invoice').val() == ''){
+        window.alert('Select a lockbox and invoice number.');
+        return;
+      }
+      postLockbox('addLockboxInvoice', {
+        enrollment_id: $('#lb_box_select').val(),
+        invoice_number: $('#lb_invoice').val(),
+        amount: $('#lb_invoice_amount').val()
+      }, 'Invoice added');
+    });
+    $('#lb_pause_btn').on('click', function(){
+      if($('#lb_box_select').val() == 'select'){ window.alert('Select a lockbox.'); return; }
+      postLockbox('pauseLockbox', { enrollment_id: $('#lb_box_select').val() }, 'Paused');
+    });
+    $('#lb_resume_btn').on('click', function(){
+      if($('#lb_box_select').val() == 'select'){ window.alert('Select a lockbox.'); return; }
+      postLockbox('resumeLockbox', { enrollment_id: $('#lb_box_select').val() }, 'Resumed');
+    });
+    $('#lb_archive_btn').on('click', function(){
+      if($('#lb_box_select').val() == 'select'){ window.alert('Select a lockbox.'); return; }
+      postLockbox('archiveLockbox', { enrollment_id: $('#lb_box_select').val() }, 'Archived');
+    });
+    $('#lb_return_btn').on('click', function(){
+      if($('#lb_item_select').val() == 'select'){ window.alert('Select a remittance.'); return; }
+      postLockbox('requestLockboxReturn', { item_id: $('#lb_item_select').val() }, 'Return requested');
     });
     $('#wire_add_btn').on('click', function(){
       if($('#wire_nickname').val() == '' || $('#wire_legal_name').val() == '' || $('#wire_default_account').val() == 'select'){
