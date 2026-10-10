@@ -131,7 +131,7 @@ class HttpSecureCookieAndMutatingGetTests(unittest.TestCase):
             twilio.verify.v2.services.return_value.verification_checks.create.return_value.status = (
                 "approved"
             )
-            customers_cls.return_value.reset_password.return_value = "Password Updated"
+            customers_cls.return_value.reset_fpassword.return_value = "Password Updated"
             response = self.client.get(
                 "/resetPassword",
                 json={
@@ -142,7 +142,7 @@ class HttpSecureCookieAndMutatingGetTests(unittest.TestCase):
                 },
             )
         self.assertEqual(response.status_code, 200)
-        customers_cls.return_value.reset_password.assert_called_once()
+        customers_cls.return_value.reset_fpassword.assert_called_once()
 
 
 class StaffAuthAndDenyHelperTests(unittest.TestCase):
@@ -200,8 +200,9 @@ class StaffAuthAndDenyHelperTests(unittest.TestCase):
                 "/denyRequest",
                 json={"userid": "emp1", "transaction_no": 9},
             )
-        self.assertEqual(response.status_code, 200)
-        customers_cls.return_value.deny_funds_requested.assert_called_once_with(9)
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.get_json()["message"], "Unauthorized access")
+        customers_cls.return_value.deny_funds_requested.assert_not_called()
         emp_cls.return_value.deny_funds_requested.assert_not_called()
 
     def test_self_register_session_key_enables_deny_without_login(self):
@@ -225,8 +226,8 @@ class StaffAuthAndDenyHelperTests(unittest.TestCase):
                 "/denyRequest",
                 json={"userid": "cust1", "transaction_no": 44},
             )
-        self.assertEqual(deny.status_code, 200)
-        customers_cls.return_value.deny_funds_requested.assert_called_once_with(44)
+        self.assertIn(deny.status_code, (301, 302))
+        customers_cls.return_value.deny_funds_requested.assert_not_called()
 
     def test_empty_amount_on_fund_transfer_raises_instead_of_400(self):
         with self.client.session_transaction() as sess:
@@ -398,12 +399,13 @@ class OrphanedQueueAndConfigTests(unittest.TestCase):
                 )
         self.emp_cursor.execute.assert_not_called()
 
-    def test_logging_overwrites_audit_file_on_import(self):
+    def test_logging_appends_audit_file_on_import(self):
         import app as app_module
 
         src = inspect.getsource(app_module)
-        self.assertIn("filemode='w'", src)
-        self.assertIn("filename='SystemLogs/bank.log'", src)
+        self.assertIn("filemode='a'", src)
+        self.assertIn("BANK_LOG_FILE", src)
+        self.assertNotIn("filemode='w'", src)
 
     def test_server_binds_all_interfaces_with_debug(self):
         import app as app_module
