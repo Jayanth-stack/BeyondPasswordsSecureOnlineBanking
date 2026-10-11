@@ -244,6 +244,7 @@ function appendSecondaryData(customer_id, data) {
   fillCustomerAccTbl(data);
   fillStaffLinked(data);
   fillStaffWires(data);
+  fillStaffZelle(data);
   if($('#cust_details_card').css('display')=='none'){
     $('#cust_details_card').show();
   }
@@ -372,6 +373,74 @@ function fillStaffWires(data) {
     option.innerHTML = wires[j].nickname + ' $' + wires[j].amount + ' (' + wires[j].status + ')';
     selection.options.add(option);
   }
+}
+
+function fillStaffZelle(data) {
+  var snapshot = data.Zelle || {};
+  var card = document.getElementById('staff_zelle_card');
+  if (!card) {
+    return;
+  }
+  card.style.display = 'block';
+  var summary = document.getElementById('staff_zelle_summary');
+  if (summary) {
+    summary.innerHTML = 'YTD sent: $' + (snapshot.ytd_sent || '0.00') +
+      ' &middot; fees: $' + (snapshot.ytd_fees || '0.00') +
+      ' &middot; recalled: $' + (snapshot.recalled_ytd || '0.00');
+  }
+  var contactTable = document.getElementById('staff_zelle_contact_tbl');
+  var contactBody = contactTable.getElementsByTagName('tbody')[0];
+  contactBody.innerHTML = '';
+  var contacts = snapshot.contacts || [];
+  for (var i = 0; i < contacts.length; i++) {
+    var row = contactBody.insertRow(-1);
+    row.insertCell(0).innerHTML = contacts[i].nickname;
+    row.insertCell(1).innerHTML = contacts[i].legal_name;
+    row.insertCell(2).innerHTML = contacts[i].alias_masked;
+    row.insertCell(3).innerHTML = contacts[i].status;
+  }
+  var table = document.getElementById('staff_zelle_tbl');
+  var body = table.getElementsByTagName('tbody')[0];
+  body.innerHTML = '';
+  var selection = document.getElementById('staff_zelle_id');
+  selection.options.length = 1;
+  var transfers = snapshot.transfers || [];
+  for (var j = 0; j < transfers.length; j++) {
+    var trow = body.insertRow(-1);
+    trow.insertCell(0).innerHTML = transfers[j].nickname;
+    trow.insertCell(1).innerHTML = '$' + transfers[j].amount;
+    trow.insertCell(2).innerHTML = transfers[j].status;
+    trow.insertCell(3).innerHTML = transfers[j].payment_id_masked || '';
+    if (['held', 'pending_release', 'pending_claim'].indexOf(transfers[j].status) < 0) {
+      continue;
+    }
+    var option = document.createElement('OPTION');
+    option.value = transfers[j].transfer_id;
+    option.innerHTML = transfers[j].nickname + ' $' + transfers[j].amount + ' (' + transfers[j].status + ')';
+    selection.options.add(option);
+  }
+}
+
+function postStaffZelle(path, payload) {
+  payload.userid = userid;
+  payload.customer_id = $('#customer_id_input').val() || document.getElementById('customer_id').innerHTML;
+  fetch(homeURL + path, {
+    method: 'post',
+    body: JSON.stringify(payload),
+    headers: { 'Content-type': 'application/json' }
+  }).then(function(response) {
+    return response.json().then(function(body) {
+      var result = document.getElementById('staff_zelle_result');
+      if (!response.ok) {
+        if (result) { result.innerHTML = (body && (body.message || body.error)) || 'Failed'; }
+        return;
+      }
+      if (result) { result.innerHTML = body.message || 'Done'; }
+      getCustomer($('#customer_id_input').val() || document.getElementById('customer_id').innerHTML);
+    });
+  }).catch(function(error) {
+    console.error(error);
+  });
 }
 
 function postStaffWire(path, payload) {
@@ -803,6 +872,7 @@ $(document).ready(function() {
       $('#cust_accounts_tbl').hide();
       $('#staff_linked_card').hide();
       $('#staff_wire_card').hide();
+      $('#staff_zelle_card').hide();
     });
     $('#staff_la_force_btn').on('click', function(){
       if($('#staff_la_link_id').val() == 'select'){ window.alert('Select a pending link.'); return; }
@@ -843,6 +913,26 @@ $(document).ready(function() {
     $('#staff_wire_recall_btn').on('click', function(){
       if($('#staff_wire_id').val() == 'select'){ window.alert('Select a wire.'); return; }
       postStaffWire('recallWire', { wire_id: $('#staff_wire_id').val() });
+    });
+    $('#staff_zelle_override_btn').on('click', function(){
+      if($('#staff_zelle_id').val() == 'select'){ window.alert('Select a Zelle.'); return; }
+      postStaffZelle('overrideZelleOfac', { transfer_id: $('#staff_zelle_id').val() });
+    });
+    $('#staff_zelle_release_btn').on('click', function(){
+      if($('#staff_zelle_id').val() == 'select'){ window.alert('Select a Zelle.'); return; }
+      postStaffZelle('releaseZelle', { transfer_id: $('#staff_zelle_id').val() });
+    });
+    $('#staff_zelle_reject_btn').on('click', function(){
+      if($('#staff_zelle_id').val() == 'select'){ window.alert('Select a Zelle.'); return; }
+      postStaffZelle('rejectZelle', { transfer_id: $('#staff_zelle_id').val() });
+    });
+    $('#staff_zelle_complete_btn').on('click', function(){
+      if($('#staff_zelle_id').val() == 'select'){ window.alert('Select a Zelle.'); return; }
+      postStaffZelle('completeZelle', { transfer_id: $('#staff_zelle_id').val() });
+    });
+    $('#staff_zelle_recall_btn').on('click', function(){
+      if($('#staff_zelle_id').val() == 'select'){ window.alert('Select a Zelle.'); return; }
+      postStaffZelle('recallZelle', { transfer_id: $('#staff_zelle_id').val() });
     });
     $('#approve_trans_btn').on('click', function(){
       if($('#customer_trans_no').val() == 'select'){
