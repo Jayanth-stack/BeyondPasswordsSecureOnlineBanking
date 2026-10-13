@@ -300,6 +300,42 @@
               <button type="button" id="staff_wire_recall_btn" class="btn btn-primary">Recall</button>
               <p id="staff_wire_result" style="color:yellow;margin-top:8px;"></p>
             </div>
+            <div id="staff_rfp_card" style="display:none;">
+              <h4 class="header_text" style="color:white;">Inbound Pay Requests</h4>
+              <p id="staff_rfp_summary" style="color:white;">YTD paid: $0.00</p>
+              <table class="table table-hover table-bordered table-color" id="staff_rfp_enroll_tbl">
+                <thead>
+                  <tr>
+                    <th>Nickname</th>
+                    <th>Last4</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+              <table class="table table-hover table-bordered table-color" id="staff_rfp_tbl">
+                <thead>
+                  <tr>
+                    <th>Creditor</th>
+                    <th>Amount</th>
+                    <th>Status</th>
+                    <th>Reference</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+              <textarea id="staff_rfp_file" placeholder="PAIN013 file" style="width:90%;height:60px;"></textarea>
+              <br>
+              <button type="button" id="staff_rfp_ingest_btn" class="btn btn-primary">Ingest file</button>
+              <select id="staff_rfp_id" style="height:30px;margin-right:5px;">
+                <option value="select">Select request</option>
+              </select>
+              <button type="button" id="staff_rfp_override_btn" class="btn btn-primary">Override OFAC</button>
+              <button type="button" id="staff_rfp_release_btn" class="btn btn-primary">Release</button>
+              <button type="button" id="staff_rfp_reject_btn" class="btn btn-primary">Reject</button>
+              <button type="button" id="staff_rfp_return_btn" class="btn btn-primary">Return</button>
+              <p id="staff_rfp_result" style="color:yellow;margin-top:8px;"></p>
+            </div>
         </div>
         <div id="account_details_pane" style="display:none;">
           <label class="details_lbl" for="first_name">First name:</label>

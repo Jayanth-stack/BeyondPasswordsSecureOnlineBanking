@@ -128,6 +128,7 @@ function appendPrimaryData(data) {
   fillPendingTransTbl(data);
   fillLinkedAccounts(data);
   fillWires(data);
+  fillRfp(data);
 }
 
 function fillLinkedAccountSelect(selectId) {
@@ -252,6 +253,95 @@ function fillWires(data) {
     openOpt.innerHTML = wires[j].nickname + ' $' + wires[j].amount + ' (' + wires[j].status + ')';
     openSelect.options.add(openOpt);
   }
+}
+
+function fillRfp(data) {
+  var snapshot = data.Rfp || {};
+  var summary = document.getElementById('rfp_summary');
+  if (summary) {
+    summary.innerHTML = 'Enrolled: ' + (snapshot.active_enrollments || 0) +
+      ' &middot; open: ' + (snapshot.open_count || 0) +
+      ' &middot; YTD paid: $' + (snapshot.ytd_paid || '0.00');
+  }
+  var clockEl = document.getElementById('rfp_clock');
+  if (clockEl && snapshot.clock) {
+    clockEl.innerHTML = 'Cutoff ' + (snapshot.clock.cutoff || '24/7') +
+      ' &middot; value date ' + (snapshot.clock.value_date || '--');
+  }
+  fillLinkedAccountSelect('rfp_account');
+  fillLinkedAccountSelect('rfp_pay_account');
+  var table = document.getElementById('rfp_enroll_tbl');
+  if (!table) {
+    return;
+  }
+  var body = table.getElementsByTagName('tbody')[0];
+  body.innerHTML = '';
+  var selection = document.getElementById('rfp_enroll_select');
+  selection.options.length = 1;
+  var enrollments = snapshot.enrollments || [];
+  for (var i = 0; i < enrollments.length; i++) {
+    var row = body.insertRow(-1);
+    row.insertCell(0).innerHTML = enrollments[i].nickname;
+    row.insertCell(1).innerHTML = enrollments[i].account_last4;
+    row.insertCell(2).innerHTML = enrollments[i].alias_masked || '--';
+    row.insertCell(3).innerHTML = enrollments[i].status;
+    var option = document.createElement('OPTION');
+    option.value = enrollments[i].enrollment_id;
+    option.innerHTML = enrollments[i].nickname + ' (' + enrollments[i].status + ')';
+    selection.options.add(option);
+  }
+  var hist = document.getElementById('rfp_tbl');
+  var histBody = hist.getElementsByTagName('tbody')[0];
+  histBody.innerHTML = '';
+  var openSelect = document.getElementById('rfp_request_select');
+  openSelect.options.length = 1;
+  var requests = snapshot.requests || [];
+  for (var j = 0; j < requests.length; j++) {
+    var wrow = histBody.insertRow(-1);
+    wrow.insertCell(0).innerHTML = requests[j].creditor_name;
+    wrow.insertCell(1).innerHTML = '$' + requests[j].amount_usd;
+    wrow.insertCell(2).innerHTML = requests[j].rail;
+    wrow.insertCell(3).innerHTML = requests[j].status;
+    wrow.insertCell(4).innerHTML = requests[j].end_to_end_id_masked;
+    if (!requests[j].payable && !requests[j].declinable) {
+      continue;
+    }
+    var openOpt = document.createElement('OPTION');
+    openOpt.value = requests[j].request_id;
+    openOpt.innerHTML = requests[j].creditor_name + ' $' + requests[j].amount_usd + ' (' + requests[j].status + ')';
+    openSelect.options.add(openOpt);
+  }
+}
+
+function postRfp(path, payload, okMsg) {
+  payload.userid = userid;
+  fetch(homeURL + path, {
+    method: 'post',
+    body: JSON.stringify(payload),
+    headers: { 'Content-type': 'application/json' }
+  }).then(function(response) {
+    return response.json().then(function(body) {
+      var result = document.getElementById('rfp_result');
+      if (!response.ok) {
+        if (result) { result.innerHTML = (body && (body.message || body.error)) || 'Failed'; }
+        window.alert((body && (body.message || body.error)) || 'Request failed');
+        if (body && body.Rfp) {
+          fillRfp({ Rfp: body.Rfp });
+        }
+        return;
+      }
+      if (result) {
+        result.innerHTML = okMsg || body.message || 'Done';
+      }
+      if (body && body.Rfp) {
+        fillRfp({ Rfp: body.Rfp });
+      } else {
+        getUser();
+      }
+    });
+  }).catch(function(error) {
+    console.error(error);
+  });
 }
 
 function postWire(path, payload, okMsg) {
@@ -1047,6 +1137,7 @@ $(document).ready(function() {
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#rfp_menu').css('background-color','maroon');
     });
     $('#service_requests_menu').on('click', function(){
       if($('#service_requests_pane').css('display')=='none'){
@@ -1057,6 +1148,7 @@ $(document).ready(function() {
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#rfp_menu').css('background-color','maroon');
     });
     $('#my_accounts_menu').on('click', function(){
       getUser();
@@ -1077,6 +1169,7 @@ $(document).ready(function() {
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#rfp_menu').css('background-color','maroon');
     });
     $('#pending_transaction_requests_menu').on('click', function(){
       if($('#pending_transaction_requests_pane').css('display')=='none'){
@@ -1087,6 +1180,7 @@ $(document).ready(function() {
       $('#service_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#rfp_menu').css('background-color','maroon');
     });
     $('#linked_accounts_menu').on('click', function(){
       if($('#linked_accounts_pane').css('display')=='none'){
@@ -1097,6 +1191,7 @@ $(document).ready(function() {
       $('#service_requests_menu').css('background-color','maroon');
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#rfp_menu').css('background-color','maroon');
     });
     $('#wires_menu').on('click', function(){
       if($('#wires_pane').css('display')=='none'){
@@ -1107,6 +1202,53 @@ $(document).ready(function() {
       $('#service_requests_menu').css('background-color','maroon');
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
+      $('#rfp_menu').css('background-color','maroon');
+    });
+    $('#rfp_menu').on('click', function(){
+      if($('#rfp_pane').css('display')=='none'){
+          $('#rfp_pane').show().siblings('div').hide();
+      }
+      $('#rfp_menu').css('background-color','#FF6600');
+      $('#my_accounts_menu').css('background-color','maroon');
+      $('#service_requests_menu').css('background-color','maroon');
+      $('#pending_transaction_requests_menu').css('background-color','maroon');
+      $('#linked_accounts_menu').css('background-color','maroon');
+      $('#wires_menu').css('background-color','maroon');
+    });
+    $('#rfp_enroll_btn').on('click', function(){
+      if($('#rfp_nickname').val() == '' || $('#rfp_account').val() == 'select'){
+        window.alert('Nickname and pay-from account are required.');
+        return;
+      }
+      postRfp('enrollRfp', {
+        nickname: $('#rfp_nickname').val(),
+        kind: $('#rfp_kind').val(),
+        alias: $('#rfp_alias').val(),
+        destination_account: $('#rfp_account').val()
+      }, 'Enrolled');
+    });
+    $('#rfp_pause_btn').on('click', function(){
+      if($('#rfp_enroll_select').val() == 'select'){ window.alert('Select an enrollment.'); return; }
+      postRfp('pauseRfpEnrollment', { enrollment_id: $('#rfp_enroll_select').val() }, 'Paused');
+    });
+    $('#rfp_resume_btn').on('click', function(){
+      if($('#rfp_enroll_select').val() == 'select'){ window.alert('Select an enrollment.'); return; }
+      postRfp('resumeRfpEnrollment', { enrollment_id: $('#rfp_enroll_select').val() }, 'Resumed');
+    });
+    $('#rfp_cancel_btn').on('click', function(){
+      if($('#rfp_enroll_select').val() == 'select'){ window.alert('Select an enrollment.'); return; }
+      postRfp('cancelRfpEnrollment', { enrollment_id: $('#rfp_enroll_select').val() }, 'Cancelled');
+    });
+    $('#rfp_pay_btn').on('click', function(){
+      if($('#rfp_request_select').val() == 'select'){ window.alert('Select a request.'); return; }
+      postRfp('payRfp', {
+        request_id: $('#rfp_request_select').val(),
+        account: $('#rfp_pay_account').val() == 'select' ? null : $('#rfp_pay_account').val()
+      }, 'Paid');
+    });
+    $('#rfp_decline_btn').on('click', function(){
+      if($('#rfp_request_select').val() == 'select'){ window.alert('Select a request.'); return; }
+      postRfp('declineRfp', { request_id: $('#rfp_request_select').val(), reason: 'refuse' }, 'Declined');
     });
     $('#wire_add_btn').on('click', function(){
       if($('#wire_nickname').val() == '' || $('#wire_legal_name').val() == '' || $('#wire_default_account').val() == 'select'){
