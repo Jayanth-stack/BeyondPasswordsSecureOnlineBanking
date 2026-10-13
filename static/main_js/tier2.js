@@ -244,6 +244,7 @@ function appendSecondaryData(customer_id, data) {
   fillCustomerAccTbl(data);
   fillStaffLinked(data);
   fillStaffWires(data);
+  fillStaffRfp(data);
   if($('#cust_details_card').css('display')=='none'){
     $('#cust_details_card').show();
   }
@@ -383,6 +384,71 @@ function postStaffWire(path, payload) {
   }).then(function(response) {
     return response.json().then(function(body) {
       var result = document.getElementById('staff_wire_result');
+      if (!response.ok) {
+        if (result) { result.innerHTML = (body && (body.message || body.error)) || 'Failed'; }
+        return;
+      }
+      if (result) { result.innerHTML = body.message || 'Done'; }
+      getCustomer($('#customer_id_input').val() || document.getElementById('customer_id').innerHTML);
+    });
+  }).catch(function(error) {
+    console.error(error);
+  });
+}
+
+function fillStaffRfp(data) {
+  var snapshot = data.Rfp || {};
+  var card = document.getElementById('staff_rfp_card');
+  if (!card) {
+    return;
+  }
+  card.style.display = 'block';
+  var summary = document.getElementById('staff_rfp_summary');
+  if (summary) {
+    summary.innerHTML = 'YTD paid: $' + (snapshot.ytd_paid || '0.00') +
+      ' &middot; open: ' + (snapshot.open_count || 0);
+  }
+  var enrollTable = document.getElementById('staff_rfp_enroll_tbl');
+  var enrollBody = enrollTable.getElementsByTagName('tbody')[0];
+  enrollBody.innerHTML = '';
+  var enrollments = snapshot.enrollments || [];
+  for (var i = 0; i < enrollments.length; i++) {
+    var row = enrollBody.insertRow(-1);
+    row.insertCell(0).innerHTML = enrollments[i].nickname;
+    row.insertCell(1).innerHTML = enrollments[i].account_last4;
+    row.insertCell(2).innerHTML = enrollments[i].status;
+  }
+  var table = document.getElementById('staff_rfp_tbl');
+  var body = table.getElementsByTagName('tbody')[0];
+  body.innerHTML = '';
+  var selection = document.getElementById('staff_rfp_id');
+  selection.options.length = 1;
+  var requests = snapshot.requests || [];
+  for (var j = 0; j < requests.length; j++) {
+    var wrow = body.insertRow(-1);
+    wrow.insertCell(0).innerHTML = requests[j].creditor_name;
+    wrow.insertCell(1).innerHTML = '$' + requests[j].amount_usd;
+    wrow.insertCell(2).innerHTML = requests[j].status;
+    wrow.insertCell(3).innerHTML = requests[j].end_to_end_id_masked;
+    if (['unmatched', 'held', 'requested', 'pending_release', 'paid'].indexOf(requests[j].status) < 0) {
+      continue;
+    }
+    var option = document.createElement('OPTION');
+    option.value = requests[j].request_id;
+    option.innerHTML = requests[j].creditor_name + ' $' + requests[j].amount_usd + ' (' + requests[j].status + ')';
+    selection.options.add(option);
+  }
+}
+
+function postStaffRfp(path, payload) {
+  payload.userid = userid;
+  fetch(homeURL + path, {
+    method: 'post',
+    body: JSON.stringify(payload),
+    headers: { 'Content-type': 'application/json' }
+  }).then(function(response) {
+    return response.json().then(function(body) {
+      var result = document.getElementById('staff_rfp_result');
       if (!response.ok) {
         if (result) { result.innerHTML = (body && (body.message || body.error)) || 'Failed'; }
         return;
@@ -843,6 +909,26 @@ $(document).ready(function() {
     $('#staff_wire_recall_btn').on('click', function(){
       if($('#staff_wire_id').val() == 'select'){ window.alert('Select a wire.'); return; }
       postStaffWire('recallWire', { wire_id: $('#staff_wire_id').val() });
+    });
+    $('#staff_rfp_ingest_btn').on('click', function(){
+      if(!$('#staff_rfp_file').val()){ window.alert('Paste a PAIN013 file.'); return; }
+      postStaffRfp('ingestRfpFile', { file: $('#staff_rfp_file').val() });
+    });
+    $('#staff_rfp_override_btn').on('click', function(){
+      if($('#staff_rfp_id').val() == 'select'){ window.alert('Select a request.'); return; }
+      postStaffRfp('overrideRfpOfac', { request_id: $('#staff_rfp_id').val() });
+    });
+    $('#staff_rfp_release_btn').on('click', function(){
+      if($('#staff_rfp_id').val() == 'select'){ window.alert('Select a request.'); return; }
+      postStaffRfp('releaseRfp', { request_id: $('#staff_rfp_id').val() });
+    });
+    $('#staff_rfp_reject_btn').on('click', function(){
+      if($('#staff_rfp_id').val() == 'select'){ window.alert('Select a request.'); return; }
+      postStaffRfp('rejectRfp', { request_id: $('#staff_rfp_id').val() });
+    });
+    $('#staff_rfp_return_btn').on('click', function(){
+      if($('#staff_rfp_id').val() == 'select'){ window.alert('Select a request.'); return; }
+      postStaffRfp('returnRfp', { request_id: $('#staff_rfp_id').val() });
     });
     $('#approve_trans_btn').on('click', function(){
       if($('#customer_trans_no').val() == 'select'){

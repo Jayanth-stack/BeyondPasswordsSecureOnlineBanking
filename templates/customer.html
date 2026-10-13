@@ -111,6 +111,15 @@
         </button>
 
         <button type="button" class="btn btn-primary btn-block"
+        id="rfp_menu">
+        <span class="glyphicon glyphicon-import gi-3x"
+        style="color: white" aria-hidden="true">
+        </span>
+        <br />
+        Pay Requests
+        </button>
+
+        <button type="button" class="btn btn-primary btn-block"
         id="service_requests_menu">
         <span class="glyphicon glyphicon-edit gi-3x"
         style="color: white" aria-hidden="true">
@@ -352,6 +361,63 @@
           <select id="wire_open_select" style="height:30px;margin-right:5px;">
             <option value="select">Select open wire</option>
           </select>
+        </div>
+        <div id="rfp_pane" style="display:none;">
+          <p id="rfp_summary" style="color:white;">Enrolled: 0 &middot; open: 0 &middot; YTD paid: $0.00</p>
+          <p id="rfp_clock" style="color:white;">Cutoff 24/7 &middot; value date --</p>
+          <table class="table table-hover table-bordered table-color fixed-header" id="rfp_enroll_tbl">
+            <thead>
+              <tr>
+                <th>Nickname</th>
+                <th>Last4</th>
+                <th>Alias</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+          <hr>
+          <h5 style="color:white;">Enroll an account for incoming requests</h5>
+          <input type="text" id="rfp_nickname" placeholder="Nickname" style="height:30px;width:140px;margin-right:5px;">
+          <select id="rfp_kind" style="height:30px;margin-right:5px;">
+            <option value="none">Account only</option>
+            <option value="email">Email (Zelle)</option>
+            <option value="sms">SMS (Zelle)</option>
+          </select>
+          <input type="text" id="rfp_alias" placeholder="email or mobile" style="height:30px;width:180px;margin-right:5px;">
+          <select id="rfp_account" style="height:30px;margin-right:5px;">
+            <option value="select">Pay-from account</option>
+          </select>
+          <button type="button" id="rfp_enroll_btn" class="btn btn-primary">Enroll</button>
+          <button type="button" id="rfp_pause_btn" class="btn btn-primary">Pause</button>
+          <button type="button" id="rfp_resume_btn" class="btn btn-primary">Resume</button>
+          <button type="button" id="rfp_cancel_btn" class="btn btn-primary">Cancel</button>
+          <select id="rfp_enroll_select" style="height:30px;margin-left:5px;">
+            <option value="select">Select enrollment</option>
+          </select>
+          <p id="rfp_result" style="color:yellow;margin-top:10px;"></p>
+          <hr>
+          <h5 style="color:white;">Incoming payment requests</h5>
+          <table class="table table-hover table-bordered table-color fixed-header" id="rfp_tbl">
+            <thead>
+              <tr>
+                <th>Creditor</th>
+                <th>Amount</th>
+                <th>Rail</th>
+                <th>Status</th>
+                <th>Reference</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+          <select id="rfp_request_select" style="height:30px;margin-right:5px;">
+            <option value="select">Select request</option>
+          </select>
+          <select id="rfp_pay_account" style="height:30px;margin-right:5px;">
+            <option value="select">Funding account</option>
+          </select>
+          <button type="button" id="rfp_pay_btn" class="btn btn-primary">Pay</button>
+          <button type="button" id="rfp_decline_btn" class="btn btn-primary">Decline</button>
         </div>
         <div id="account_details_pane" style="display:none;">
 					<label class="details_lbl" for="first_name">First name:</label>
