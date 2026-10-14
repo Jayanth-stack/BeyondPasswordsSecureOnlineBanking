@@ -321,6 +321,7 @@ function appendSecondaryData(customer_id, data) {
   fillCustomerAccTbl(data);
   fillStaffLinked(data);
   fillStaffWires(data);
+  fillStaffInv(data);
   if($('#cust_details_card').css('display')=='none'){
     $('#cust_details_card').show();
   }
@@ -449,6 +450,60 @@ function fillStaffWires(data) {
     option.innerHTML = wires[j].nickname + ' $' + wires[j].amount + ' (' + wires[j].status + ')';
     selection.options.add(option);
   }
+}
+
+function fillStaffInv(data) {
+  var snapshot = data.Investigations || {};
+  var card = document.getElementById('staff_inv_card');
+  if (!card) {
+    return;
+  }
+  card.style.display = 'block';
+  var summary = document.getElementById('staff_inv_summary');
+  if (summary) {
+    summary.innerHTML = 'YTD settled: $' + (snapshot.ytd_settled || '0.00') +
+      ' &middot; recalled: $' + (snapshot.ytd_recalled || '0.00') +
+      ' &middot; open: ' + (snapshot.open_count || 0);
+  }
+  var table = document.getElementById('staff_inv_tbl');
+  var body = table.getElementsByTagName('tbody')[0];
+  body.innerHTML = '';
+  var selection = document.getElementById('staff_inv_id');
+  selection.options.length = 1;
+  var cases = snapshot.cases || [];
+  for (var j = 0; j < cases.length; j++) {
+    var row = body.insertRow(-1);
+    row.insertCell(0).innerHTML = cases[j].nickname;
+    row.insertCell(1).innerHTML = '$' + cases[j].amount_usd;
+    row.insertCell(2).innerHTML = cases[j].status;
+    row.insertCell(3).innerHTML = cases[j].uetr_masked || '';
+    var option = document.createElement('OPTION');
+    option.value = cases[j].case_id;
+    option.innerHTML = (cases[j].nickname || 'case') + ' $' + cases[j].amount_usd + ' (' + cases[j].status + ')';
+    selection.options.add(option);
+  }
+}
+
+function postStaffInv(path, payload) {
+  payload.userid = userid;
+  payload.customer_id = $('#customer_id_input').val() || document.getElementById('customer_id').innerHTML;
+  fetch(homeURL + path, {
+    method: 'post',
+    body: JSON.stringify(payload),
+    headers: { 'Content-type': 'application/json' }
+  }).then(function(response) {
+    return response.json().then(function(body) {
+      var result = document.getElementById('staff_inv_result');
+      if (!response.ok) {
+        if (result) { result.innerHTML = (body && (body.message || body.error)) || 'Failed'; }
+        return;
+      }
+      if (result) { result.innerHTML = body.message || 'Done'; }
+      getCustomer($('#customer_id_input').val() || document.getElementById('customer_id').innerHTML);
+    });
+  }).catch(function(error) {
+    console.error(error);
+  });
 }
 
 function postStaffWire(path, payload) {
@@ -917,6 +972,34 @@ $(document).ready(function() {
     $('#staff_wire_recall_btn').on('click', function(){
       if($('#staff_wire_id').val() == 'select'){ window.alert('Select a wire.'); return; }
       postStaffWire('recallWire', { wire_id: $('#staff_wire_id').val() });
+    });
+    $('#staff_inv_ingest_pacs_btn').on('click', function(){
+      if(!$('#staff_inv_file').val()){ window.alert('Paste a PACS002 file.'); return; }
+      postStaffInv('ingestPacs002File', { file: $('#staff_inv_file').val() });
+    });
+    $('#staff_inv_ingest_camt_btn').on('click', function(){
+      if(!$('#staff_inv_file').val()){ window.alert('Paste a CAMT056 file.'); return; }
+      postStaffInv('ingestCamt056File', { file: $('#staff_inv_file').val() });
+    });
+    $('#staff_inv_override_btn').on('click', function(){
+      if($('#staff_inv_id').val() == 'select'){ window.alert('Select a case.'); return; }
+      postStaffInv('overrideInvOfac', { case_id: $('#staff_inv_id').val() });
+    });
+    $('#staff_inv_release_btn').on('click', function(){
+      if($('#staff_inv_id').val() == 'select'){ window.alert('Select a case.'); return; }
+      postStaffInv('releaseInv', { case_id: $('#staff_inv_id').val() });
+    });
+    $('#staff_inv_reject_btn').on('click', function(){
+      if($('#staff_inv_id').val() == 'select'){ window.alert('Select a case.'); return; }
+      postStaffInv('rejectInv', { case_id: $('#staff_inv_id').val() });
+    });
+    $('#staff_inv_accept_btn').on('click', function(){
+      if($('#staff_inv_id').val() == 'select'){ window.alert('Select a case.'); return; }
+      postStaffInv('acceptRecall', { case_id: $('#staff_inv_id').val() });
+    });
+    $('#staff_inv_export_btn').on('click', function(){
+      if($('#staff_inv_id').val() == 'select'){ window.alert('Select a case.'); return; }
+      postStaffInv('exportInv', { case_id: $('#staff_inv_id').val() });
     });
     $('#approve_req_btn').on('click', function(){
       if($('#customer_req_id').val() == 'select'){
