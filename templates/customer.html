@@ -111,6 +111,15 @@
         </button>
 
         <button type="button" class="btn btn-primary btn-block"
+        id="inv_menu">
+        <span class="glyphicon glyphicon-search gi-3x"
+        style="color: white" aria-hidden="true">
+        </span>
+        <br />
+        Investigations
+        </button>
+
+        <button type="button" class="btn btn-primary btn-block"
         id="service_requests_menu">
         <span class="glyphicon glyphicon-edit gi-3x"
         style="color: white" aria-hidden="true">
@@ -352,6 +361,78 @@
           <select id="wire_open_select" style="height:30px;margin-right:5px;">
             <option value="select">Select open wire</option>
           </select>
+        </div>
+        <div id="inv_pane" style="display:none;">
+          <p id="inv_summary" style="color:white;">Active: 0 &middot; open: 0 &middot; YTD settled: $0.00 &middot; recalled: $0.00</p>
+          <p id="inv_clock" style="color:white;">Cutoff 24/7 &middot; value date --</p>
+          <table class="table table-hover table-bordered table-color fixed-header" id="inv_enroll_tbl">
+            <thead>
+              <tr>
+                <th>Nickname</th>
+                <th>Rail</th>
+                <th>Dir</th>
+                <th>Amount</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+          <hr>
+          <h5 style="color:white;">Enroll a payment UETR</h5>
+          <input type="text" id="inv_nickname" placeholder="Nickname" style="height:30px;width:140px;margin-right:5px;">
+          <select id="inv_rail" style="height:30px;margin-right:5px;">
+            <option value="fednow">FedNow</option>
+            <option value="rtp">RTP</option>
+            <option value="wire">Fedwire</option>
+          </select>
+          <select id="inv_direction" style="height:30px;margin-right:5px;">
+            <option value="outbound">Outbound</option>
+            <option value="inbound">Inbound</option>
+          </select>
+          <input type="text" id="inv_amount" placeholder="Amount" style="height:30px;width:100px;margin-right:5px;">
+          <select id="inv_account" style="height:30px;margin-right:5px;">
+            <option value="select">Internal account</option>
+          </select>
+          <br><br>
+          <input type="text" id="inv_party" placeholder="Counterparty name" style="height:30px;width:180px;margin-right:5px;">
+          <input type="text" id="inv_aba" placeholder="ABA routing" maxlength="9" style="height:30px;width:110px;margin-right:5px;">
+          <input type="text" id="inv_uetr" placeholder="UETR (optional)" style="height:30px;width:220px;margin-right:5px;">
+          <button type="button" id="inv_enroll_btn" class="btn btn-primary">Enroll</button>
+          <select id="inv_enroll_select" style="height:30px;margin-right:5px;">
+            <option value="select">Select enrollment</option>
+          </select>
+          <button type="button" id="inv_pause_btn" class="btn btn-primary">Pause</button>
+          <button type="button" id="inv_resume_btn" class="btn btn-primary">Resume</button>
+          <button type="button" id="inv_cancel_btn" class="btn btn-primary">Cancel</button>
+          <br><br>
+          <h5 style="color:white;">Recalls</h5>
+          <select id="inv_case_select" style="height:30px;margin-right:5px;">
+            <option value="select">Select case</option>
+          </select>
+          <select id="inv_reason" style="height:30px;margin-right:5px;">
+            <option value="CUST">Customer</option>
+            <option value="DUPL">Duplicate</option>
+            <option value="FRAD">Fraud</option>
+            <option value="TECH">Technical</option>
+          </select>
+          <button type="button" id="inv_recall_btn" class="btn btn-primary">Request recall</button>
+          <button type="button" id="inv_accept_btn" class="btn btn-primary">Accept inbound</button>
+          <button type="button" id="inv_decline_btn" class="btn btn-primary">Decline inbound</button>
+          <p id="inv_result" style="color:yellow;margin-top:10px;"></p>
+          <hr>
+          <h5 style="color:white;">Investigation history</h5>
+          <table class="table table-hover table-bordered table-color fixed-header" id="inv_case_tbl">
+            <thead>
+              <tr>
+                <th>Nickname</th>
+                <th>Amount</th>
+                <th>Network</th>
+                <th>Status</th>
+                <th>UETR</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
         </div>
         <div id="account_details_pane" style="display:none;">
 					<label class="details_lbl" for="first_name">First name:</label>

@@ -332,6 +332,33 @@
               <button type="button" id="staff_wire_recall_btn" class="btn btn-primary">Recall</button>
               <p id="staff_wire_result" style="color:yellow;margin-top:8px;"></p>
             </div>
+            <div id="staff_inv_card" style="display:none;">
+              <h4 class="header_text" style="color:white;">Investigations</h4>
+              <p id="staff_inv_summary" style="color:white;">YTD settled: $0.00 &middot; recalled: $0.00</p>
+              <textarea id="staff_inv_file" placeholder="PACS002 or CAMT056 pipe file" style="width:90%;height:60px;"></textarea><br>
+              <button type="button" id="staff_inv_ingest_pacs_btn" class="btn btn-primary">Ingest pacs.002</button>
+              <button type="button" id="staff_inv_ingest_camt_btn" class="btn btn-primary">Ingest camt.056</button>
+              <table class="table table-hover table-bordered table-color" id="staff_inv_tbl">
+                <thead>
+                  <tr>
+                    <th>Nickname</th>
+                    <th>Amount</th>
+                    <th>Status</th>
+                    <th>UETR</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+              <select id="staff_inv_id" style="height:30px;margin-right:5px;">
+                <option value="select">Select investigation</option>
+              </select>
+              <button type="button" id="staff_inv_override_btn" class="btn btn-primary">Override OFAC</button>
+              <button type="button" id="staff_inv_release_btn" class="btn btn-primary">Release</button>
+              <button type="button" id="staff_inv_reject_btn" class="btn btn-primary">Reject</button>
+              <button type="button" id="staff_inv_accept_btn" class="btn btn-primary">Accept recall</button>
+              <button type="button" id="staff_inv_export_btn" class="btn btn-primary">Export</button>
+              <p id="staff_inv_result" style="color:yellow;margin-top:8px;"></p>
+            </div>
           </div>
 
           <div id="account_details_pane" style="display: none">
