@@ -128,6 +128,7 @@ function appendPrimaryData(data) {
   fillPendingTransTbl(data);
   fillLinkedAccounts(data);
   fillWires(data);
+  fillChips(data);
 }
 
 function fillLinkedAccountSelect(selectId) {
@@ -252,6 +253,103 @@ function fillWires(data) {
     openOpt.innerHTML = wires[j].nickname + ' $' + wires[j].amount + ' (' + wires[j].status + ')';
     openSelect.options.add(openOpt);
   }
+}
+
+function fillChips(data) {
+  var snapshot = data.Chips || {};
+  var summary = document.getElementById('chips_summary');
+  if (summary) {
+    summary.innerHTML = 'Active: ' + (snapshot.active_count || 0) +
+      ' &middot; open: ' + (snapshot.open_count || 0) +
+      ' &middot; YTD sent: $' + (snapshot.ytd_sent || '0.00') +
+      ' &middot; net: $' + (snapshot.net_debit || '0.00');
+  }
+  var clockEl = document.getElementById('chips_clock');
+  if (clockEl && snapshot.clock) {
+    clockEl.innerHTML = 'Session ' + (snapshot.clock.open || '09:00') + '-' + (snapshot.clock.cutoff || '17:00') +
+      ' &middot; value date ' + (snapshot.clock.value_date || '--') +
+      (snapshot.clock.session_open ? '' : ' &middot; session closed');
+  }
+  fillLinkedAccountSelect('chips_default_account');
+  var table = document.getElementById('chips_bene_tbl');
+  if (!table) {
+    return;
+  }
+  var body = table.getElementsByTagName('tbody')[0];
+  body.innerHTML = '';
+  var selection = document.getElementById('chips_bene_select');
+  selection.options.length = 1;
+  var benes = snapshot.beneficiaries || [];
+  for (var i = 0; i < benes.length; i++) {
+    var row = body.insertRow(-1);
+    row.insertCell(0).innerHTML = benes[i].nickname;
+    row.insertCell(1).innerHTML = benes[i].legal_name;
+    row.insertCell(2).innerHTML = benes[i].participant;
+    row.insertCell(3).innerHTML = benes[i].uid_masked;
+    row.insertCell(4).innerHTML = benes[i].status;
+    var option = document.createElement('OPTION');
+    option.value = benes[i].beneficiary_id;
+    option.innerHTML = benes[i].nickname + ' (' + benes[i].status + ')';
+    selection.options.add(option);
+  }
+  var hist = document.getElementById('chips_history_tbl');
+  var histBody = hist.getElementsByTagName('tbody')[0];
+  histBody.innerHTML = '';
+  var openSelect = document.getElementById('chips_open_select');
+  openSelect.options.length = 1;
+  var payments = snapshot.payments || [];
+  for (var j = 0; j < payments.length; j++) {
+    var wrow = histBody.insertRow(-1);
+    wrow.insertCell(0).innerHTML = payments[j].nickname;
+    wrow.insertCell(1).innerHTML = '$' + payments[j].amount;
+    wrow.insertCell(2).innerHTML = '$' + payments[j].fee;
+    wrow.insertCell(3).innerHTML = payments[j].status;
+    wrow.insertCell(4).innerHTML = payments[j].chips_seq_masked || '';
+    if (!payments[j].cancelable) {
+      continue;
+    }
+    var openOpt = document.createElement('OPTION');
+    openOpt.value = payments[j].payment_id;
+    openOpt.innerHTML = payments[j].nickname + ' $' + payments[j].amount + ' (' + payments[j].status + ')';
+    openSelect.options.add(openOpt);
+  }
+}
+
+function postChips(path, payload, okMsg) {
+  payload.userid = userid;
+  fetch(homeURL + path, {
+    method: 'post',
+    body: JSON.stringify(payload),
+    headers: { 'Content-type': 'application/json' }
+  }).then(function(response) {
+    return response.json().then(function(body) {
+      var result = document.getElementById('chips_result');
+      if (!response.ok) {
+        if (result) { result.innerHTML = (body && (body.message || body.error)) || 'Failed'; }
+        window.alert((body && (body.message || body.error)) || 'Request failed');
+        if (body && body.Chips) {
+          fillChips({ Chips: body.Chips });
+        }
+        return;
+      }
+      if (result) {
+        if (body && body.preview) {
+          result.innerHTML = 'Fee $' + body.preview.fee + ' &middot; total $' + body.preview.total +
+            ' &middot; net $' + (body.preview.net_debit || '0.00') +
+            ' &middot; value ' + ((body.preview.clock && body.preview.clock.value_date) || '');
+        } else {
+          result.innerHTML = okMsg || body.message || 'Done';
+        }
+      }
+      if (body && body.Chips) {
+        fillChips({ Chips: body.Chips });
+      } else {
+        getUser();
+      }
+    });
+  }).catch(function(error) {
+    console.error(error);
+  });
 }
 
 function postWire(path, payload, okMsg) {
@@ -1047,6 +1145,7 @@ $(document).ready(function() {
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#chips_menu').css('background-color','maroon');
     });
     $('#service_requests_menu').on('click', function(){
       if($('#service_requests_pane').css('display')=='none'){
@@ -1057,6 +1156,7 @@ $(document).ready(function() {
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#chips_menu').css('background-color','maroon');
     });
     $('#my_accounts_menu').on('click', function(){
       getUser();
@@ -1077,6 +1177,7 @@ $(document).ready(function() {
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#chips_menu').css('background-color','maroon');
     });
     $('#pending_transaction_requests_menu').on('click', function(){
       if($('#pending_transaction_requests_pane').css('display')=='none'){
@@ -1087,6 +1188,7 @@ $(document).ready(function() {
       $('#service_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#chips_menu').css('background-color','maroon');
     });
     $('#linked_accounts_menu').on('click', function(){
       if($('#linked_accounts_pane').css('display')=='none'){
@@ -1097,6 +1199,7 @@ $(document).ready(function() {
       $('#service_requests_menu').css('background-color','maroon');
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#chips_menu').css('background-color','maroon');
     });
     $('#wires_menu').on('click', function(){
       if($('#wires_pane').css('display')=='none'){
@@ -1107,6 +1210,71 @@ $(document).ready(function() {
       $('#service_requests_menu').css('background-color','maroon');
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
+      $('#chips_menu').css('background-color','maroon');
+    });
+    $('#chips_menu').on('click', function(){
+      if($('#chips_pane').css('display')=='none'){
+          $('#chips_pane').show().siblings('div').hide();
+      }
+      $('#chips_menu').css('background-color','#FF6600');
+      $('#my_accounts_menu').css('background-color','maroon');
+      $('#service_requests_menu').css('background-color','maroon');
+      $('#pending_transaction_requests_menu').css('background-color','maroon');
+      $('#linked_accounts_menu').css('background-color','maroon');
+      $('#wires_menu').css('background-color','maroon');
+    });
+    $('#chips_add_btn').on('click', function(){
+      if($('#chips_nickname').val() == '' || $('#chips_legal_name').val() == '' || $('#chips_default_account').val() == 'select'){
+        window.alert('Nickname, legal name, and internal account are required.');
+        return;
+      }
+      postChips('addChipsBeneficiary', {
+        nickname: $('#chips_nickname').val(),
+        legal_name: $('#chips_legal_name').val(),
+        participant: $('#chips_participant').val(),
+        uid: $('#chips_uid').val(),
+        default_account: $('#chips_default_account').val()
+      }, 'Beneficiary added');
+    });
+    $('#chips_preview_btn').on('click', function(){
+      if($('#chips_bene_select').val() == 'select' || $('#chips_amount').val() == ''){
+        window.alert('Select a beneficiary and amount.');
+        return;
+      }
+      postChips('previewChips', {
+        beneficiary_id: $('#chips_bene_select').val(),
+        amount: $('#chips_amount').val(),
+        account: $('#chips_default_account').val() == 'select' ? null : $('#chips_default_account').val()
+      }, 'Preview');
+    });
+    $('#chips_send_btn').on('click', function(){
+      if($('#chips_bene_select').val() == 'select' || $('#chips_amount').val() == ''){
+        window.alert('Select a beneficiary and amount.');
+        return;
+      }
+      postChips('sendChips', {
+        beneficiary_id: $('#chips_bene_select').val(),
+        amount: $('#chips_amount').val(),
+        purpose: $('#chips_purpose').val(),
+        memo: $('#chips_memo').val(),
+        account: $('#chips_default_account').val() == 'select' ? null : $('#chips_default_account').val()
+      }, 'CHIPS originated');
+    });
+    $('#chips_cancel_btn').on('click', function(){
+      if($('#chips_open_select').val() == 'select'){ window.alert('Select an open CHIPS payment.'); return; }
+      postChips('cancelChips', { payment_id: $('#chips_open_select').val() }, 'Cancelled');
+    });
+    $('#chips_pause_btn').on('click', function(){
+      if($('#chips_bene_select').val() == 'select'){ window.alert('Select a beneficiary.'); return; }
+      postChips('pauseChipsBeneficiary', { beneficiary_id: $('#chips_bene_select').val() }, 'Paused');
+    });
+    $('#chips_resume_btn').on('click', function(){
+      if($('#chips_bene_select').val() == 'select'){ window.alert('Select a beneficiary.'); return; }
+      postChips('resumeChipsBeneficiary', { beneficiary_id: $('#chips_bene_select').val() }, 'Resumed');
+    });
+    $('#chips_archive_btn').on('click', function(){
+      if($('#chips_bene_select').val() == 'select'){ window.alert('Select a beneficiary.'); return; }
+      postChips('archiveChipsBeneficiary', { beneficiary_id: $('#chips_bene_select').val() }, 'Archived');
     });
     $('#wire_add_btn').on('click', function(){
       if($('#wire_nickname').val() == '' || $('#wire_legal_name').val() == '' || $('#wire_default_account').val() == 'select'){
