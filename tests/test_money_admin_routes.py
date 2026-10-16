@@ -200,7 +200,7 @@ class MoneyAdminRouteTests(unittest.TestCase):
                 json={"userid": "emp1", "customer_id": "cust1"},
             )
         self.assertEqual(response.status_code, 200)
-        emp_cls.return_value.deactivate_customer.assert_called_once_with("cust1")
+        emp_cls.return_value.deactivate_customer.assert_called_once_with("emp1", "cust1")
 
     def test_deactivate_employee_authorized_calls_helper(self):
         self._session("admin1", "admin", emp_tier=3)
@@ -222,7 +222,7 @@ class MoneyAdminRouteTests(unittest.TestCase):
                 json={"userid": "emp1", "update_req_no": 9},
             )
         self.assertEqual(response.status_code, 200)
-        emp_cls.return_value.approve_update_info.assert_called_once_with(9)
+        emp_cls.return_value.approve_update_info.assert_called_once_with("emp1", 9)
 
     def test_deny_update_info_authorized_employee(self):
         self._session("emp1", "employee", emp_tier=2)
