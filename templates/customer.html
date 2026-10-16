@@ -111,6 +111,15 @@
         </button>
 
         <button type="button" class="btn btn-primary btn-block"
+        id="chips_in_menu">
+        <span class="glyphicon glyphicon-download-alt gi-3x"
+        style="color: white" aria-hidden="true">
+        </span>
+        <br />
+        CHIPS In
+        </button>
+
+        <button type="button" class="btn btn-primary btn-block"
         id="service_requests_menu">
         <span class="glyphicon glyphicon-edit gi-3x"
         style="color: white" aria-hidden="true">
@@ -352,6 +361,51 @@
           <select id="wire_open_select" style="height:30px;margin-right:5px;">
             <option value="select">Select open wire</option>
           </select>
+        </div>
+        <div id="chips_in_pane" style="display:none;">
+          <p id="chips_in_summary" style="color:white;">UIDs: 0 &middot; open: 0 &middot; YTD received: $0.00</p>
+          <p id="chips_in_clock" style="color:white;">Session 09:00-17:00 &middot; value date --</p>
+          <table class="table table-hover table-bordered table-color fixed-header" id="chips_uid_tbl">
+            <thead>
+              <tr>
+                <th>Nickname</th>
+                <th>UID</th>
+                <th>Last4</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+          <h5 style="color:white;">Enroll a CHIPS UID</h5>
+          <input type="text" id="chips_uid_nickname" placeholder="Nickname" style="height:30px;width:140px;margin-right:5px;">
+          <input type="text" id="chips_uid_value" placeholder="UID (or blank)" maxlength="6" style="height:30px;width:120px;margin-right:5px;">
+          <select id="chips_uid_account" style="height:30px;margin-right:5px;">
+            <option value="select">Internal account</option>
+          </select>
+          <button type="button" id="chips_uid_add_btn" class="btn btn-primary">Enroll</button>
+          <button type="button" id="chips_uid_pause_btn" class="btn btn-primary">Pause</button>
+          <button type="button" id="chips_uid_resume_btn" class="btn btn-primary">Resume</button>
+          <button type="button" id="chips_uid_cancel_btn" class="btn btn-primary">Cancel</button>
+          <select id="chips_uid_select" style="height:30px;margin-left:5px;">
+            <option value="select">Select UID</option>
+          </select>
+          <p id="chips_in_result" style="color:yellow;margin-top:10px;"></p>
+          <h5 style="color:white;">Incoming CHIPS</h5>
+          <table class="table table-hover table-bordered table-color fixed-header" id="chips_in_tbl">
+            <thead>
+              <tr>
+                <th>Sender</th>
+                <th>Amount</th>
+                <th>UID</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+          <select id="chips_in_select" style="height:30px;margin-right:5px;">
+            <option value="select">Select inbound</option>
+          </select>
+          <button type="button" id="chips_in_return_btn" class="btn btn-primary">Request return</button>
         </div>
         <div id="account_details_pane" style="display:none;">
 					<label class="details_lbl" for="first_name">First name:</label>

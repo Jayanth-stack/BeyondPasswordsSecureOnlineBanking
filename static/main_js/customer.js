@@ -128,6 +128,7 @@ function appendPrimaryData(data) {
   fillPendingTransTbl(data);
   fillLinkedAccounts(data);
   fillWires(data);
+  fillChipsIn(data);
 }
 
 function fillLinkedAccountSelect(selectId) {
@@ -281,6 +282,94 @@ function postWire(path, payload, okMsg) {
       }
       if (body && body.Wires) {
         fillWires({ Wires: body.Wires });
+      } else {
+        getUser();
+      }
+    });
+  }).catch(function(error) {
+    console.error(error);
+  });
+}
+
+function fillChipsIn(data) {
+  var snapshot = data.ChipsIn || {};
+  var summary = document.getElementById('chips_in_summary');
+  if (summary) {
+    summary.innerHTML = 'UIDs: ' + (snapshot.active_uids || 0) +
+      ' &middot; open: ' + (snapshot.open_count || 0) +
+      ' &middot; YTD received: $' + (snapshot.ytd_received || '0.00');
+  }
+  var clockEl = document.getElementById('chips_in_clock');
+  if (clockEl && snapshot.clock) {
+    clockEl.innerHTML = 'Session ' + (snapshot.clock.open || '09:00') + '-' + (snapshot.clock.cutoff || '17:00') +
+      ' &middot; value date ' + (snapshot.clock.value_date || '--') +
+      (snapshot.clock.session_open ? ' &middot; open' : ' &middot; closed');
+  }
+  fillLinkedAccountSelect('chips_uid_account');
+  var table = document.getElementById('chips_uid_tbl');
+  if (!table) {
+    return;
+  }
+  var body = table.getElementsByTagName('tbody')[0];
+  body.innerHTML = '';
+  var selection = document.getElementById('chips_uid_select');
+  selection.options.length = 1;
+  var uids = snapshot.uids || [];
+  for (var i = 0; i < uids.length; i++) {
+    var row = body.insertRow(-1);
+    row.insertCell(0).innerHTML = uids[i].nickname;
+    row.insertCell(1).innerHTML = uids[i].uid_masked;
+    row.insertCell(2).innerHTML = uids[i].account_last4;
+    row.insertCell(3).innerHTML = uids[i].status;
+    var option = document.createElement('OPTION');
+    option.value = uids[i].uid_id;
+    option.innerHTML = uids[i].nickname + ' (' + uids[i].status + ')';
+    selection.options.add(option);
+  }
+  var hist = document.getElementById('chips_in_tbl');
+  var histBody = hist.getElementsByTagName('tbody')[0];
+  histBody.innerHTML = '';
+  var inSelect = document.getElementById('chips_in_select');
+  inSelect.options.length = 1;
+  var items = snapshot.inbounds || [];
+  for (var j = 0; j < items.length; j++) {
+    var wrow = histBody.insertRow(-1);
+    wrow.insertCell(0).innerHTML = items[j].sender_name;
+    wrow.insertCell(1).innerHTML = '$' + items[j].amount_usd;
+    wrow.insertCell(2).innerHTML = items[j].uid_masked;
+    wrow.insertCell(3).innerHTML = items[j].status;
+    if (!items[j].returnable) {
+      continue;
+    }
+    var openOpt = document.createElement('OPTION');
+    openOpt.value = items[j].inbound_id;
+    openOpt.innerHTML = items[j].sender_name + ' $' + items[j].amount_usd + ' (' + items[j].status + ')';
+    inSelect.options.add(openOpt);
+  }
+}
+
+function postChipsIn(path, payload, okMsg) {
+  payload.userid = userid;
+  fetch(homeURL + path, {
+    method: 'post',
+    body: JSON.stringify(payload),
+    headers: { 'Content-type': 'application/json' }
+  }).then(function(response) {
+    return response.json().then(function(body) {
+      var result = document.getElementById('chips_in_result');
+      if (!response.ok) {
+        if (result) { result.innerHTML = (body && (body.message || body.error)) || 'Failed'; }
+        window.alert((body && (body.message || body.error)) || 'Request failed');
+        if (body && body.ChipsIn) {
+          fillChipsIn({ ChipsIn: body.ChipsIn });
+        }
+        return;
+      }
+      if (result) {
+        result.innerHTML = okMsg || body.message || 'Done';
+      }
+      if (body && body.ChipsIn) {
+        fillChipsIn({ ChipsIn: body.ChipsIn });
       } else {
         getUser();
       }
@@ -1047,6 +1136,7 @@ $(document).ready(function() {
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#chips_in_menu').css('background-color','maroon');
     });
     $('#service_requests_menu').on('click', function(){
       if($('#service_requests_pane').css('display')=='none'){
@@ -1057,6 +1147,7 @@ $(document).ready(function() {
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#chips_in_menu').css('background-color','maroon');
     });
     $('#my_accounts_menu').on('click', function(){
       getUser();
@@ -1077,6 +1168,7 @@ $(document).ready(function() {
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#chips_in_menu').css('background-color','maroon');
     });
     $('#pending_transaction_requests_menu').on('click', function(){
       if($('#pending_transaction_requests_pane').css('display')=='none'){
@@ -1087,6 +1179,7 @@ $(document).ready(function() {
       $('#service_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#chips_in_menu').css('background-color','maroon');
     });
     $('#linked_accounts_menu').on('click', function(){
       if($('#linked_accounts_pane').css('display')=='none'){
@@ -1097,6 +1190,7 @@ $(document).ready(function() {
       $('#service_requests_menu').css('background-color','maroon');
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#chips_in_menu').css('background-color','maroon');
     });
     $('#wires_menu').on('click', function(){
       if($('#wires_pane').css('display')=='none'){
@@ -1107,6 +1201,18 @@ $(document).ready(function() {
       $('#service_requests_menu').css('background-color','maroon');
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
+      $('#chips_in_menu').css('background-color','maroon');
+    });
+    $('#chips_in_menu').on('click', function(){
+      if($('#chips_in_pane').css('display')=='none'){
+          $('#chips_in_pane').show().siblings('div').hide();
+      }
+      $('#chips_in_menu').css('background-color','#FF6600');
+      $('#my_accounts_menu').css('background-color','maroon');
+      $('#service_requests_menu').css('background-color','maroon');
+      $('#pending_transaction_requests_menu').css('background-color','maroon');
+      $('#linked_accounts_menu').css('background-color','maroon');
+      $('#wires_menu').css('background-color','maroon');
     });
     $('#wire_add_btn').on('click', function(){
       if($('#wire_nickname').val() == '' || $('#wire_legal_name').val() == '' || $('#wire_default_account').val() == 'select'){
@@ -1164,6 +1270,33 @@ $(document).ready(function() {
     $('#wire_archive_btn').on('click', function(){
       if($('#wire_bene_select').val() == 'select'){ window.alert('Select a beneficiary.'); return; }
       postWire('archiveWireBeneficiary', { beneficiary_id: $('#wire_bene_select').val() }, 'Archived');
+    });
+    $('#chips_uid_add_btn').on('click', function(){
+      if($('#chips_uid_nickname').val() == '' || $('#chips_uid_account').val() == 'select'){
+        window.alert('Nickname and internal account are required.');
+        return;
+      }
+      postChipsIn('addChipsUid', {
+        nickname: $('#chips_uid_nickname').val(),
+        uid: $('#chips_uid_value').val(),
+        destination_account: $('#chips_uid_account').val()
+      }, 'UID enrolled');
+    });
+    $('#chips_uid_pause_btn').on('click', function(){
+      if($('#chips_uid_select').val() == 'select'){ window.alert('Select a UID.'); return; }
+      postChipsIn('pauseChipsUid', { uid_id: $('#chips_uid_select').val() }, 'Paused');
+    });
+    $('#chips_uid_resume_btn').on('click', function(){
+      if($('#chips_uid_select').val() == 'select'){ window.alert('Select a UID.'); return; }
+      postChipsIn('resumeChipsUid', { uid_id: $('#chips_uid_select').val() }, 'Resumed');
+    });
+    $('#chips_uid_cancel_btn').on('click', function(){
+      if($('#chips_uid_select').val() == 'select'){ window.alert('Select a UID.'); return; }
+      postChipsIn('cancelChipsUid', { uid_id: $('#chips_uid_select').val() }, 'Cancelled');
+    });
+    $('#chips_in_return_btn').on('click', function(){
+      if($('#chips_in_select').val() == 'select'){ window.alert('Select an inbound CHIPS credit.'); return; }
+      postChipsIn('requestChipsInReturn', { inbound_id: $('#chips_in_select').val() }, 'Return requested');
     });
     $('#la_add_btn').on('click', function(){
       if($('#la_nickname').val() == '' || $('#la_default_account').val() == 'select'){
