@@ -321,6 +321,7 @@ function appendSecondaryData(customer_id, data) {
   fillCustomerAccTbl(data);
   fillStaffLinked(data);
   fillStaffWires(data);
+  fillStaffGpi(data);
   if($('#cust_details_card').css('display')=='none'){
     $('#cust_details_card').show();
   }
@@ -460,6 +461,60 @@ function postStaffWire(path, payload) {
   }).then(function(response) {
     return response.json().then(function(body) {
       var result = document.getElementById('staff_wire_result');
+      if (!response.ok) {
+        if (result) { result.innerHTML = (body && (body.message || body.error)) || 'Failed'; }
+        return;
+      }
+      if (result) { result.innerHTML = body.message || 'Done'; }
+      getCustomer($('#customer_id_input').val() || document.getElementById('customer_id').innerHTML);
+    });
+  }).catch(function(error) {
+    console.error(error);
+  });
+}
+
+function fillStaffGpi(data) {
+  var snapshot = data.Gpi || {};
+  var card = document.getElementById('staff_gpi_card');
+  if (!card) {
+    return;
+  }
+  card.style.display = 'block';
+  var summary = document.getElementById('staff_gpi_summary');
+  if (summary) {
+    summary.innerHTML = 'YTD tracked: $' + (snapshot.ytd_tracked || '0.00') +
+      ' &middot; queried: $' + (snapshot.ytd_queried || '0.00') +
+      ' &middot; open: ' + (snapshot.open_count || 0);
+  }
+  var table = document.getElementById('staff_gpi_tbl');
+  var body = table.getElementsByTagName('tbody')[0];
+  body.innerHTML = '';
+  var selection = document.getElementById('staff_gpi_id');
+  selection.options.length = 1;
+  var cases = snapshot.cases || [];
+  for (var j = 0; j < cases.length; j++) {
+    var row = body.insertRow(-1);
+    row.insertCell(0).innerHTML = cases[j].nickname;
+    row.insertCell(1).innerHTML = '$' + cases[j].amount_usd;
+    row.insertCell(2).innerHTML = cases[j].status;
+    row.insertCell(3).innerHTML = cases[j].uetr_masked || '';
+    var option = document.createElement('OPTION');
+    option.value = cases[j].case_id;
+    option.innerHTML = (cases[j].nickname || 'case') + ' $' + cases[j].amount_usd + ' (' + cases[j].status + ')';
+    selection.options.add(option);
+  }
+}
+
+function postStaffGpi(path, payload) {
+  payload.userid = userid;
+  payload.customer_id = $('#customer_id_input').val() || document.getElementById('customer_id').innerHTML;
+  fetch(homeURL + path, {
+    method: 'post',
+    body: JSON.stringify(payload),
+    headers: { 'Content-type': 'application/json' }
+  }).then(function(response) {
+    return response.json().then(function(body) {
+      var result = document.getElementById('staff_gpi_result');
       if (!response.ok) {
         if (result) { result.innerHTML = (body && (body.message || body.error)) || 'Failed'; }
         return;
@@ -877,6 +932,7 @@ $(document).ready(function() {
       $('#cust_accounts_tbl').hide();
       $('#staff_linked_card').hide();
       $('#staff_wire_card').hide();
+      $('#staff_gpi_card').hide();
     });
     $('#staff_la_force_btn').on('click', function(){
       if($('#staff_la_link_id').val() == 'select'){ window.alert('Select a pending link.'); return; }
@@ -917,6 +973,34 @@ $(document).ready(function() {
     $('#staff_wire_recall_btn').on('click', function(){
       if($('#staff_wire_id').val() == 'select'){ window.alert('Select a wire.'); return; }
       postStaffWire('recallWire', { wire_id: $('#staff_wire_id').val() });
+    });
+    $('#staff_gpi_ingest_btn').on('click', function(){
+      if(!$('#staff_gpi_file').val()){ window.alert('Paste a GPI1 file.'); return; }
+      postStaffGpi('ingestGpiFile', { file: $('#staff_gpi_file').val() });
+    });
+    $('#staff_gpi_ingest_mt199_btn').on('click', function(){
+      if(!$('#staff_gpi_file').val()){ window.alert('Paste an MT199 file.'); return; }
+      postStaffGpi('ingestMt199File', { file: $('#staff_gpi_file').val() });
+    });
+    $('#staff_gpi_override_btn').on('click', function(){
+      if($('#staff_gpi_id').val() == 'select'){ window.alert('Select a case.'); return; }
+      postStaffGpi('overrideGpiOfac', { case_id: $('#staff_gpi_id').val() });
+    });
+    $('#staff_gpi_release_btn').on('click', function(){
+      if($('#staff_gpi_id').val() == 'select'){ window.alert('Select a case.'); return; }
+      postStaffGpi('releaseGpi', { case_id: $('#staff_gpi_id').val() });
+    });
+    $('#staff_gpi_reject_btn').on('click', function(){
+      if($('#staff_gpi_id').val() == 'select'){ window.alert('Select a case.'); return; }
+      postStaffGpi('rejectGpi', { case_id: $('#staff_gpi_id').val() });
+    });
+    $('#staff_gpi_accept_btn').on('click', function(){
+      if($('#staff_gpi_id').val() == 'select'){ window.alert('Select a case.'); return; }
+      postStaffGpi('acceptGpiQuery', { case_id: $('#staff_gpi_id').val() });
+    });
+    $('#staff_gpi_export_btn').on('click', function(){
+      if($('#staff_gpi_id').val() == 'select'){ window.alert('Select a case.'); return; }
+      postStaffGpi('exportGpi', { case_id: $('#staff_gpi_id').val() });
     });
     $('#approve_req_btn').on('click', function(){
       if($('#customer_req_id').val() == 'select'){
