@@ -128,6 +128,7 @@ function appendPrimaryData(data) {
   fillPendingTransTbl(data);
   fillLinkedAccounts(data);
   fillWires(data);
+  fillPix(data);
 }
 
 function fillLinkedAccountSelect(selectId) {
@@ -252,6 +253,108 @@ function fillWires(data) {
     openOpt.innerHTML = wires[j].nickname + ' $' + wires[j].amount + ' (' + wires[j].status + ')';
     openSelect.options.add(openOpt);
   }
+}
+
+function fillPix(data) {
+  var snapshot = data.Pix || {};
+  var summary = document.getElementById('pix_summary');
+  if (summary) {
+    summary.innerHTML = 'Active: ' + (snapshot.active_count || 0) +
+      ' &middot; open: ' + (snapshot.open_count || 0) +
+      ' &middot; YTD sent: R$' + (snapshot.ytd_sent || '0.00') +
+      ' &middot; fees: R$' + (snapshot.ytd_fees || '0.00');
+  }
+  var clockEl = document.getElementById('pix_clock');
+  if (clockEl && snapshot.clock) {
+    clockEl.innerHTML = 'SPI 24/7 &middot; BRT ' + (snapshot.clock.local_time || '--') +
+      (snapshot.clock.night ? ' &middot; night cap' : ' &middot; day cap') +
+      (snapshot.clock.holiday ? ' &middot; holiday' : '');
+  }
+  fillLinkedAccountSelect('pix_default_account');
+  var table = document.getElementById('pix_key_tbl');
+  if (!table) {
+    return;
+  }
+  var body = table.getElementsByTagName('tbody')[0];
+  body.innerHTML = '';
+  var selection = document.getElementById('pix_key_select');
+  selection.options.length = 1;
+  var keys = snapshot.keys || [];
+  for (var i = 0; i < keys.length; i++) {
+    var row = body.insertRow(-1);
+    row.insertCell(0).innerHTML = keys[i].nickname;
+    row.insertCell(1).innerHTML = keys[i].legal_name;
+    row.insertCell(2).innerHTML = keys[i].key_type;
+    row.insertCell(3).innerHTML = keys[i].key_masked;
+    row.insertCell(4).innerHTML = keys[i].status;
+    var option = document.createElement('OPTION');
+    option.value = keys[i].key_id;
+    option.innerHTML = keys[i].nickname + ' (' + keys[i].status + ')';
+    selection.options.add(option);
+  }
+  var hist = document.getElementById('pix_history_tbl');
+  var histBody = hist.getElementsByTagName('tbody')[0];
+  histBody.innerHTML = '';
+  var openSelect = document.getElementById('pix_open_select');
+  openSelect.options.length = 1;
+  var doneSelect = document.getElementById('pix_done_select');
+  doneSelect.options.length = 1;
+  var payments = snapshot.payments || [];
+  for (var j = 0; j < payments.length; j++) {
+    var prow = histBody.insertRow(-1);
+    prow.insertCell(0).innerHTML = payments[j].nickname;
+    prow.insertCell(1).innerHTML = 'R$' + payments[j].amount;
+    prow.insertCell(2).innerHTML = payments[j].status;
+    prow.insertCell(3).innerHTML = (payments[j].end_to_end_id_masked || '').slice(-16);
+    if (payments[j].cancelable) {
+      var openOpt = document.createElement('OPTION');
+      openOpt.value = payments[j].payment_id;
+      openOpt.innerHTML = payments[j].nickname + ' R$' + payments[j].amount + ' (' + payments[j].status + ')';
+      openSelect.options.add(openOpt);
+    }
+    if (payments[j].recallable) {
+      var doneOpt = document.createElement('OPTION');
+      doneOpt.value = payments[j].payment_id;
+      doneOpt.innerHTML = payments[j].nickname + ' R$' + payments[j].amount;
+      doneSelect.options.add(doneOpt);
+    }
+  }
+}
+
+function postPix(path, payload, okMsg) {
+  payload.userid = userid;
+  fetch(homeURL + path, {
+    method: 'post',
+    body: JSON.stringify(payload),
+    headers: { 'Content-type': 'application/json' }
+  }).then(function(response) {
+    return response.json().then(function(body) {
+      var result = document.getElementById('pix_result');
+      if (!response.ok) {
+        if (result) { result.innerHTML = (body && (body.message || body.error)) || 'Failed'; }
+        window.alert((body && (body.message || body.error)) || 'Request failed');
+        if (body && body.Pix) {
+          fillPix({ Pix: body.Pix });
+        }
+        return;
+      }
+      if (result) {
+        if (body && body.preview) {
+          result.innerHTML = 'Fee R$' + body.preview.fee + ' &middot; total R$' + body.preview.total +
+            (body.preview.clock && body.preview.clock.night ? ' &middot; night' : '');
+        } else {
+          result.innerHTML = okMsg || body.message || 'Done';
+        }
+      }
+      if (body && body.Pix) {
+        fillPix({ Pix: body.Pix });
+      } else {
+        getUser();
+      }
+    });
+  }).catch(function(error) {
+    console.error(error);
+  });
 }
 
 function postWire(path, payload, okMsg) {
@@ -1047,6 +1150,7 @@ $(document).ready(function() {
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#pix_menu').css('background-color','maroon');
     });
     $('#service_requests_menu').on('click', function(){
       if($('#service_requests_pane').css('display')=='none'){
@@ -1057,6 +1161,7 @@ $(document).ready(function() {
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#pix_menu').css('background-color','maroon');
     });
     $('#my_accounts_menu').on('click', function(){
       getUser();
@@ -1077,6 +1182,7 @@ $(document).ready(function() {
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#pix_menu').css('background-color','maroon');
     });
     $('#pending_transaction_requests_menu').on('click', function(){
       if($('#pending_transaction_requests_pane').css('display')=='none'){
@@ -1087,6 +1193,7 @@ $(document).ready(function() {
       $('#service_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#pix_menu').css('background-color','maroon');
     });
     $('#linked_accounts_menu').on('click', function(){
       if($('#linked_accounts_pane').css('display')=='none'){
@@ -1097,6 +1204,7 @@ $(document).ready(function() {
       $('#service_requests_menu').css('background-color','maroon');
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#pix_menu').css('background-color','maroon');
     });
     $('#wires_menu').on('click', function(){
       if($('#wires_pane').css('display')=='none'){
@@ -1107,6 +1215,18 @@ $(document).ready(function() {
       $('#service_requests_menu').css('background-color','maroon');
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
+      $('#pix_menu').css('background-color','maroon');
+    });
+    $('#pix_menu').on('click', function(){
+      if($('#pix_pane').css('display')=='none'){
+          $('#pix_pane').show().siblings('div').hide();
+      }
+      $('#pix_menu').css('background-color','#FF6600');
+      $('#my_accounts_menu').css('background-color','maroon');
+      $('#service_requests_menu').css('background-color','maroon');
+      $('#pending_transaction_requests_menu').css('background-color','maroon');
+      $('#linked_accounts_menu').css('background-color','maroon');
+      $('#wires_menu').css('background-color','maroon');
     });
     $('#wire_add_btn').on('click', function(){
       if($('#wire_nickname').val() == '' || $('#wire_legal_name').val() == '' || $('#wire_default_account').val() == 'select'){
@@ -1164,6 +1284,64 @@ $(document).ready(function() {
     $('#wire_archive_btn').on('click', function(){
       if($('#wire_bene_select').val() == 'select'){ window.alert('Select a beneficiary.'); return; }
       postWire('archiveWireBeneficiary', { beneficiary_id: $('#wire_bene_select').val() }, 'Archived');
+    });
+    $('#pix_add_btn').on('click', function(){
+      if($('#pix_nickname').val() == '' || $('#pix_legal_name').val() == '' || $('#pix_default_account').val() == 'select'){
+        window.alert('Nickname, legal name, and internal account are required.');
+        return;
+      }
+      postPix('addPixKey', {
+        nickname: $('#pix_nickname').val(),
+        legal_name: $('#pix_legal_name').val(),
+        key_type: $('#pix_key_type').val(),
+        key_value: $('#pix_key_value').val(),
+        ispb: $('#pix_ispb').val(),
+        default_account: $('#pix_default_account').val()
+      }, 'PIX key added');
+    });
+    $('#pix_preview_btn').on('click', function(){
+      if($('#pix_key_select').val() == 'select' || $('#pix_amount').val() == ''){
+        window.alert('Select a PIX key and amount.');
+        return;
+      }
+      postPix('previewPix', {
+        key_id: $('#pix_key_select').val(),
+        amount: $('#pix_amount').val(),
+        account: $('#pix_default_account').val() == 'select' ? null : $('#pix_default_account').val()
+      }, 'Preview');
+    });
+    $('#pix_send_btn').on('click', function(){
+      if($('#pix_key_select').val() == 'select' || $('#pix_amount').val() == ''){
+        window.alert('Select a PIX key and amount.');
+        return;
+      }
+      postPix('sendPix', {
+        key_id: $('#pix_key_select').val(),
+        amount: $('#pix_amount').val(),
+        purpose: $('#pix_purpose').val(),
+        memo: $('#pix_memo').val(),
+        account: $('#pix_default_account').val() == 'select' ? null : $('#pix_default_account').val()
+      }, 'PIX originated');
+    });
+    $('#pix_cancel_btn').on('click', function(){
+      if($('#pix_open_select').val() == 'select'){ window.alert('Select an open PIX.'); return; }
+      postPix('cancelPix', { payment_id: $('#pix_open_select').val() }, 'Cancelled');
+    });
+    $('#pix_recall_btn').on('click', function(){
+      if($('#pix_done_select').val() == 'select'){ window.alert('Select a completed PIX.'); return; }
+      postPix('recallPix', { payment_id: $('#pix_done_select').val() }, 'MED returned');
+    });
+    $('#pix_pause_btn').on('click', function(){
+      if($('#pix_key_select').val() == 'select'){ window.alert('Select a PIX key.'); return; }
+      postPix('pausePixKey', { key_id: $('#pix_key_select').val() }, 'Paused');
+    });
+    $('#pix_resume_btn').on('click', function(){
+      if($('#pix_key_select').val() == 'select'){ window.alert('Select a PIX key.'); return; }
+      postPix('resumePixKey', { key_id: $('#pix_key_select').val() }, 'Resumed');
+    });
+    $('#pix_archive_btn').on('click', function(){
+      if($('#pix_key_select').val() == 'select'){ window.alert('Select a PIX key.'); return; }
+      postPix('archivePixKey', { key_id: $('#pix_key_select').val() }, 'Archived');
     });
     $('#la_add_btn').on('click', function(){
       if($('#la_nickname').val() == '' || $('#la_default_account').val() == 'select'){

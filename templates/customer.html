@@ -111,6 +111,15 @@
         </button>
 
         <button type="button" class="btn btn-primary btn-block"
+        id="pix_menu">
+        <span class="glyphicon glyphicon-flash gi-3x"
+        style="color: white" aria-hidden="true">
+        </span>
+        <br />
+        PIX
+        </button>
+
+        <button type="button" class="btn btn-primary btn-block"
         id="service_requests_menu">
         <span class="glyphicon glyphicon-edit gi-3x"
         style="color: white" aria-hidden="true">
@@ -351,6 +360,82 @@
           </table>
           <select id="wire_open_select" style="height:30px;margin-right:5px;">
             <option value="select">Select open wire</option>
+          </select>
+        </div>
+        <div id="pix_pane" style="display:none;">
+          <p id="pix_summary" style="color:white;">Active: 0 &middot; open: 0 &middot; YTD sent: R$0.00</p>
+          <p id="pix_clock" style="color:white;">SPI 24/7 &middot; BRT --</p>
+          <table class="table table-hover table-bordered table-color fixed-header" id="pix_key_tbl">
+            <thead>
+              <tr>
+                <th>Nickname</th>
+                <th>Name</th>
+                <th>Type</th>
+                <th>Key</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+          <hr>
+          <h5 style="color:white;">Add a PIX key</h5>
+          <input type="text" id="pix_nickname" placeholder="Nickname" style="height:30px;width:140px;margin-right:5px;">
+          <input type="text" id="pix_legal_name" placeholder="Legal name" style="height:30px;width:160px;margin-right:5px;">
+          <select id="pix_key_type" style="height:30px;margin-right:5px;">
+            <option value="cpf">CPF</option>
+            <option value="cnpj">CNPJ</option>
+            <option value="email">Email</option>
+            <option value="phone">Phone</option>
+            <option value="evp">EVP</option>
+          </select>
+          <input type="text" id="pix_key_value" placeholder="Dict key" style="height:30px;width:180px;margin-right:5px;">
+          <input type="text" id="pix_ispb" placeholder="ISPB" maxlength="8" style="height:30px;width:100px;margin-right:5px;">
+          <select id="pix_default_account" style="height:30px;margin-right:5px;">
+            <option value="select">Internal account</option>
+          </select>
+          <button type="button" id="pix_add_btn" class="btn btn-primary">Add key</button>
+          <br><br>
+          <h5 style="color:white;">Send PIX</h5>
+          <select id="pix_key_select" style="height:30px;margin-right:5px;">
+            <option value="select">Select key</option>
+          </select>
+          <input type="text" id="pix_amount" placeholder="BRL amount" style="height:30px;width:110px;margin-right:5px;">
+          <select id="pix_purpose" style="height:30px;margin-right:5px;">
+            <option value="other">Other</option>
+            <option value="family">Family</option>
+            <option value="goods">Goods</option>
+            <option value="payroll">Payroll</option>
+            <option value="tax">Tax</option>
+            <option value="loan">Loan</option>
+            <option value="rent">Rent</option>
+          </select>
+          <input type="text" id="pix_memo" placeholder="Memo" style="height:30px;width:140px;margin-right:5px;">
+          <button type="button" id="pix_preview_btn" class="btn btn-primary">Preview</button>
+          <button type="button" id="pix_send_btn" class="btn btn-primary">Send PIX</button>
+          <button type="button" id="pix_cancel_btn" class="btn btn-primary">Cancel open</button>
+          <button type="button" id="pix_recall_btn" class="btn btn-primary">MED return</button>
+          <button type="button" id="pix_pause_btn" class="btn btn-primary">Pause</button>
+          <button type="button" id="pix_resume_btn" class="btn btn-primary">Resume</button>
+          <button type="button" id="pix_archive_btn" class="btn btn-primary">Archive</button>
+          <p id="pix_result" style="color:yellow;margin-top:10px;"></p>
+          <hr>
+          <h5 style="color:white;">PIX history</h5>
+          <table class="table table-hover table-bordered table-color fixed-header" id="pix_history_tbl">
+            <thead>
+              <tr>
+                <th>Nickname</th>
+                <th>Amount</th>
+                <th>Status</th>
+                <th>EndToEnd</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+          <select id="pix_open_select" style="height:30px;margin-right:5px;">
+            <option value="select">Select open PIX</option>
+          </select>
+          <select id="pix_done_select" style="height:30px;margin-right:5px;">
+            <option value="select">Select completed PIX</option>
           </select>
         </div>
         <div id="account_details_pane" style="display:none;">
