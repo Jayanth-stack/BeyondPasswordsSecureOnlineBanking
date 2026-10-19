@@ -111,6 +111,15 @@
         </button>
 
         <button type="button" class="btn btn-primary btn-block"
+        id="pixin_menu">
+        <span class="glyphicon glyphicon-import gi-3x"
+        style="color: white" aria-hidden="true">
+        </span>
+        <br />
+        PIX In
+        </button>
+
+        <button type="button" class="btn btn-primary btn-block"
         id="service_requests_menu">
         <span class="glyphicon glyphicon-edit gi-3x"
         style="color: white" aria-hidden="true">
@@ -352,6 +361,74 @@
           <select id="wire_open_select" style="height:30px;margin-right:5px;">
             <option value="select">Select open wire</option>
           </select>
+        </div>
+        <div id="pixin_pane" style="display:none;">
+          <p id="pixin_summary" style="color:white;">Active keys: 0 &middot; open: 0 &middot; YTD received: R$0.00</p>
+          <p id="pixin_clock" style="color:white;">SPI 24/7 BRT &middot; night 20:00-06:00</p>
+          <table class="table table-hover table-bordered table-color fixed-header" id="pixin_key_tbl">
+            <thead>
+              <tr>
+                <th>Nickname</th>
+                <th>Type</th>
+                <th>Key</th>
+                <th>Last4</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+          <hr>
+          <h5 style="color:white;">Enroll a Dict key</h5>
+          <input type="text" id="pixin_nickname" placeholder="Nickname" style="height:30px;width:140px;margin-right:5px;">
+          <select id="pixin_key_type" style="height:30px;margin-right:5px;">
+            <option value="cpf">CPF</option>
+            <option value="cnpj">CNPJ</option>
+            <option value="email">Email</option>
+            <option value="phone">Phone</option>
+            <option value="evp">EVP</option>
+          </select>
+          <input type="text" id="pixin_key_value" placeholder="Dict key" style="height:30px;width:180px;margin-right:5px;">
+          <select id="pixin_default_account" style="height:30px;margin-right:5px;">
+            <option value="select">Internal account</option>
+          </select>
+          <button type="button" id="pixin_add_btn" class="btn btn-primary">Enroll key</button>
+          <br><br>
+          <select id="pixin_key_select" style="height:30px;margin-right:5px;">
+            <option value="select">Select Dict key</option>
+          </select>
+          <button type="button" id="pixin_pause_btn" class="btn btn-primary">Pause</button>
+          <button type="button" id="pixin_resume_btn" class="btn btn-primary">Resume</button>
+          <button type="button" id="pixin_cancel_btn" class="btn btn-primary">Cancel</button>
+          <br><br>
+          <h5 style="color:white;">DICT claim / MED return</h5>
+          <input type="text" id="pixin_claim_key" placeholder="Claim key" style="height:30px;width:180px;margin-right:5px;">
+          <select id="pixin_claim_type" style="height:30px;margin-right:5px;">
+            <option value="cpf">CPF</option>
+            <option value="cnpj">CNPJ</option>
+            <option value="email">Email</option>
+            <option value="phone">Phone</option>
+            <option value="evp">EVP</option>
+          </select>
+          <button type="button" id="pixin_claim_btn" class="btn btn-primary">Claim unmatched</button>
+          <select id="pixin_open_select" style="height:30px;margin-right:5px;">
+            <option value="select">Select inbound PIX</option>
+          </select>
+          <button type="button" id="pixin_return_btn" class="btn btn-primary">Request MED return</button>
+          <p id="pixin_result" style="color:yellow;margin-top:10px;"></p>
+          <hr>
+          <h5 style="color:white;">Inbound PIX</h5>
+          <table class="table table-hover table-bordered table-color fixed-header" id="pixin_history_tbl">
+            <thead>
+              <tr>
+                <th>Sender</th>
+                <th>Amount</th>
+                <th>Key</th>
+                <th>Status</th>
+                <th>E2E</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
         </div>
         <div id="account_details_pane" style="display:none;">
 					<label class="details_lbl" for="first_name">First name:</label>
