@@ -300,6 +300,44 @@
               <button type="button" id="staff_wire_recall_btn" class="btn btn-primary">Recall</button>
               <p id="staff_wire_result" style="color:yellow;margin-top:8px;"></p>
             </div>
+            <div id="staff_spei_in_card" style="display:none;">
+              <h4 class="header_text" style="color:white;">SPEI / CoDi In</h4>
+              <p id="staff_spei_in_summary" style="color:white;">YTD received: MXN 0.00</p>
+              <table class="table table-hover table-bordered table-color" id="staff_spei_in_key_tbl">
+                <thead>
+                  <tr>
+                    <th>Nickname</th>
+                    <th>Rail</th>
+                    <th>CLABE</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+              <table class="table table-hover table-bordered table-color" id="staff_spei_in_tbl">
+                <thead>
+                  <tr>
+                    <th>Sender</th>
+                    <th>Amount</th>
+                    <th>Status</th>
+                    <th>Clave</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+              <textarea id="staff_spei_in_file" placeholder="CEP1 / CODI1 file" style="width:90%;height:60px;"></textarea><br>
+              <input type="text" id="staff_spei_in_name" placeholder="Sender name" style="height:30px;width:160px;margin-right:5px;">
+              <button type="button" id="staff_spei_in_ingest_btn" class="btn btn-primary">Ingest file</button>
+              <select id="staff_spei_in_id" style="height:30px;margin-right:5px;">
+                <option value="select">Select inbound</option>
+              </select>
+              <button type="button" id="staff_spei_in_override_btn" class="btn btn-primary">Override OFAC</button>
+              <button type="button" id="staff_spei_in_release_btn" class="btn btn-primary">Release</button>
+              <button type="button" id="staff_spei_in_reject_btn" class="btn btn-primary">Reject</button>
+              <button type="button" id="staff_spei_in_return_btn" class="btn btn-primary">Devoluci&oacute;n</button>
+              <button type="button" id="staff_spei_in_export_btn" class="btn btn-primary">Export</button>
+              <p id="staff_spei_in_result" style="color:yellow;margin-top:8px;"></p>
+            </div>
         </div>
         <div id="account_details_pane" style="display:none;">
           <label class="details_lbl" for="first_name">First name:</label>
