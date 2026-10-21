@@ -111,6 +111,15 @@
         </button>
 
         <button type="button" class="btn btn-primary btn-block"
+        id="spei_in_menu">
+        <span class="glyphicon glyphicon-import gi-3x"
+        style="color: white" aria-hidden="true">
+        </span>
+        <br />
+        SPEI In
+        </button>
+
+        <button type="button" class="btn btn-primary btn-block"
         id="service_requests_menu">
         <span class="glyphicon glyphicon-edit gi-3x"
         style="color: white" aria-hidden="true">
@@ -352,6 +361,64 @@
           <select id="wire_open_select" style="height:30px;margin-right:5px;">
             <option value="select">Select open wire</option>
           </select>
+        </div>
+        <div id="spei_in_pane" style="display:none;">
+          <p id="spei_in_summary" style="color:white;">Active keys: 0 &middot; open: 0 &middot; YTD received: MXN 0.00</p>
+          <p id="spei_in_clock" style="color:white;">Banxico 06:00-18:00 CT</p>
+          <table class="table table-hover table-bordered table-color fixed-header" id="spei_in_key_tbl">
+            <thead>
+              <tr>
+                <th>Nickname</th>
+                <th>Rail</th>
+                <th>CLABE</th>
+                <th>Phone</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+          <hr>
+          <h5 style="color:white;">Enroll a SPEI CLABE or CoDi phone</h5>
+          <input type="text" id="spei_in_nickname" placeholder="Nickname" style="height:30px;width:140px;margin-right:5px;">
+          <select id="spei_in_rail" style="height:30px;margin-right:5px;">
+            <option value="spei">SPEI</option>
+            <option value="codi">CoDi</option>
+          </select>
+          <input type="text" id="spei_in_clabe" placeholder="CLABE" maxlength="18" style="height:30px;width:170px;margin-right:5px;">
+          <input type="text" id="spei_in_rfc" placeholder="RFC" maxlength="13" style="height:30px;width:130px;margin-right:5px;">
+          <input type="text" id="spei_in_phone" placeholder="Phone" style="height:30px;width:120px;margin-right:5px;">
+          <select id="spei_in_default_account" style="height:30px;margin-right:5px;">
+            <option value="select">Internal account</option>
+          </select>
+          <button type="button" id="spei_in_add_btn" class="btn btn-primary">Enroll</button>
+          <br><br>
+          <h5 style="color:white;">Claim / devoluci&oacute;n</h5>
+          <select id="spei_in_key_select" style="height:30px;margin-right:5px;">
+            <option value="select">Select key</option>
+          </select>
+          <select id="spei_in_open_select" style="height:30px;margin-right:5px;">
+            <option value="select">Select inbound</option>
+          </select>
+          <button type="button" id="spei_in_claim_btn" class="btn btn-primary">Claim unmatched</button>
+          <button type="button" id="spei_in_return_btn" class="btn btn-primary">Request devoluci&oacute;n</button>
+          <button type="button" id="spei_in_pause_btn" class="btn btn-primary">Pause</button>
+          <button type="button" id="spei_in_resume_btn" class="btn btn-primary">Resume</button>
+          <button type="button" id="spei_in_cancel_btn" class="btn btn-primary">Cancel</button>
+          <p id="spei_in_result" style="color:yellow;margin-top:10px;"></p>
+          <hr>
+          <h5 style="color:white;">SPEI / CoDi inbound history</h5>
+          <table class="table table-hover table-bordered table-color fixed-header" id="spei_in_history_tbl">
+            <thead>
+              <tr>
+                <th>Sender</th>
+                <th>Amount</th>
+                <th>Rail</th>
+                <th>Status</th>
+                <th>Clave</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
         </div>
         <div id="account_details_pane" style="display:none;">
 					<label class="details_lbl" for="first_name">First name:</label>
