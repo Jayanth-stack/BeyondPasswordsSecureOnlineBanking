@@ -244,6 +244,7 @@ function appendSecondaryData(customer_id, data) {
   fillCustomerAccTbl(data);
   fillStaffLinked(data);
   fillStaffWires(data);
+  fillStaffUpi(data);
   if($('#cust_details_card').css('display')=='none'){
     $('#cust_details_card').show();
   }
@@ -372,6 +373,73 @@ function fillStaffWires(data) {
     option.innerHTML = wires[j].nickname + ' $' + wires[j].amount + ' (' + wires[j].status + ')';
     selection.options.add(option);
   }
+}
+
+function fillStaffUpi(data) {
+  var snapshot = data.Upi || {};
+  var card = document.getElementById('staff_upi_card');
+  if (!card) {
+    return;
+  }
+  card.style.display = 'block';
+  var summary = document.getElementById('staff_upi_summary');
+  if (summary) {
+    summary.innerHTML = 'YTD sent: INR ' + (snapshot.ytd_sent || '0.00') +
+      ' &middot; fees: INR ' + (snapshot.ytd_fees || '0.00') +
+      ' &middot; recalled: INR ' + (snapshot.recalled_ytd || '0.00');
+  }
+  var beneTable = document.getElementById('staff_upi_bene_tbl');
+  var beneBody = beneTable.getElementsByTagName('tbody')[0];
+  beneBody.innerHTML = '';
+  var benes = snapshot.beneficiaries || [];
+  for (var i = 0; i < benes.length; i++) {
+    var row = beneBody.insertRow(-1);
+    row.insertCell(0).innerHTML = benes[i].nickname;
+    row.insertCell(1).innerHTML = benes[i].legal_name;
+    row.insertCell(2).innerHTML = benes[i].rail;
+    row.insertCell(3).innerHTML = benes[i].status;
+  }
+  var table = document.getElementById('staff_upi_tbl');
+  var body = table.getElementsByTagName('tbody')[0];
+  body.innerHTML = '';
+  var selection = document.getElementById('staff_upi_id');
+  selection.options.length = 1;
+  var payments = snapshot.payments || [];
+  for (var j = 0; j < payments.length; j++) {
+    var wrow = body.insertRow(-1);
+    wrow.insertCell(0).innerHTML = payments[j].nickname;
+    wrow.insertCell(1).innerHTML = 'INR ' + payments[j].amount;
+    wrow.insertCell(2).innerHTML = payments[j].status;
+    wrow.insertCell(3).innerHTML = (payments[j].rrn_masked || payments[j].payment_id).slice(-12);
+    if (['held', 'queued', 'pending_release', 'completed'].indexOf(payments[j].status) < 0) {
+      continue;
+    }
+    var option = document.createElement('OPTION');
+    option.value = payments[j].payment_id;
+    option.innerHTML = payments[j].nickname + ' INR ' + payments[j].amount + ' (' + payments[j].status + ')';
+    selection.options.add(option);
+  }
+}
+
+function postStaffUpi(path, payload) {
+  payload.userid = userid;
+  fetch(homeURL + path, {
+    method: 'post',
+    body: JSON.stringify(payload),
+    headers: { 'Content-type': 'application/json' }
+  }).then(function(response) {
+    return response.json().then(function(body) {
+      var result = document.getElementById('staff_upi_result');
+      if (!response.ok) {
+        if (result) { result.innerHTML = (body && (body.message || body.error)) || 'Failed'; }
+        return;
+      }
+      if (result) { result.innerHTML = body.message || 'Done'; }
+      getCustomer($('#customer_id_input').val() || document.getElementById('customer_id').innerHTML);
+    });
+  }).catch(function(error) {
+    console.error(error);
+  });
 }
 
 function postStaffWire(path, payload) {
@@ -803,6 +871,7 @@ $(document).ready(function() {
       $('#cust_accounts_tbl').hide();
       $('#staff_linked_card').hide();
       $('#staff_wire_card').hide();
+      $('#staff_upi_card').hide();
     });
     $('#staff_la_force_btn').on('click', function(){
       if($('#staff_la_link_id').val() == 'select'){ window.alert('Select a pending link.'); return; }
@@ -843,6 +912,26 @@ $(document).ready(function() {
     $('#staff_wire_recall_btn').on('click', function(){
       if($('#staff_wire_id').val() == 'select'){ window.alert('Select a wire.'); return; }
       postStaffWire('recallWire', { wire_id: $('#staff_wire_id').val() });
+    });
+    $('#staff_upi_override_btn').on('click', function(){
+      if($('#staff_upi_id').val() == 'select'){ window.alert('Select a UPI.'); return; }
+      postStaffUpi('overrideUpiOfac', { payment_id: $('#staff_upi_id').val() });
+    });
+    $('#staff_upi_release_btn').on('click', function(){
+      if($('#staff_upi_id').val() == 'select'){ window.alert('Select a UPI.'); return; }
+      postStaffUpi('releaseUpi', { payment_id: $('#staff_upi_id').val() });
+    });
+    $('#staff_upi_reject_btn').on('click', function(){
+      if($('#staff_upi_id').val() == 'select'){ window.alert('Select a UPI.'); return; }
+      postStaffUpi('rejectUpi', { payment_id: $('#staff_upi_id').val() });
+    });
+    $('#staff_upi_recall_btn').on('click', function(){
+      if($('#staff_upi_id').val() == 'select'){ window.alert('Select a UPI.'); return; }
+      postStaffUpi('recallUpi', { payment_id: $('#staff_upi_id').val() });
+    });
+    $('#staff_upi_export_btn').on('click', function(){
+      if($('#staff_upi_id').val() == 'select'){ window.alert('Select a UPI.'); return; }
+      postStaffUpi('exportUpi', { payment_id: $('#staff_upi_id').val() });
     });
     $('#approve_trans_btn').on('click', function(){
       if($('#customer_trans_no').val() == 'select'){
