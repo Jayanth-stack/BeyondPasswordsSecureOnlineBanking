@@ -128,6 +128,7 @@ function appendPrimaryData(data) {
   fillPendingTransTbl(data);
   fillLinkedAccounts(data);
   fillWires(data);
+  fillUpi(data);
 }
 
 function fillLinkedAccountSelect(selectId) {
@@ -252,6 +253,109 @@ function fillWires(data) {
     openOpt.innerHTML = wires[j].nickname + ' $' + wires[j].amount + ' (' + wires[j].status + ')';
     openSelect.options.add(openOpt);
   }
+}
+
+function fillUpi(data) {
+  var snapshot = data.Upi || {};
+  var summary = document.getElementById('upi_summary');
+  if (summary) {
+    summary.innerHTML = 'Active: ' + (snapshot.active_count || 0) +
+      ' &middot; open: ' + (snapshot.open_count || 0) +
+      ' &middot; YTD sent: INR ' + (snapshot.ytd_sent || '0.00') +
+      ' &middot; fees: INR ' + (snapshot.ytd_fees || '0.00');
+  }
+  var clockEl = document.getElementById('upi_clock');
+  if (clockEl && snapshot.clock) {
+    clockEl.innerHTML = (snapshot.clock.session ? 'RTGS session open' : 'RTGS after cutoff / UPI 24/7') +
+      ' &middot; IST ' + (snapshot.clock.local_time || '--') +
+      ' &middot; value ' + (snapshot.clock.value_date || '--');
+  }
+  fillLinkedAccountSelect('upi_default_account');
+  var table = document.getElementById('upi_bene_tbl');
+  if (!table) {
+    return;
+  }
+  var body = table.getElementsByTagName('tbody')[0];
+  body.innerHTML = '';
+  var selection = document.getElementById('upi_bene_select');
+  selection.options.length = 1;
+  var benes = snapshot.beneficiaries || [];
+  for (var i = 0; i < benes.length; i++) {
+    var row = body.insertRow(-1);
+    row.insertCell(0).innerHTML = benes[i].nickname;
+    row.insertCell(1).innerHTML = benes[i].legal_name;
+    row.insertCell(2).innerHTML = benes[i].rail;
+    row.insertCell(3).innerHTML = benes[i].vpa_masked || benes[i].ifsc_masked || benes[i].mmid_masked || '';
+    row.insertCell(4).innerHTML = benes[i].status;
+    var option = document.createElement('OPTION');
+    option.value = benes[i].beneficiary_id;
+    option.innerHTML = benes[i].nickname + ' (' + benes[i].rail + ', ' + benes[i].status + ')';
+    selection.options.add(option);
+  }
+  var hist = document.getElementById('upi_history_tbl');
+  var histBody = hist.getElementsByTagName('tbody')[0];
+  histBody.innerHTML = '';
+  var openSelect = document.getElementById('upi_open_select');
+  openSelect.options.length = 1;
+  var doneSelect = document.getElementById('upi_done_select');
+  doneSelect.options.length = 1;
+  var payments = snapshot.payments || [];
+  for (var j = 0; j < payments.length; j++) {
+    var wrow = histBody.insertRow(-1);
+    wrow.insertCell(0).innerHTML = payments[j].nickname;
+    wrow.insertCell(1).innerHTML = 'INR ' + payments[j].amount;
+    wrow.insertCell(2).innerHTML = payments[j].rail;
+    wrow.insertCell(3).innerHTML = payments[j].status;
+    wrow.insertCell(4).innerHTML = (payments[j].rrn_masked || '').slice(-12);
+    if (payments[j].cancelable) {
+      var openOpt = document.createElement('OPTION');
+      openOpt.value = payments[j].payment_id;
+      openOpt.innerHTML = payments[j].nickname + ' INR ' + payments[j].amount + ' (' + payments[j].status + ')';
+      openSelect.options.add(openOpt);
+    }
+    if (payments[j].recallable) {
+      var doneOpt = document.createElement('OPTION');
+      doneOpt.value = payments[j].payment_id;
+      doneOpt.innerHTML = payments[j].nickname + ' INR ' + payments[j].amount;
+      doneSelect.options.add(doneOpt);
+    }
+  }
+}
+
+function postUpi(path, payload, okMsg) {
+  payload.userid = userid;
+  fetch(homeURL + path, {
+    method: 'post',
+    body: JSON.stringify(payload),
+    headers: { 'Content-type': 'application/json' }
+  }).then(function(response) {
+    return response.json().then(function(body) {
+      var result = document.getElementById('upi_result');
+      if (!response.ok) {
+        if (result) { result.innerHTML = (body && (body.message || body.error)) || 'Failed'; }
+        window.alert((body && (body.message || body.error)) || 'Request failed');
+        if (body && body.Upi) {
+          fillUpi({ Upi: body.Upi });
+        }
+        return;
+      }
+      if (result) {
+        if (body && body.preview) {
+          result.innerHTML = 'Fee INR ' + body.preview.fee + ' &middot; total INR ' + body.preview.total +
+            ' &middot; value ' + ((body.preview.clock && body.preview.clock.value_date) || '');
+        } else {
+          result.innerHTML = okMsg || body.message || 'Done';
+        }
+      }
+      if (body && body.Upi) {
+        fillUpi({ Upi: body.Upi });
+      } else {
+        getUser();
+      }
+    });
+  }).catch(function(error) {
+    console.error(error);
+  });
 }
 
 function postWire(path, payload, okMsg) {
@@ -1047,6 +1151,7 @@ $(document).ready(function() {
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#upi_menu').css('background-color','maroon');
     });
     $('#service_requests_menu').on('click', function(){
       if($('#service_requests_pane').css('display')=='none'){
@@ -1057,6 +1162,7 @@ $(document).ready(function() {
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#upi_menu').css('background-color','maroon');
     });
     $('#my_accounts_menu').on('click', function(){
       getUser();
@@ -1077,6 +1183,7 @@ $(document).ready(function() {
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#upi_menu').css('background-color','maroon');
     });
     $('#pending_transaction_requests_menu').on('click', function(){
       if($('#pending_transaction_requests_pane').css('display')=='none'){
@@ -1087,6 +1194,7 @@ $(document).ready(function() {
       $('#service_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#upi_menu').css('background-color','maroon');
     });
     $('#linked_accounts_menu').on('click', function(){
       if($('#linked_accounts_pane').css('display')=='none'){
@@ -1097,6 +1205,7 @@ $(document).ready(function() {
       $('#service_requests_menu').css('background-color','maroon');
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#upi_menu').css('background-color','maroon');
     });
     $('#wires_menu').on('click', function(){
       if($('#wires_pane').css('display')=='none'){
@@ -1107,6 +1216,80 @@ $(document).ready(function() {
       $('#service_requests_menu').css('background-color','maroon');
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
+      $('#upi_menu').css('background-color','maroon');
+    });
+    $('#upi_menu').on('click', function(){
+      if($('#upi_pane').css('display')=='none'){
+          $('#upi_pane').show().siblings('div').hide();
+      }
+      $('#upi_menu').css('background-color','#FF6600');
+      $('#my_accounts_menu').css('background-color','maroon');
+      $('#service_requests_menu').css('background-color','maroon');
+      $('#pending_transaction_requests_menu').css('background-color','maroon');
+      $('#linked_accounts_menu').css('background-color','maroon');
+      $('#wires_menu').css('background-color','maroon');
+    });
+    $('#upi_add_btn').on('click', function(){
+      if($('#upi_nickname').val() == '' || $('#upi_legal_name').val() == '' || $('#upi_default_account').val() == 'select'){
+        window.alert('Nickname, legal name, and internal account are required.');
+        return;
+      }
+      postUpi('addUpiBeneficiary', {
+        nickname: $('#upi_nickname').val(),
+        legal_name: $('#upi_legal_name').val(),
+        rail: $('#upi_rail').val(),
+        vpa: $('#upi_vpa').val(),
+        ifsc: $('#upi_ifsc').val(),
+        account_number: $('#upi_account_number').val(),
+        mmid: $('#upi_mmid').val(),
+        phone: $('#upi_phone').val(),
+        pan: $('#upi_pan').val(),
+        default_account: $('#upi_default_account').val()
+      }, 'Beneficiary added');
+    });
+    $('#upi_preview_btn').on('click', function(){
+      if($('#upi_bene_select').val() == 'select' || $('#upi_amount').val() == ''){
+        window.alert('Select a beneficiary and amount.');
+        return;
+      }
+      postUpi('previewUpi', {
+        beneficiary_id: $('#upi_bene_select').val(),
+        amount: $('#upi_amount').val(),
+        account: $('#upi_default_account').val() == 'select' ? null : $('#upi_default_account').val()
+      }, 'Preview');
+    });
+    $('#upi_send_btn').on('click', function(){
+      if($('#upi_bene_select').val() == 'select' || $('#upi_amount').val() == ''){
+        window.alert('Select a beneficiary and amount.');
+        return;
+      }
+      postUpi('sendUpi', {
+        beneficiary_id: $('#upi_bene_select').val(),
+        amount: $('#upi_amount').val(),
+        purpose: $('#upi_purpose').val(),
+        memo: $('#upi_memo').val(),
+        account: $('#upi_default_account').val() == 'select' ? null : $('#upi_default_account').val()
+      }, 'UPI originated');
+    });
+    $('#upi_cancel_btn').on('click', function(){
+      if($('#upi_open_select').val() == 'select'){ window.alert('Select an open payment.'); return; }
+      postUpi('cancelUpi', { payment_id: $('#upi_open_select').val() }, 'Cancelled');
+    });
+    $('#upi_recall_btn').on('click', function(){
+      if($('#upi_done_select').val() == 'select'){ window.alert('Select a completed payment.'); return; }
+      postUpi('recallUpi', { payment_id: $('#upi_done_select').val() }, 'Complaint sent');
+    });
+    $('#upi_pause_btn').on('click', function(){
+      if($('#upi_bene_select').val() == 'select'){ window.alert('Select a beneficiary.'); return; }
+      postUpi('pauseUpiBeneficiary', { beneficiary_id: $('#upi_bene_select').val() }, 'Paused');
+    });
+    $('#upi_resume_btn').on('click', function(){
+      if($('#upi_bene_select').val() == 'select'){ window.alert('Select a beneficiary.'); return; }
+      postUpi('resumeUpiBeneficiary', { beneficiary_id: $('#upi_bene_select').val() }, 'Resumed');
+    });
+    $('#upi_archive_btn').on('click', function(){
+      if($('#upi_bene_select').val() == 'select'){ window.alert('Select a beneficiary.'); return; }
+      postUpi('archiveUpiBeneficiary', { beneficiary_id: $('#upi_bene_select').val() }, 'Archived');
     });
     $('#wire_add_btn').on('click', function(){
       if($('#wire_nickname').val() == '' || $('#wire_legal_name').val() == '' || $('#wire_default_account').val() == 'select'){

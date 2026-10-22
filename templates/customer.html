@@ -111,6 +111,15 @@
         </button>
 
         <button type="button" class="btn btn-primary btn-block"
+        id="upi_menu">
+        <span class="glyphicon glyphicon-flash gi-3x"
+        style="color: white" aria-hidden="true">
+        </span>
+        <br />
+        UPI / IMPS
+        </button>
+
+        <button type="button" class="btn btn-primary btn-block"
         id="service_requests_menu">
         <span class="glyphicon glyphicon-edit gi-3x"
         style="color: white" aria-hidden="true">
@@ -351,6 +360,87 @@
           </table>
           <select id="wire_open_select" style="height:30px;margin-right:5px;">
             <option value="select">Select open wire</option>
+          </select>
+        </div>
+        <div id="upi_pane" style="display:none;">
+          <p id="upi_summary" style="color:white;">Active: 0 &middot; open: 0 &middot; YTD sent: INR 0.00</p>
+          <p id="upi_clock" style="color:white;">UPI/IMPS 24/7 IST &middot; RTGS 09:00-18:00</p>
+          <table class="table table-hover table-bordered table-color fixed-header" id="upi_bene_tbl">
+            <thead>
+              <tr>
+                <th>Nickname</th>
+                <th>Name</th>
+                <th>Rail</th>
+                <th>VPA / IFSC</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+          <hr>
+          <h5 style="color:white;">Add a UPI / IMPS / NEFT / RTGS beneficiary</h5>
+          <input type="text" id="upi_nickname" placeholder="Nickname" style="height:30px;width:140px;margin-right:5px;">
+          <input type="text" id="upi_legal_name" placeholder="Legal name" style="height:30px;width:160px;margin-right:5px;">
+          <select id="upi_rail" style="height:30px;margin-right:5px;">
+            <option value="upi">UPI (VPA)</option>
+            <option value="imps">IMPS</option>
+            <option value="neft">NEFT</option>
+            <option value="rtgs">RTGS</option>
+          </select>
+          <input type="text" id="upi_vpa" placeholder="VPA name@psp" style="height:30px;width:160px;margin-right:5px;">
+          <input type="text" id="upi_ifsc" placeholder="IFSC" maxlength="11" style="height:30px;width:120px;margin-right:5px;">
+          <input type="text" id="upi_account_number" placeholder="Account no." style="height:30px;width:130px;margin-right:5px;">
+          <br><br>
+          <input type="text" id="upi_mmid" placeholder="MMID" maxlength="7" style="height:30px;width:90px;margin-right:5px;">
+          <input type="text" id="upi_phone" placeholder="IN mobile" style="height:30px;width:120px;margin-right:5px;">
+          <input type="text" id="upi_pan" placeholder="PAN" maxlength="10" style="height:30px;width:110px;margin-right:5px;">
+          <select id="upi_default_account" style="height:30px;margin-right:5px;">
+            <option value="select">Internal account</option>
+          </select>
+          <button type="button" id="upi_add_btn" class="btn btn-primary">Add beneficiary</button>
+          <br><br>
+          <h5 style="color:white;">Send INR</h5>
+          <select id="upi_bene_select" style="height:30px;margin-right:5px;">
+            <option value="select">Select beneficiary</option>
+          </select>
+          <input type="text" id="upi_amount" placeholder="INR amount" style="height:30px;width:110px;margin-right:5px;">
+          <select id="upi_purpose" style="height:30px;margin-right:5px;">
+            <option value="other">Other</option>
+            <option value="family">Family</option>
+            <option value="goods">Goods</option>
+            <option value="payroll">Payroll</option>
+            <option value="tax">Tax</option>
+            <option value="loan">Loan</option>
+            <option value="rent">Rent</option>
+          </select>
+          <input type="text" id="upi_memo" placeholder="Memo" style="height:30px;width:140px;margin-right:5px;">
+          <button type="button" id="upi_preview_btn" class="btn btn-primary">Preview</button>
+          <button type="button" id="upi_send_btn" class="btn btn-primary">Send UPI</button>
+          <button type="button" id="upi_cancel_btn" class="btn btn-primary">Cancel open</button>
+          <button type="button" id="upi_recall_btn" class="btn btn-primary">Complaint</button>
+          <button type="button" id="upi_pause_btn" class="btn btn-primary">Pause</button>
+          <button type="button" id="upi_resume_btn" class="btn btn-primary">Resume</button>
+          <button type="button" id="upi_archive_btn" class="btn btn-primary">Archive</button>
+          <p id="upi_result" style="color:yellow;margin-top:10px;"></p>
+          <hr>
+          <h5 style="color:white;">UPI history</h5>
+          <table class="table table-hover table-bordered table-color fixed-header" id="upi_history_tbl">
+            <thead>
+              <tr>
+                <th>Nickname</th>
+                <th>Amount</th>
+                <th>Rail</th>
+                <th>Status</th>
+                <th>RRN</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+          <select id="upi_open_select" style="height:30px;margin-right:5px;">
+            <option value="select">Select open payment</option>
+          </select>
+          <select id="upi_done_select" style="height:30px;margin-right:5px;">
+            <option value="select">Select completed payment</option>
           </select>
         </div>
         <div id="account_details_pane" style="display:none;">
