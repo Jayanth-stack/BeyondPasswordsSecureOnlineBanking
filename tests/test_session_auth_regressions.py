@@ -11,7 +11,9 @@ _MOCK_DB = MagicMock()
 _MOCK_CURSOR = MagicMock()
 _MOCK_DB.cursor.return_value = _MOCK_CURSOR
 
-with patch("mysql.connector.connect", return_value=_MOCK_DB):
+with patch("mysql.connector.connect", return_value=_MOCK_DB), patch(
+    "twilio.rest.Client"
+):
     from app import app
 
 
