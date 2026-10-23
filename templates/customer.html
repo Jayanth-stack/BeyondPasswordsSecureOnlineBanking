@@ -111,6 +111,15 @@
         </button>
 
         <button type="button" class="btn btn-primary btn-block"
+        id="upi_in_menu">
+        <span class="glyphicon glyphicon-import gi-3x"
+        style="color: white" aria-hidden="true">
+        </span>
+        <br />
+        UPI In
+        </button>
+
+        <button type="button" class="btn btn-primary btn-block"
         id="service_requests_menu">
         <span class="glyphicon glyphicon-edit gi-3x"
         style="color: white" aria-hidden="true">
@@ -352,6 +361,69 @@
           <select id="wire_open_select" style="height:30px;margin-right:5px;">
             <option value="select">Select open wire</option>
           </select>
+        </div>
+        <div id="upi_in_pane" style="display:none;">
+          <p id="upi_in_summary" style="color:white;">Active keys: 0 &middot; open: 0 &middot; YTD received: INR 0.00</p>
+          <p id="upi_in_clock" style="color:white;">NPCI UPI/IMPS 24/7 &middot; RTGS 09:00-18:00 IST</p>
+          <table class="table table-hover table-bordered table-color fixed-header" id="upi_in_key_tbl">
+            <thead>
+              <tr>
+                <th>Nickname</th>
+                <th>Rail</th>
+                <th>VPA / IFSC</th>
+                <th>Phone</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+          <hr>
+          <h5 style="color:white;">Enroll a UPI VPA, IMPS MMID, or IFSC</h5>
+          <input type="text" id="upi_in_nickname" placeholder="Nickname" style="height:30px;width:140px;margin-right:5px;">
+          <select id="upi_in_rail" style="height:30px;margin-right:5px;">
+            <option value="upi">UPI</option>
+            <option value="imps">IMPS</option>
+            <option value="neft">NEFT</option>
+            <option value="rtgs">RTGS</option>
+          </select>
+          <input type="text" id="upi_in_vpa" placeholder="VPA" style="height:30px;width:150px;margin-right:5px;">
+          <input type="text" id="upi_in_ifsc" placeholder="IFSC" maxlength="11" style="height:30px;width:120px;margin-right:5px;">
+          <input type="text" id="upi_in_account" placeholder="Account" style="height:30px;width:120px;margin-right:5px;">
+          <input type="text" id="upi_in_mmid" placeholder="MMID" maxlength="7" style="height:30px;width:90px;margin-right:5px;">
+          <input type="text" id="upi_in_phone" placeholder="Mobile" style="height:30px;width:110px;margin-right:5px;">
+          <input type="text" id="upi_in_pan" placeholder="PAN" maxlength="10" style="height:30px;width:110px;margin-right:5px;">
+          <select id="upi_in_default_account" style="height:30px;margin-right:5px;">
+            <option value="select">Internal account</option>
+          </select>
+          <button type="button" id="upi_in_add_btn" class="btn btn-primary">Enroll</button>
+          <br><br>
+          <h5 style="color:white;">Claim / complaint</h5>
+          <select id="upi_in_key_select" style="height:30px;margin-right:5px;">
+            <option value="select">Select key</option>
+          </select>
+          <select id="upi_in_open_select" style="height:30px;margin-right:5px;">
+            <option value="select">Select inbound</option>
+          </select>
+          <button type="button" id="upi_in_claim_btn" class="btn btn-primary">Claim unmatched</button>
+          <button type="button" id="upi_in_return_btn" class="btn btn-primary">Request return</button>
+          <button type="button" id="upi_in_pause_btn" class="btn btn-primary">Pause</button>
+          <button type="button" id="upi_in_resume_btn" class="btn btn-primary">Resume</button>
+          <button type="button" id="upi_in_cancel_btn" class="btn btn-primary">Cancel</button>
+          <p id="upi_in_result" style="color:yellow;margin-top:10px;"></p>
+          <hr>
+          <h5 style="color:white;">UPI / IMPS / NEFT / RTGS inbound history</h5>
+          <table class="table table-hover table-bordered table-color fixed-header" id="upi_in_history_tbl">
+            <thead>
+              <tr>
+                <th>Sender</th>
+                <th>Amount</th>
+                <th>Rail</th>
+                <th>Status</th>
+                <th>RRN</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
         </div>
         <div id="account_details_pane" style="display:none;">
 					<label class="details_lbl" for="first_name">First name:</label>
