@@ -128,6 +128,7 @@ function appendPrimaryData(data) {
   fillPendingTransTbl(data);
   fillLinkedAccounts(data);
   fillWires(data);
+  fillCardHolds(data);
 }
 
 function fillLinkedAccountSelect(selectId) {
@@ -252,6 +253,92 @@ function fillWires(data) {
     openOpt.innerHTML = wires[j].nickname + ' $' + wires[j].amount + ' (' + wires[j].status + ')';
     openSelect.options.add(openOpt);
   }
+}
+
+function fillCardHolds(data) {
+  var snapshot = data.CardHolds || {};
+  var summary = document.getElementById('cardholds_summary');
+  if (summary) {
+    summary.innerHTML = 'Active: ' + (snapshot.active_count || 0) +
+      ' &middot; open: ' + (snapshot.open_count || 0) +
+      ' &middot; held: $' + (snapshot.open_holds || '0.00') +
+      ' &middot; captured YTD: $' + (snapshot.ytd_captured || '0.00');
+  }
+  var clockEl = document.getElementById('cardholds_clock');
+  if (clockEl && snapshot.clock) {
+    clockEl.innerHTML = 'Network 24/7 &middot; retail ' + (snapshot.clock.retail_days || 7) +
+      'd &middot; fuel ' + (snapshot.clock.fuel_days || 2) + 'd';
+  }
+  fillLinkedAccountSelect('ch_default_account');
+  var table = document.getElementById('cardhold_key_tbl');
+  if (!table) {
+    return;
+  }
+  var keyBody = table.getElementsByTagName('tbody')[0];
+  keyBody.innerHTML = '';
+  var selection = document.getElementById('ch_key_select');
+  selection.options.length = 1;
+  var keys = snapshot.keys || [];
+  for (var i = 0; i < keys.length; i++) {
+    var row = keyBody.insertRow(-1);
+    row.insertCell(0).innerHTML = keys[i].nickname;
+    row.insertCell(1).innerHTML = keys[i].brand;
+    row.insertCell(2).innerHTML = keys[i].pan_masked || keys[i].last4;
+    row.insertCell(3).innerHTML = keys[i].default_account;
+    row.insertCell(4).innerHTML = keys[i].status;
+    var option = document.createElement('OPTION');
+    option.value = keys[i].key_id;
+    option.innerHTML = keys[i].nickname + ' (' + keys[i].status + ')';
+    selection.options.add(option);
+  }
+  var hist = document.getElementById('cardhold_tbl');
+  var histBody = hist.getElementsByTagName('tbody')[0];
+  histBody.innerHTML = '';
+  var openSelect = document.getElementById('ch_hold_select');
+  openSelect.options.length = 1;
+  var holds = snapshot.holds || [];
+  for (var j = 0; j < holds.length; j++) {
+    var hrow = histBody.insertRow(-1);
+    hrow.insertCell(0).innerHTML = holds[j].merchant;
+    hrow.insertCell(1).innerHTML = '$' + holds[j].amount;
+    hrow.insertCell(2).innerHTML = holds[j].status;
+    hrow.insertCell(3).innerHTML = holds[j].mcc;
+    hrow.insertCell(4).innerHTML = holds[j].approval_code || '';
+    if (!holds[j].voidable && !holds[j].open) {
+      continue;
+    }
+    var openOpt = document.createElement('OPTION');
+    openOpt.value = holds[j].hold_id;
+    openOpt.innerHTML = holds[j].merchant + ' $' + holds[j].amount + ' (' + holds[j].status + ')';
+    openSelect.options.add(openOpt);
+  }
+}
+
+function postCardHold(path, payload, okMsg) {
+  payload.userid = userid;
+  fetch(homeURL + path, {
+    method: 'post',
+    body: JSON.stringify(payload),
+    headers: { 'Content-type': 'application/json' }
+  }).then(function(response) {
+    return response.json().then(function(body) {
+      var result = document.getElementById('ch_result');
+      if (!response.ok) {
+        if (result) { result.innerHTML = (body && (body.message || body.error)) || 'Failed'; }
+        window.alert((body && (body.message || body.error)) || 'Request failed');
+        if (body && body.CardHolds) {
+          fillCardHolds({ CardHolds: body.CardHolds });
+        }
+        return;
+      }
+      if (result) {
+        result.innerHTML = okMsg || body.message || 'OK';
+      }
+      if (body && body.CardHolds) {
+        fillCardHolds({ CardHolds: body.CardHolds });
+      }
+    });
+  });
 }
 
 function postWire(path, payload, okMsg) {
@@ -1047,6 +1134,7 @@ $(document).ready(function() {
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#cardholds_menu').css('background-color','maroon');
     });
     $('#service_requests_menu').on('click', function(){
       if($('#service_requests_pane').css('display')=='none'){
@@ -1057,6 +1145,7 @@ $(document).ready(function() {
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#cardholds_menu').css('background-color','maroon');
     });
     $('#my_accounts_menu').on('click', function(){
       getUser();
@@ -1077,6 +1166,7 @@ $(document).ready(function() {
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#cardholds_menu').css('background-color','maroon');
     });
     $('#pending_transaction_requests_menu').on('click', function(){
       if($('#pending_transaction_requests_pane').css('display')=='none'){
@@ -1087,6 +1177,7 @@ $(document).ready(function() {
       $('#service_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#cardholds_menu').css('background-color','maroon');
     });
     $('#linked_accounts_menu').on('click', function(){
       if($('#linked_accounts_pane').css('display')=='none'){
@@ -1097,6 +1188,7 @@ $(document).ready(function() {
       $('#service_requests_menu').css('background-color','maroon');
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#cardholds_menu').css('background-color','maroon');
     });
     $('#wires_menu').on('click', function(){
       if($('#wires_pane').css('display')=='none'){
@@ -1107,6 +1199,57 @@ $(document).ready(function() {
       $('#service_requests_menu').css('background-color','maroon');
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
+      $('#cardholds_menu').css('background-color','maroon');
+    });
+    $('#cardholds_menu').on('click', function(){
+      if($('#cardholds_pane').css('display')=='none'){
+          $('#cardholds_pane').show().siblings('div').hide();
+      }
+      $('#cardholds_menu').css('background-color','#FF6600');
+      $('#my_accounts_menu').css('background-color','maroon');
+      $('#service_requests_menu').css('background-color','maroon');
+      $('#pending_transaction_requests_menu').css('background-color','maroon');
+      $('#linked_accounts_menu').css('background-color','maroon');
+      $('#wires_menu').css('background-color','maroon');
+    });
+    $('#ch_add_btn').on('click', function(){
+      if($('#ch_nickname').val() == '' || $('#ch_pan').val() == '' || $('#ch_default_account').val() == 'select'){
+        window.alert('Nickname, PAN, and internal account are required.');
+        return;
+      }
+      postCardHold('addCardHoldKey', {
+        nickname: $('#ch_nickname').val(),
+        pan: $('#ch_pan').val(),
+        default_account: $('#ch_default_account').val()
+      }, 'Card enrolled');
+    });
+    $('#ch_claim_btn').on('click', function(){
+      if($('#ch_claim_id').val() == '' || $('#ch_claim_last4').val() == ''){
+        window.alert('Hold ID and last4 are required.');
+        return;
+      }
+      postCardHold('claimCardHold', {
+        hold_id: $('#ch_claim_id').val(),
+        last4: $('#ch_claim_last4').val(),
+        brand: $('#ch_claim_brand').val(),
+        account: $('#ch_default_account').val() == 'select' ? null : $('#ch_default_account').val()
+      }, 'Claimed');
+    });
+    $('#ch_void_btn').on('click', function(){
+      if($('#ch_hold_select').val() == 'select'){ window.alert('Select an open hold.'); return; }
+      postCardHold('requestCardHoldVoid', { hold_id: $('#ch_hold_select').val() }, 'Void requested');
+    });
+    $('#ch_pause_btn').on('click', function(){
+      if($('#ch_key_select').val() == 'select'){ window.alert('Select a card.'); return; }
+      postCardHold('pauseCardHoldKey', { key_id: $('#ch_key_select').val() }, 'Paused');
+    });
+    $('#ch_resume_btn').on('click', function(){
+      if($('#ch_key_select').val() == 'select'){ window.alert('Select a card.'); return; }
+      postCardHold('resumeCardHoldKey', { key_id: $('#ch_key_select').val() }, 'Resumed');
+    });
+    $('#ch_cancel_btn').on('click', function(){
+      if($('#ch_key_select').val() == 'select'){ window.alert('Select a card.'); return; }
+      postCardHold('cancelCardHoldKey', { key_id: $('#ch_key_select').val() }, 'Cancelled');
     });
     $('#wire_add_btn').on('click', function(){
       if($('#wire_nickname').val() == '' || $('#wire_legal_name').val() == '' || $('#wire_default_account').val() == 'select'){
