@@ -111,6 +111,15 @@
         </button>
 
         <button type="button" class="btn btn-primary btn-block"
+        id="presents_menu">
+        <span class="glyphicon glyphicon-credit-card gi-3x"
+        style="color: white" aria-hidden="true">
+        </span>
+        <br />
+        Card Clearing
+        </button>
+
+        <button type="button" class="btn btn-primary btn-block"
         id="service_requests_menu">
         <span class="glyphicon glyphicon-edit gi-3x"
         style="color: white" aria-hidden="true">
@@ -351,6 +360,60 @@
           </table>
           <select id="wire_open_select" style="height:30px;margin-right:5px;">
             <option value="select">Select open wire</option>
+          </select>
+        </div>
+        <div id="presents_pane" style="display:none;">
+          <p id="presents_summary" style="color:white;">Active: 0 &middot; open: 0 &middot; YTD posted: $0.00 &middot; interchange: $0.00</p>
+          <p id="presents_clock" style="color:white;">Cutoff 22:00 &middot; value date --</p>
+          <table class="table table-hover table-bordered table-color fixed-header" id="present_key_tbl">
+            <thead>
+              <tr>
+                <th>Nickname</th>
+                <th>Brand</th>
+                <th>Last4</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+          <hr>
+          <h5 style="color:white;">Enroll a card</h5>
+          <input type="text" id="present_nickname" placeholder="Nickname" style="height:30px;width:140px;margin-right:5px;">
+          <input type="text" id="present_pan" placeholder="PAN" style="height:30px;width:180px;margin-right:5px;">
+          <select id="present_default_account" style="height:30px;margin-right:5px;">
+            <option value="select">Internal account</option>
+          </select>
+          <button type="button" id="present_add_btn" class="btn btn-primary">Enroll card</button>
+          <br><br>
+          <select id="present_key_select" style="height:30px;margin-right:5px;">
+            <option value="select">Select card</option>
+          </select>
+          <button type="button" id="present_pause_btn" class="btn btn-primary">Pause</button>
+          <button type="button" id="present_resume_btn" class="btn btn-primary">Resume</button>
+          <button type="button" id="present_cancel_btn" class="btn btn-primary">Cancel</button>
+          <hr>
+          <h5 style="color:white;">Claim unmatched presentment</h5>
+          <input type="text" id="present_claim_id" placeholder="Presentment id" style="height:30px;width:180px;margin-right:5px;">
+          <input type="text" id="present_claim_pan" placeholder="PAN or last4" style="height:30px;width:160px;margin-right:5px;">
+          <button type="button" id="present_claim_btn" class="btn btn-primary">Claim</button>
+          <button type="button" id="present_reverse_btn" class="btn btn-primary">Request reverse</button>
+          <p id="present_result" style="color:yellow;margin-top:10px;"></p>
+          <hr>
+          <h5 style="color:white;">Clearing history</h5>
+          <table class="table table-hover table-bordered table-color fixed-header" id="present_history_tbl">
+            <thead>
+              <tr>
+                <th>Merchant</th>
+                <th>Amount</th>
+                <th>Interchange</th>
+                <th>Status</th>
+                <th>ARN</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+          <select id="present_open_select" style="height:30px;margin-right:5px;">
+            <option value="select">Select posted presentment</option>
           </select>
         </div>
         <div id="account_details_pane" style="display:none;">
