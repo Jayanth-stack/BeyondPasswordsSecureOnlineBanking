@@ -15,6 +15,12 @@ from utility.link import (
     get_service as get_link_service,
     set_service as set_link_service,
 )
+from utility.present import (
+    attach_present_routes,
+    build_service as build_present_service,
+    get_service as get_present_service,
+    set_service as set_present_service,
+)
 from utility.wire import (
     attach_wire_routes,
     build_service as build_wire_service,
@@ -278,6 +284,7 @@ def get_customer_data():
             'FundsRequests': c.get_funds_requests(customer_id),
             'LinkedAccounts': _link_snapshot(customer_id, actor=customer_id, actor_type='customer'),
             'Wires': _wire_snapshot(customer_id, actor=customer_id, actor_type='customer'),
+            'CardPresents': _present_snapshot(customer_id, actor=customer_id, actor_type='customer'),
         }
         return jsonify(response), 200
     except Exception as e:
@@ -918,6 +925,9 @@ def get_customer():
                 'Wires': _wire_snapshot(
                     values['customer_id'], actor=session['userid'], actor_type=session.get('usertype') or 'employee',
                 ),
+                'CardPresents': _present_snapshot(
+                    values['customer_id'], actor=session['userid'], actor_type=session.get('usertype') or 'employee',
+                ),
             }
             return jsonify(response), 200
         except Exception as e:
@@ -1382,6 +1392,25 @@ wire_service = build_wire_service(
 )
 set_wire_service(wire_service)
 attach_wire_routes(app, wire_service)
+
+
+def _present_snapshot(userid, actor=None, actor_type='customer'):
+    service = get_present_service()
+    if service is None:
+        return {'enabled': False, 'keys': [], 'presentments': []}
+    try:
+        return service.snapshot(userid, actor=actor, actor_type=actor_type)
+    except Exception:
+        return {'enabled': False, 'keys': [], 'presentments': []}
+
+
+present_service = build_present_service(
+    debit_fn=_link_debit,
+    credit_fn=_link_credit,
+    accounts_fn=_link_accounts,
+)
+set_present_service(present_service)
+attach_present_routes(app, present_service)
 
 app.config['SESSION_COOKIE_SECURE'] = True
 app.config['SESSION_COOKIE_HTTPONLY'] = True
