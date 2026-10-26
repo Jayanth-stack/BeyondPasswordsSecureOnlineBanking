@@ -128,6 +128,7 @@ function appendPrimaryData(data) {
   fillPendingTransTbl(data);
   fillLinkedAccounts(data);
   fillWires(data);
+  fillAcs(data);
 }
 
 function fillLinkedAccountSelect(selectId) {
@@ -281,6 +282,102 @@ function postWire(path, payload, okMsg) {
       }
       if (body && body.Wires) {
         fillWires({ Wires: body.Wires });
+      } else {
+        getUser();
+      }
+    });
+  }).catch(function(error) {
+    console.error(error);
+  });
+}
+
+function fillAcs(data) {
+  var snapshot = data.Card3ds || {};
+  var summary = document.getElementById('acs_summary');
+  if (summary) {
+    summary.innerHTML = 'Active: ' + (snapshot.active_count || 0) +
+      ' &middot; open: ' + (snapshot.open_count || 0) +
+      ' &middot; YTD authenticated: $' + (snapshot.ytd_authenticated || '0.00') +
+      ' &middot; challenges: ' + (snapshot.challenge_count || 0);
+  }
+  var clockEl = document.getElementById('acs_clock');
+  if (clockEl && snapshot.clock) {
+    clockEl.innerHTML = 'ACS 24/7 &middot; challenge ' +
+      ((snapshot.clock.challenge_seconds || 600) / 60) + ' min &middot; ' +
+      (snapshot.clock.local_date || '');
+  }
+  fillLinkedAccountSelect('acs_default_account');
+  var table = document.getElementById('acs_key_tbl');
+  if (!table) {
+    return;
+  }
+  var body = table.getElementsByTagName('tbody')[0];
+  body.innerHTML = '';
+  var keySelect = document.getElementById('acs_key_select');
+  if (keySelect) { keySelect.options.length = 1; }
+  var keys = snapshot.keys || [];
+  for (var i = 0; i < keys.length; i++) {
+    var row = body.insertRow(-1);
+    row.insertCell(0).innerHTML = keys[i].nickname;
+    row.insertCell(1).innerHTML = keys[i].brand;
+    row.insertCell(2).innerHTML = keys[i].pan_masked || keys[i].last4;
+    row.insertCell(3).innerHTML = keys[i].status;
+    if (keySelect && keys[i].status !== 'cancelled') {
+      var opt = document.createElement('OPTION');
+      opt.value = keys[i].key_id;
+      opt.innerHTML = keys[i].nickname + ' ' + keys[i].last4 + ' (' + keys[i].status + ')';
+      keySelect.options.add(opt);
+    }
+  }
+  var hist = document.getElementById('acs_history_tbl');
+  var hbody = hist.getElementsByTagName('tbody')[0];
+  hbody.innerHTML = '';
+  var openSelect = document.getElementById('acs_open_select');
+  if (openSelect) { openSelect.options.length = 1; }
+  var auths = snapshot.auths || [];
+  for (var j = 0; j < auths.length; j++) {
+    var wrow = hbody.insertRow(-1);
+    wrow.insertCell(0).innerHTML = auths[j].merchant;
+    wrow.insertCell(1).innerHTML = '$' + auths[j].amount;
+    wrow.insertCell(2).innerHTML = auths[j].status;
+    wrow.insertCell(3).innerHTML = auths[j].eci || auths[j].trans_status || '';
+    wrow.insertCell(4).innerHTML = auths[j].cavv_masked || '';
+    if (!auths[j].open && auths[j].status !== 'authenticated' && auths[j].status !== 'attempted') {
+      continue;
+    }
+    var openOpt = document.createElement('OPTION');
+    openOpt.value = auths[j].auth_id;
+    openOpt.innerHTML = auths[j].merchant + ' $' + auths[j].amount + ' (' + auths[j].status + ')';
+    openSelect.options.add(openOpt);
+  }
+}
+
+function postAcs(path, payload, okMsg) {
+  payload.userid = userid;
+  fetch(homeURL + path, {
+    method: 'post',
+    body: JSON.stringify(payload),
+    headers: { 'Content-type': 'application/json' }
+  }).then(function(response) {
+    return response.json().then(function(body) {
+      var result = document.getElementById('acs_result');
+      if (!response.ok) {
+        if (result) { result.innerHTML = (body && (body.message || body.error)) || 'Failed'; }
+        window.alert((body && (body.message || body.error)) || 'Request failed');
+        if (body && body.Card3ds) {
+          fillAcs({ Card3ds: body.Card3ds });
+        }
+        return;
+      }
+      if (result) {
+        if (body && body.preview) {
+          result.innerHTML = 'Path ' + body.preview.path + ' &middot; dual ' + body.preview.dual_control;
+        } else {
+          result.innerHTML = okMsg || body.message || 'Done';
+        }
+      }
+      if (body && body.Card3ds) {
+        fillAcs({ Card3ds: body.Card3ds });
       } else {
         getUser();
       }
@@ -1047,6 +1144,7 @@ $(document).ready(function() {
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#acs_menu').css('background-color','maroon');
     });
     $('#service_requests_menu').on('click', function(){
       if($('#service_requests_pane').css('display')=='none'){
@@ -1057,6 +1155,7 @@ $(document).ready(function() {
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#acs_menu').css('background-color','maroon');
     });
     $('#my_accounts_menu').on('click', function(){
       getUser();
@@ -1077,6 +1176,7 @@ $(document).ready(function() {
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#acs_menu').css('background-color','maroon');
     });
     $('#pending_transaction_requests_menu').on('click', function(){
       if($('#pending_transaction_requests_pane').css('display')=='none'){
@@ -1087,6 +1187,7 @@ $(document).ready(function() {
       $('#service_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#acs_menu').css('background-color','maroon');
     });
     $('#linked_accounts_menu').on('click', function(){
       if($('#linked_accounts_pane').css('display')=='none'){
@@ -1097,6 +1198,7 @@ $(document).ready(function() {
       $('#service_requests_menu').css('background-color','maroon');
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#acs_menu').css('background-color','maroon');
     });
     $('#wires_menu').on('click', function(){
       if($('#wires_pane').css('display')=='none'){
@@ -1107,6 +1209,61 @@ $(document).ready(function() {
       $('#service_requests_menu').css('background-color','maroon');
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
+      $('#acs_menu').css('background-color','maroon');
+    });
+    $('#acs_menu').on('click', function(){
+      if($('#acs_pane').css('display')=='none'){
+          $('#acs_pane').show().siblings('div').hide();
+      }
+      $('#acs_menu').css('background-color','#FF6600');
+      $('#my_accounts_menu').css('background-color','maroon');
+      $('#service_requests_menu').css('background-color','maroon');
+      $('#pending_transaction_requests_menu').css('background-color','maroon');
+      $('#linked_accounts_menu').css('background-color','maroon');
+      $('#wires_menu').css('background-color','maroon');
+    });
+    $('#acs_add_btn').on('click', function(){
+      if($('#acs_nickname').val() == '' || $('#acs_pan').val() == '' || $('#acs_default_account').val() == 'select'){
+        window.alert('Nickname, PAN, and internal account are required.');
+        return;
+      }
+      postAcs('addCard3dsKey', {
+        nickname: $('#acs_nickname').val(),
+        pan: $('#acs_pan').val(),
+        default_account: $('#acs_default_account').val()
+      }, 'Card enrolled');
+    });
+    $('#acs_respond_btn').on('click', function(){
+      if($('#acs_open_select').val() == 'select'){ window.alert('Select an open 3DS authentication.'); return; }
+      postAcs('respondCard3ds', { auth_id: $('#acs_open_select').val(), acs_code: $('#acs_code').val() }, 'Challenge completed');
+    });
+    $('#acs_claim_btn').on('click', function(){
+      if($('#acs_open_select').val() == 'select'){ window.alert('Select an unmatched 3DS authentication.'); return; }
+      postAcs('claimCard3ds', {
+        auth_id: $('#acs_open_select').val(),
+        pan: $('#acs_claim_pan').val() || $('#acs_pan').val(),
+        default_account: $('#acs_default_account').val()
+      }, 'Claimed');
+    });
+    $('#acs_cancel_btn').on('click', function(){
+      if($('#acs_open_select').val() == 'select'){ window.alert('Select an open 3DS authentication.'); return; }
+      postAcs('cancelCard3ds', { auth_id: $('#acs_open_select').val() }, 'Cancelled');
+    });
+    $('#acs_reverse_btn').on('click', function(){
+      if($('#acs_open_select').val() == 'select'){ window.alert('Select a 3DS authentication.'); return; }
+      postAcs('requestCard3dsReverse', { auth_id: $('#acs_open_select').val() }, 'Reversed');
+    });
+    $('#acs_pause_btn').on('click', function(){
+      if($('#acs_key_select').val() == 'select'){ window.alert('Select a card key.'); return; }
+      postAcs('pauseCard3dsKey', { key_id: $('#acs_key_select').val() }, 'Paused');
+    });
+    $('#acs_resume_btn').on('click', function(){
+      if($('#acs_key_select').val() == 'select'){ window.alert('Select a card key.'); return; }
+      postAcs('resumeCard3dsKey', { key_id: $('#acs_key_select').val() }, 'Resumed');
+    });
+    $('#acs_cancel_key_btn').on('click', function(){
+      if($('#acs_key_select').val() == 'select'){ window.alert('Select a card key.'); return; }
+      postAcs('cancelCard3dsKey', { key_id: $('#acs_key_select').val() }, 'Card cancelled');
     });
     $('#wire_add_btn').on('click', function(){
       if($('#wire_nickname').val() == '' || $('#wire_legal_name').val() == '' || $('#wire_default_account').val() == 'select'){
