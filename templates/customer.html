@@ -111,6 +111,15 @@
         </button>
 
         <button type="button" class="btn btn-primary btn-block"
+        id="acs_menu">
+        <span class="glyphicon glyphicon-lock gi-3x"
+        style="color: white" aria-hidden="true">
+        </span>
+        <br />
+        Card 3DS
+        </button>
+
+        <button type="button" class="btn btn-primary btn-block"
         id="service_requests_menu">
         <span class="glyphicon glyphicon-edit gi-3x"
         style="color: white" aria-hidden="true">
@@ -351,6 +360,61 @@
           </table>
           <select id="wire_open_select" style="height:30px;margin-right:5px;">
             <option value="select">Select open wire</option>
+          </select>
+        </div>
+        <div id="acs_pane" style="display:none;">
+          <p id="acs_summary" style="color:white;">Active: 0 &middot; open: 0 &middot; YTD authenticated: $0.00 &middot; challenges: 0</p>
+          <p id="acs_clock" style="color:white;">ACS 24/7 &middot; challenge 10 min</p>
+          <table class="table table-hover table-bordered table-color fixed-header" id="acs_key_tbl">
+            <thead>
+              <tr>
+                <th>Nickname</th>
+                <th>Brand</th>
+                <th>PAN</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+          <hr>
+          <h5 style="color:white;">Enroll a 3DS card</h5>
+          <input type="text" id="acs_nickname" placeholder="Nickname" style="height:30px;width:140px;margin-right:5px;">
+          <input type="text" id="acs_pan" placeholder="PAN" style="height:30px;width:180px;margin-right:5px;">
+          <select id="acs_default_account" style="height:30px;margin-right:5px;">
+            <option value="select">Internal account</option>
+          </select>
+          <button type="button" id="acs_add_btn" class="btn btn-primary">Enroll card</button>
+          <br><br>
+          <h5 style="color:white;">Challenge / claim</h5>
+          <select id="acs_open_select" style="height:30px;margin-right:5px;">
+            <option value="select">Select open 3DS</option>
+          </select>
+          <input type="text" id="acs_code" placeholder="ACS code" maxlength="6" style="height:30px;width:100px;margin-right:5px;">
+          <input type="text" id="acs_claim_pan" placeholder="Claim PAN" style="height:30px;width:160px;margin-right:5px;">
+          <button type="button" id="acs_respond_btn" class="btn btn-primary">Respond</button>
+          <button type="button" id="acs_claim_btn" class="btn btn-primary">Claim</button>
+          <button type="button" id="acs_cancel_btn" class="btn btn-primary">Cancel challenge</button>
+          <button type="button" id="acs_reverse_btn" class="btn btn-primary">Request reverse</button>
+          <button type="button" id="acs_pause_btn" class="btn btn-primary">Pause</button>
+          <button type="button" id="acs_resume_btn" class="btn btn-primary">Resume</button>
+          <button type="button" id="acs_cancel_key_btn" class="btn btn-primary">Cancel card</button>
+          <p id="acs_result" style="color:yellow;margin-top:10px;"></p>
+          <hr>
+          <h5 style="color:white;">3DS history</h5>
+          <table class="table table-hover table-bordered table-color fixed-header" id="acs_history_tbl">
+            <thead>
+              <tr>
+                <th>Merchant</th>
+                <th>Amount</th>
+                <th>Status</th>
+                <th>ECI</th>
+                <th>CAVV</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+          <select id="acs_key_select" style="height:30px;margin-right:5px;">
+            <option value="select">Select card key</option>
           </select>
         </div>
         <div id="account_details_pane" style="display:none;">
