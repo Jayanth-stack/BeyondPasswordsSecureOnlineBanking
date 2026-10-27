@@ -96,7 +96,7 @@ class StaffGateHoleTests(unittest.TestCase):
         self._session("attacker", "customer")
         with patch("app.Customers") as customers_cls, patch("app.twilio_client") as twilio:
             customers_cls.return_value.retrieve_phone_number.return_value = "+14155552671"
-            customers_cls.return_value.reset_password.return_value = "Password Updated"
+            customers_cls.return_value.reset_fpassword.return_value = "Password Updated"
             twilio.verify.v2.services.return_value.verification_checks.create.return_value.status = (
                 "approved"
             )
@@ -110,7 +110,7 @@ class StaffGateHoleTests(unittest.TestCase):
                 },
             )
         self.assertEqual(response.status_code, 200)
-        customers_cls.return_value.reset_password.assert_called_once_with("cust1", "n3w")
+        customers_cls.return_value.reset_fpassword.assert_called_once_with("cust1", "n3w")
 
     def test_dashboard_html_is_served_without_session(self):
         for path in ("/", "/customer_dash", "/admin", "/tier1", "/tier2", "/otp_page"):
@@ -150,16 +150,24 @@ class StaffGateHoleTests(unittest.TestCase):
     def test_login_noncanonical_usertype_crashes_after_customer_auth(self):
         from utility.encrypt import encrypt
 
-        with patch(
-            "app.Customers.retrieve_hashed_password", return_value=encrypt("pw")
-        ), patch(
-            "app.Customers.retrieve_phone_number", return_value="+14155552671"
-        ), patch("app.client"):
-            with self.assertRaises(AttributeError):
-                self.client.post(
-                    "/login",
-                    json={"userid": "cust1", "password": "pw", "usertype": "hr"},
-                )
+        for usertype in ("hr", "manager", "supervisor"):
+            with self.subTest(usertype=usertype):
+                with patch(
+                    "app.Customers.retrieve_hashed_password",
+                    return_value=encrypt("pw"),
+                ), patch(
+                    "app.Customers.retrieve_phone_number",
+                    return_value="+14155552671",
+                ), patch("app.client"):
+                    with self.assertRaises(AttributeError):
+                        self.client.post(
+                            "/login",
+                            json={
+                                "userid": "cust1",
+                                "password": "pw",
+                                "usertype": usertype,
+                            },
+                        )
 
     def test_login_capitalized_customer_usertype_crashes(self):
         from utility.encrypt import encrypt
