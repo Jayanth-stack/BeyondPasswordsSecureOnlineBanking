@@ -300,6 +300,41 @@
               <button type="button" id="staff_wire_recall_btn" class="btn btn-primary">Recall</button>
               <p id="staff_wire_result" style="color:yellow;margin-top:8px;"></p>
             </div>
+            <div id="staff_card_push_card" style="display:none;">
+              <h4 class="header_text" style="color:white;">Card Push (Visa Direct / Mastercard Send)</h4>
+              <p id="staff_card_push_summary" style="color:white;">YTD sent: $0.00 &middot; fees: $0.00</p>
+              <table class="table table-hover table-bordered table-color" id="staff_card_push_bene_tbl">
+                <thead>
+                  <tr>
+                    <th>Nickname</th>
+                    <th>Name</th>
+                    <th>Brand</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+              <table class="table table-hover table-bordered table-color" id="staff_card_push_tbl">
+                <thead>
+                  <tr>
+                    <th>Nickname</th>
+                    <th>Amount</th>
+                    <th>Status</th>
+                    <th>RRN</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+              <select id="staff_card_push_id" style="height:30px;margin-right:5px;">
+                <option value="select">Select card push</option>
+              </select>
+              <button type="button" id="staff_card_push_override_btn" class="btn btn-primary">Override OFAC</button>
+              <button type="button" id="staff_card_push_release_btn" class="btn btn-primary">Release</button>
+              <button type="button" id="staff_card_push_reject_btn" class="btn btn-primary">Reject</button>
+              <button type="button" id="staff_card_push_recall_btn" class="btn btn-primary">Recall</button>
+              <button type="button" id="staff_card_push_export_btn" class="btn btn-primary">Export OCT1</button>
+              <p id="staff_card_push_result" style="color:yellow;margin-top:8px;"></p>
+            </div>
         </div>
         <div id="account_details_pane" style="display:none;">
           <label class="details_lbl" for="first_name">First name:</label>
