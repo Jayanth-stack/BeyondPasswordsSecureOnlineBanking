@@ -128,6 +128,7 @@ function appendPrimaryData(data) {
   fillPendingTransTbl(data);
   fillLinkedAccounts(data);
   fillWires(data);
+  fillCardUpdater(data);
 }
 
 function fillLinkedAccountSelect(selectId) {
@@ -281,6 +282,103 @@ function postWire(path, payload, okMsg) {
       }
       if (body && body.Wires) {
         fillWires({ Wires: body.Wires });
+      } else {
+        getUser();
+      }
+    });
+  }).catch(function(error) {
+    console.error(error);
+  });
+}
+
+function fillCardUpdater(data) {
+  var snapshot = data.CardUpdater || {};
+  var summary = document.getElementById('vau_summary');
+  if (summary) {
+    summary.innerHTML = 'Active: ' + (snapshot.active_count || 0) +
+      ' &middot; open: ' + (snapshot.open_count || 0) +
+      ' &middot; posted: ' + (snapshot.posted_count || 0) +
+      ' &middot; fees: $' + (snapshot.ytd_fees || '0.00');
+  }
+  var clockEl = document.getElementById('vau_clock');
+  if (clockEl && snapshot.clock) {
+    clockEl.innerHTML = 'Visa Friday ' + (snapshot.clock.cutoff || '22:00') +
+      (snapshot.clock.visa_window ? ' &middot; window open' : ' &middot; after cutoff') +
+      ' &middot; Mastercard 24/7';
+  }
+  fillLinkedAccountSelect('vau_default_account');
+  var table = document.getElementById('vau_key_tbl');
+  if (!table) {
+    return;
+  }
+  var body = table.getElementsByTagName('tbody')[0];
+  body.innerHTML = '';
+  var selection = document.getElementById('vau_key_select');
+  selection.options.length = 1;
+  var keys = snapshot.keys || [];
+  for (var i = 0; i < keys.length; i++) {
+    var row = body.insertRow(-1);
+    row.insertCell(0).innerHTML = keys[i].nickname;
+    row.insertCell(1).innerHTML = keys[i].brand;
+    row.insertCell(2).innerHTML = keys[i].last4;
+    row.insertCell(3).innerHTML = keys[i].expiry_masked;
+    row.insertCell(4).innerHTML = keys[i].status;
+    var option = document.createElement('OPTION');
+    option.value = keys[i].key_id;
+    option.innerHTML = keys[i].nickname + ' (' + keys[i].status + ')';
+    selection.options.add(option);
+  }
+  var hist = document.getElementById('vau_history_tbl');
+  var histBody = hist.getElementsByTagName('tbody')[0];
+  histBody.innerHTML = '';
+  var openSelect = document.getElementById('vau_open_select');
+  openSelect.options.length = 1;
+  var advices = snapshot.advices || [];
+  for (var j = 0; j < advices.length; j++) {
+    var wrow = histBody.insertRow(-1);
+    wrow.insertCell(0).innerHTML = advices[j].nickname;
+    wrow.insertCell(1).innerHTML = advices[j].reason;
+    wrow.insertCell(2).innerHTML = advices[j].status;
+    wrow.insertCell(3).innerHTML = '$' + advices[j].fee;
+    wrow.insertCell(4).innerHTML = advices[j].vau_ref_masked || '';
+    if (!advices[j].cancelable && advices[j].status !== 'posted') {
+      continue;
+    }
+    var openOpt = document.createElement('OPTION');
+    openOpt.value = advices[j].advice_id;
+    openOpt.innerHTML = advices[j].nickname + ' ' + advices[j].reason + ' (' + advices[j].status + ')';
+    openSelect.options.add(openOpt);
+  }
+}
+
+function postVau(path, payload, okMsg) {
+  payload.userid = userid;
+  fetch(homeURL + path, {
+    method: 'post',
+    body: JSON.stringify(payload),
+    headers: { 'Content-type': 'application/json' }
+  }).then(function(response) {
+    return response.json().then(function(body) {
+      var result = document.getElementById('vau_result');
+      if (!response.ok) {
+        if (result) { result.innerHTML = (body && (body.message || body.error)) || 'Failed'; }
+        window.alert((body && (body.message || body.error)) || 'Request failed');
+        if (body && body.CardUpdater) {
+          fillCardUpdater({ CardUpdater: body.CardUpdater });
+        }
+        return;
+      }
+      if (result) {
+        if (body && body.preview) {
+          result.innerHTML = 'Fee $' + body.preview.fee +
+            ' &middot; dual-control ' + body.preview.dual_control +
+            ' &middot; network open ' + body.preview.network_open;
+        } else {
+          result.innerHTML = okMsg || body.message || 'Done';
+        }
+      }
+      if (body && body.CardUpdater) {
+        fillCardUpdater({ CardUpdater: body.CardUpdater });
       } else {
         getUser();
       }
@@ -1047,6 +1145,7 @@ $(document).ready(function() {
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#vau_menu').css('background-color','maroon');
     });
     $('#service_requests_menu').on('click', function(){
       if($('#service_requests_pane').css('display')=='none'){
@@ -1057,6 +1156,7 @@ $(document).ready(function() {
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#vau_menu').css('background-color','maroon');
     });
     $('#my_accounts_menu').on('click', function(){
       getUser();
@@ -1077,6 +1177,7 @@ $(document).ready(function() {
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#vau_menu').css('background-color','maroon');
     });
     $('#pending_transaction_requests_menu').on('click', function(){
       if($('#pending_transaction_requests_pane').css('display')=='none'){
@@ -1087,6 +1188,7 @@ $(document).ready(function() {
       $('#service_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#vau_menu').css('background-color','maroon');
     });
     $('#linked_accounts_menu').on('click', function(){
       if($('#linked_accounts_pane').css('display')=='none'){
@@ -1097,6 +1199,7 @@ $(document).ready(function() {
       $('#service_requests_menu').css('background-color','maroon');
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#vau_menu').css('background-color','maroon');
     });
     $('#wires_menu').on('click', function(){
       if($('#wires_pane').css('display')=='none'){
@@ -1107,6 +1210,85 @@ $(document).ready(function() {
       $('#service_requests_menu').css('background-color','maroon');
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
+      $('#vau_menu').css('background-color','maroon');
+    });
+    $('#vau_menu').on('click', function(){
+      if($('#vau_pane').css('display')=='none'){
+          $('#vau_pane').show().siblings('div').hide();
+      }
+      $('#vau_menu').css('background-color','#FF6600');
+      $('#my_accounts_menu').css('background-color','maroon');
+      $('#service_requests_menu').css('background-color','maroon');
+      $('#pending_transaction_requests_menu').css('background-color','maroon');
+      $('#linked_accounts_menu').css('background-color','maroon');
+      $('#wires_menu').css('background-color','maroon');
+    });
+    $('#vau_add_btn').on('click', function(){
+      if($('#vau_nickname').val() == '' || $('#vau_legal_name').val() == '' || $('#vau_default_account').val() == 'select'){
+        window.alert('Nickname, legal name, and internal account are required.');
+        return;
+      }
+      postVau('addCardUpdaterKey', {
+        nickname: $('#vau_nickname').val(),
+        legal_name: $('#vau_legal_name').val(),
+        pan: $('#vau_pan').val(),
+        expiry: $('#vau_expiry').val(),
+        default_account: $('#vau_default_account').val()
+      }, 'Card enrolled');
+    });
+    $('#vau_preview_btn').on('click', function(){
+      if($('#vau_key_select').val() == 'select'){
+        window.alert('Select a card.');
+        return;
+      }
+      postVau('previewCardUpdate', {
+        key_id: $('#vau_key_select').val(),
+        reason: $('#vau_reason').val(),
+        new_pan: $('#vau_new_pan').val(),
+        new_expiry: $('#vau_new_expiry').val()
+      }, 'Preview');
+    });
+    $('#vau_report_btn').on('click', function(){
+      if($('#vau_key_select').val() == 'select'){
+        window.alert('Select a card.');
+        return;
+      }
+      postVau('reportCardUpdate', {
+        key_id: $('#vau_key_select').val(),
+        reason: $('#vau_reason').val(),
+        new_pan: $('#vau_new_pan').val(),
+        new_expiry: $('#vau_new_expiry').val()
+      }, 'Update reported');
+    });
+    $('#vau_cancel_btn').on('click', function(){
+      if($('#vau_open_select').val() == 'select'){ window.alert('Select an open update.'); return; }
+      postVau('cancelCardUpdate', { advice_id: $('#vau_open_select').val() }, 'Cancelled');
+    });
+    $('#vau_pause_btn').on('click', function(){
+      if($('#vau_key_select').val() == 'select'){ window.alert('Select a card.'); return; }
+      postVau('pauseCardUpdaterKey', { key_id: $('#vau_key_select').val() }, 'Paused');
+    });
+    $('#vau_resume_btn').on('click', function(){
+      if($('#vau_key_select').val() == 'select'){ window.alert('Select a card.'); return; }
+      postVau('resumeCardUpdaterKey', { key_id: $('#vau_key_select').val() }, 'Resumed');
+    });
+    $('#vau_cancel_key_btn').on('click', function(){
+      if($('#vau_key_select').val() == 'select'){ window.alert('Select a card.'); return; }
+      postVau('cancelCardUpdaterKey', { key_id: $('#vau_key_select').val() }, 'Card cancelled');
+    });
+    $('#vau_claim_btn').on('click', function(){
+      postVau('claimCardUpdate', {
+        pan: $('#vau_claim_pan').val(),
+        last4: $('#vau_claim_last4').val(),
+        brand: $('#vau_claim_brand').val(),
+        default_account: $('#vau_default_account').val() == 'select' ? null : $('#vau_default_account').val(),
+        nickname: $('#vau_nickname').val(),
+        legal_name: $('#vau_legal_name').val()
+      }, 'Inquiry claimed');
+    });
+    $('#vau_reverse_btn').on('click', function(){
+      if($('#vau_open_select').val() == 'select'){ window.alert('Select a posted update.'); return; }
+      postVau('requestCardUpdateReverse', { advice_id: $('#vau_open_select').val() }, 'Reverse requested');
     });
     $('#wire_add_btn').on('click', function(){
       if($('#wire_nickname').val() == '' || $('#wire_legal_name').val() == '' || $('#wire_default_account').val() == 'select'){

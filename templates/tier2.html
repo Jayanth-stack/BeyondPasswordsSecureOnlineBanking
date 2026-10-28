@@ -332,6 +332,47 @@
               <button type="button" id="staff_wire_recall_btn" class="btn btn-primary">Recall</button>
               <p id="staff_wire_result" style="color:yellow;margin-top:8px;"></p>
             </div>
+            <div id="staff_vau_card" style="display:none;">
+              <h4 class="header_text" style="color:white;">Card Updater</h4>
+              <p id="staff_vau_summary" style="color:white;">Posted: 0 &middot; fees: $0.00</p>
+              <table class="table table-hover table-bordered table-color" id="staff_vau_key_tbl">
+                <thead>
+                  <tr>
+                    <th>Nickname</th>
+                    <th>Brand</th>
+                    <th>Last4</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+              <table class="table table-hover table-bordered table-color" id="staff_vau_tbl">
+                <thead>
+                  <tr>
+                    <th>Nickname</th>
+                    <th>Reason</th>
+                    <th>Status</th>
+                    <th>Ref</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+              <select id="staff_vau_id" style="height:30px;margin-right:5px;">
+                <option value="select">Select open/posted update</option>
+              </select>
+              <button type="button" id="staff_vau_override_btn" class="btn btn-primary">Override OFAC</button>
+              <button type="button" id="staff_vau_release_btn" class="btn btn-primary">Release</button>
+              <button type="button" id="staff_vau_reject_btn" class="btn btn-primary">Reject</button>
+              <button type="button" id="staff_vau_reverse_btn" class="btn btn-primary">Reverse</button>
+              <button type="button" id="staff_vau_export_btn" class="btn btn-primary">Export VAU1</button>
+              <br><br>
+              <input type="text" id="staff_vau_bid" placeholder="Merchant BID" style="height:30px;width:120px;margin-right:5px;">
+              <input type="text" id="staff_vau_merchant" placeholder="Merchant name" style="height:30px;width:140px;margin-right:5px;">
+              <input type="text" id="staff_vau_file" placeholder="VAU1 line" style="height:30px;width:280px;margin-right:5px;">
+              <button type="button" id="staff_vau_merchant_btn" class="btn btn-primary">Add merchant</button>
+              <button type="button" id="staff_vau_ingest_btn" class="btn btn-primary">Ingest file</button>
+              <p id="staff_vau_result" style="color:yellow;margin-top:8px;"></p>
+            </div>
           </div>
 
           <div id="account_details_pane" style="display: none">

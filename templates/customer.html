@@ -111,6 +111,15 @@
         </button>
 
         <button type="button" class="btn btn-primary btn-block"
+        id="vau_menu">
+        <span class="glyphicon glyphicon-credit-card gi-3x"
+        style="color: white" aria-hidden="true">
+        </span>
+        <br />
+        Card Updater
+        </button>
+
+        <button type="button" class="btn btn-primary btn-block"
         id="service_requests_menu">
         <span class="glyphicon glyphicon-edit gi-3x"
         style="color: white" aria-hidden="true">
@@ -351,6 +360,72 @@
           </table>
           <select id="wire_open_select" style="height:30px;margin-right:5px;">
             <option value="select">Select open wire</option>
+          </select>
+        </div>
+        <div id="vau_pane" style="display:none;">
+          <p id="vau_summary" style="color:white;">Active: 0 &middot; open: 0 &middot; posted: 0 &middot; fees: $0.00</p>
+          <p id="vau_clock" style="color:white;">Visa Friday 22:00 &middot; Mastercard 24/7</p>
+          <table class="table table-hover table-bordered table-color fixed-header" id="vau_key_tbl">
+            <thead>
+              <tr>
+                <th>Nickname</th>
+                <th>Brand</th>
+                <th>Last4</th>
+                <th>Expiry</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+          <h5 style="color:white;">Enroll an issued card</h5>
+          <input type="text" id="vau_nickname" placeholder="Nickname" style="height:30px;width:140px;margin-right:5px;">
+          <input type="text" id="vau_legal_name" placeholder="Legal name" style="height:30px;width:160px;margin-right:5px;">
+          <input type="text" id="vau_pan" placeholder="PAN" maxlength="19" style="height:30px;width:170px;margin-right:5px;">
+          <input type="text" id="vau_expiry" placeholder="MMYY" maxlength="4" style="height:30px;width:70px;margin-right:5px;">
+          <select id="vau_default_account" style="height:30px;margin-right:5px;">
+            <option value="select">Internal account</option>
+          </select>
+          <button type="button" id="vau_add_btn" class="btn btn-primary">Enroll card</button>
+          <h5 style="color:white;">Report an account updater event</h5>
+          <select id="vau_key_select" style="height:30px;margin-right:5px;">
+            <option value="select">Select card</option>
+          </select>
+          <select id="vau_reason" style="height:30px;margin-right:5px;">
+            <option value="E">Expiry (E)</option>
+            <option value="A">Reissue (A)</option>
+            <option value="C">Closed (C)</option>
+            <option value="Q">Contact (Q)</option>
+          </select>
+          <input type="text" id="vau_new_pan" placeholder="New PAN" maxlength="19" style="height:30px;width:170px;margin-right:5px;">
+          <input type="text" id="vau_new_expiry" placeholder="New MMYY" maxlength="4" style="height:30px;width:90px;margin-right:5px;">
+          <button type="button" id="vau_preview_btn" class="btn btn-primary">Preview</button>
+          <button type="button" id="vau_report_btn" class="btn btn-primary">Report update</button>
+          <button type="button" id="vau_cancel_btn" class="btn btn-primary">Cancel open</button>
+          <button type="button" id="vau_pause_btn" class="btn btn-primary">Pause</button>
+          <button type="button" id="vau_resume_btn" class="btn btn-primary">Resume</button>
+          <button type="button" id="vau_cancel_key_btn" class="btn btn-primary">Cancel card</button>
+          <p id="vau_result" style="color:yellow;margin-top:10px;"></p>
+          <h5 style="color:white;">Claim a merchant inquiry</h5>
+          <input type="text" id="vau_claim_pan" placeholder="PAN or leave blank" maxlength="19" style="height:30px;width:170px;margin-right:5px;">
+          <input type="text" id="vau_claim_last4" placeholder="Last4" maxlength="4" style="height:30px;width:70px;margin-right:5px;">
+          <input type="text" id="vau_claim_brand" placeholder="visa/mastercard" style="height:30px;width:130px;margin-right:5px;">
+          <button type="button" id="vau_claim_btn" class="btn btn-primary">Claim inquiry</button>
+          <button type="button" id="vau_reverse_btn" class="btn btn-primary">Request reverse</button>
+          <h5 style="color:white;">Updater history</h5>
+          <table class="table table-hover table-bordered table-color fixed-header" id="vau_history_tbl">
+            <thead>
+              <tr>
+                <th>Nickname</th>
+                <th>Reason</th>
+                <th>Status</th>
+                <th>Fee</th>
+                <th>Ref</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+          <select id="vau_open_select" style="height:30px;margin-right:5px;">
+            <option value="select">Select open update</option>
           </select>
         </div>
         <div id="account_details_pane" style="display:none;">

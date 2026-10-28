@@ -321,6 +321,7 @@ function appendSecondaryData(customer_id, data) {
   fillCustomerAccTbl(data);
   fillStaffLinked(data);
   fillStaffWires(data);
+  fillStaffVau(data);
   if($('#cust_details_card').css('display')=='none'){
     $('#cust_details_card').show();
   }
@@ -465,6 +466,77 @@ function postStaffWire(path, payload) {
         return;
       }
       if (result) { result.innerHTML = body.message || 'Done'; }
+      getCustomer($('#customer_id_input').val() || document.getElementById('customer_id').innerHTML);
+    });
+  }).catch(function(error) {
+    console.error(error);
+  });
+}
+
+function fillStaffVau(data) {
+  var snapshot = data.CardUpdater || {};
+  var card = document.getElementById('staff_vau_card');
+  if (!card) {
+    return;
+  }
+  card.style.display = 'block';
+  var summary = document.getElementById('staff_vau_summary');
+  if (summary) {
+    summary.innerHTML = 'Posted: ' + (snapshot.posted_count || 0) +
+      ' &middot; fees: $' + (snapshot.ytd_fees || '0.00') +
+      ' &middot; unmatched: ' + ((snapshot.unmatched || []).length);
+  }
+  var keyTable = document.getElementById('staff_vau_key_tbl');
+  var keyBody = keyTable.getElementsByTagName('tbody')[0];
+  keyBody.innerHTML = '';
+  var keys = snapshot.keys || [];
+  for (var i = 0; i < keys.length; i++) {
+    var row = keyBody.insertRow(-1);
+    row.insertCell(0).innerHTML = keys[i].nickname;
+    row.insertCell(1).innerHTML = keys[i].brand;
+    row.insertCell(2).innerHTML = keys[i].last4;
+    row.insertCell(3).innerHTML = keys[i].status;
+  }
+  var table = document.getElementById('staff_vau_tbl');
+  var body = table.getElementsByTagName('tbody')[0];
+  body.innerHTML = '';
+  var selection = document.getElementById('staff_vau_id');
+  selection.options.length = 1;
+  var advices = snapshot.advices || [];
+  for (var j = 0; j < advices.length; j++) {
+    var wrow = body.insertRow(-1);
+    wrow.insertCell(0).innerHTML = advices[j].nickname;
+    wrow.insertCell(1).innerHTML = advices[j].reason;
+    wrow.insertCell(2).innerHTML = advices[j].status;
+    wrow.insertCell(3).innerHTML = advices[j].vau_ref_masked || '';
+    if (['held', 'queued', 'pending_release', 'posted', 'unmatched'].indexOf(advices[j].status) < 0) {
+      continue;
+    }
+    var option = document.createElement('OPTION');
+    option.value = advices[j].advice_id;
+    option.innerHTML = advices[j].nickname + ' ' + advices[j].reason + ' (' + advices[j].status + ')';
+    selection.options.add(option);
+  }
+}
+
+function postStaffVau(path, payload) {
+  payload.userid = userid;
+  payload.customer_id = $('#customer_id_input').val() || document.getElementById('customer_id').innerHTML;
+  fetch(homeURL + path, {
+    method: 'post',
+    body: JSON.stringify(payload),
+    headers: { 'Content-type': 'application/json' }
+  }).then(function(response) {
+    return response.json().then(function(body) {
+      var result = document.getElementById('staff_vau_result');
+      if (!response.ok) {
+        if (result) { result.innerHTML = (body && (body.message || body.error)) || 'Failed'; }
+        return;
+      }
+      if (result) {
+        if (body && body.file) { result.innerHTML = body.file.split('\n')[0]; }
+        else { result.innerHTML = body.message || 'Done'; }
+      }
       getCustomer($('#customer_id_input').val() || document.getElementById('customer_id').innerHTML);
     });
   }).catch(function(error) {
@@ -877,6 +949,7 @@ $(document).ready(function() {
       $('#cust_accounts_tbl').hide();
       $('#staff_linked_card').hide();
       $('#staff_wire_card').hide();
+      $('#staff_vau_card').hide();
     });
     $('#staff_la_force_btn').on('click', function(){
       if($('#staff_la_link_id').val() == 'select'){ window.alert('Select a pending link.'); return; }
@@ -917,6 +990,41 @@ $(document).ready(function() {
     $('#staff_wire_recall_btn').on('click', function(){
       if($('#staff_wire_id').val() == 'select'){ window.alert('Select a wire.'); return; }
       postStaffWire('recallWire', { wire_id: $('#staff_wire_id').val() });
+    });
+    $('#staff_vau_override_btn').on('click', function(){
+      if($('#staff_vau_id').val() == 'select'){ window.alert('Select an update.'); return; }
+      postStaffVau('overrideCardUpdateOfac', { advice_id: $('#staff_vau_id').val() });
+    });
+    $('#staff_vau_release_btn').on('click', function(){
+      if($('#staff_vau_id').val() == 'select'){ window.alert('Select an update.'); return; }
+      postStaffVau('releaseCardUpdate', { advice_id: $('#staff_vau_id').val() });
+    });
+    $('#staff_vau_reject_btn').on('click', function(){
+      if($('#staff_vau_id').val() == 'select'){ window.alert('Select an update.'); return; }
+      postStaffVau('rejectCardUpdate', { advice_id: $('#staff_vau_id').val() });
+    });
+    $('#staff_vau_reverse_btn').on('click', function(){
+      if($('#staff_vau_id').val() == 'select'){ window.alert('Select an update.'); return; }
+      postStaffVau('reverseCardUpdate', { advice_id: $('#staff_vau_id').val() });
+    });
+    $('#staff_vau_export_btn').on('click', function(){
+      postStaffVau('exportCardUpdate', {});
+    });
+    $('#staff_vau_merchant_btn').on('click', function(){
+      if($('#staff_vau_bid').val() == '' || $('#staff_vau_merchant').val() == ''){
+        window.alert('BID and merchant name are required.');
+        return;
+      }
+      postStaffVau('addCardUpdaterMerchant', {
+        nickname: $('#staff_vau_merchant').val(),
+        legal_name: $('#staff_vau_merchant').val(),
+        bid: $('#staff_vau_bid').val(),
+        network: 'visa'
+      });
+    });
+    $('#staff_vau_ingest_btn').on('click', function(){
+      if($('#staff_vau_file').val() == ''){ window.alert('VAU1 line required.'); return; }
+      postStaffVau('ingestCardUpdateFile', { file: $('#staff_vau_file').val() });
     });
     $('#approve_req_btn').on('click', function(){
       if($('#customer_req_id').val() == 'select'){
