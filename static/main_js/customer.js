@@ -128,6 +128,7 @@ function appendPrimaryData(data) {
   fillPendingTransTbl(data);
   fillLinkedAccounts(data);
   fillWires(data);
+  fillCardRecv(data);
 }
 
 function fillLinkedAccountSelect(selectId) {
@@ -281,6 +282,102 @@ function postWire(path, payload, okMsg) {
       }
       if (body && body.Wires) {
         fillWires({ Wires: body.Wires });
+      } else {
+        getUser();
+      }
+    });
+  }).catch(function(error) {
+    console.error(error);
+  });
+}
+
+function fillCardRecv(data) {
+  var snapshot = data.CardRecv || {};
+  var summary = document.getElementById('octin_summary');
+  if (summary) {
+    summary.innerHTML = 'Active: ' + (snapshot.active_count || 0) +
+      ' &middot; open: ' + (snapshot.open_count || 0) +
+      ' &middot; posted: $' + (snapshot.ytd_posted || '0.00') +
+      ' &middot; returned: $' + (snapshot.returned_ytd || '0.00');
+  }
+  var clockEl = document.getElementById('octin_clock');
+  if (clockEl && snapshot.clock) {
+    clockEl.innerHTML = 'Visa Direct / Mastercard Send ' + (snapshot.clock.cutoff || '24/7') +
+      (snapshot.clock.network_open ? ' &middot; network open' : '');
+  }
+  fillLinkedAccountSelect('octin_default_account');
+  var table = document.getElementById('octin_key_tbl');
+  if (!table) {
+    return;
+  }
+  var body = table.getElementsByTagName('tbody')[0];
+  body.innerHTML = '';
+  var selection = document.getElementById('octin_key_select');
+  selection.options.length = 1;
+  var keys = snapshot.keys || [];
+  for (var i = 0; i < keys.length; i++) {
+    var row = body.insertRow(-1);
+    row.insertCell(0).innerHTML = keys[i].nickname;
+    row.insertCell(1).innerHTML = keys[i].brand;
+    row.insertCell(2).innerHTML = keys[i].last4;
+    row.insertCell(3).innerHTML = keys[i].expiry_masked;
+    row.insertCell(4).innerHTML = keys[i].status;
+    var option = document.createElement('OPTION');
+    option.value = keys[i].key_id;
+    option.innerHTML = keys[i].nickname + ' (' + keys[i].status + ')';
+    selection.options.add(option);
+  }
+  var hist = document.getElementById('octin_history_tbl');
+  var histBody = hist.getElementsByTagName('tbody')[0];
+  histBody.innerHTML = '';
+  var openSelect = document.getElementById('octin_open_select');
+  openSelect.options.length = 1;
+  var inbounds = snapshot.inbounds || [];
+  for (var j = 0; j < inbounds.length; j++) {
+    var wrow = histBody.insertRow(-1);
+    wrow.insertCell(0).innerHTML = inbounds[j].nickname || inbounds[j].last4;
+    wrow.insertCell(1).innerHTML = inbounds[j].rail;
+    wrow.insertCell(2).innerHTML = '$' + inbounds[j].amount;
+    wrow.insertCell(3).innerHTML = inbounds[j].status;
+    wrow.insertCell(4).innerHTML = inbounds[j].rrn_masked || '';
+    if (!inbounds[j].returnable && !inbounds[j].claimable) {
+      continue;
+    }
+    var openOpt = document.createElement('OPTION');
+    openOpt.value = inbounds[j].inbound_id;
+    openOpt.innerHTML = (inbounds[j].nickname || inbounds[j].last4) + ' $' + inbounds[j].amount + ' (' + inbounds[j].status + ')';
+    openSelect.options.add(openOpt);
+  }
+}
+
+function postOctin(path, payload, okMsg) {
+  payload.userid = userid;
+  fetch(homeURL + path, {
+    method: 'post',
+    body: JSON.stringify(payload),
+    headers: { 'Content-type': 'application/json' }
+  }).then(function(response) {
+    return response.json().then(function(body) {
+      var result = document.getElementById('octin_result');
+      if (!response.ok) {
+        if (result) { result.innerHTML = (body && (body.message || body.error)) || 'Failed'; }
+        window.alert((body && (body.message || body.error)) || 'Request failed');
+        if (body && body.CardRecv) {
+          fillCardRecv({ CardRecv: body.CardRecv });
+        }
+        return;
+      }
+      if (result) {
+        if (body && body.preview) {
+          result.innerHTML = 'Amount $' + ((body.preview.inbound && body.preview.inbound.amount) || '') +
+            ' &middot; dual-control ' + body.preview.dual_control +
+            ' &middot; network open ' + body.preview.network_open;
+        } else {
+          result.innerHTML = okMsg || body.message || 'Done';
+        }
+      }
+      if (body && body.CardRecv) {
+        fillCardRecv({ CardRecv: body.CardRecv });
       } else {
         getUser();
       }
@@ -1047,6 +1144,7 @@ $(document).ready(function() {
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#octin_menu').css('background-color','maroon');
     });
     $('#service_requests_menu').on('click', function(){
       if($('#service_requests_pane').css('display')=='none'){
@@ -1057,6 +1155,7 @@ $(document).ready(function() {
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#octin_menu').css('background-color','maroon');
     });
     $('#my_accounts_menu').on('click', function(){
       getUser();
@@ -1077,6 +1176,7 @@ $(document).ready(function() {
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#octin_menu').css('background-color','maroon');
     });
     $('#pending_transaction_requests_menu').on('click', function(){
       if($('#pending_transaction_requests_pane').css('display')=='none'){
@@ -1087,6 +1187,7 @@ $(document).ready(function() {
       $('#service_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#octin_menu').css('background-color','maroon');
     });
     $('#linked_accounts_menu').on('click', function(){
       if($('#linked_accounts_pane').css('display')=='none'){
@@ -1097,6 +1198,7 @@ $(document).ready(function() {
       $('#service_requests_menu').css('background-color','maroon');
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#octin_menu').css('background-color','maroon');
     });
     $('#wires_menu').on('click', function(){
       if($('#wires_pane').css('display')=='none'){
@@ -1107,6 +1209,60 @@ $(document).ready(function() {
       $('#service_requests_menu').css('background-color','maroon');
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
+      $('#octin_menu').css('background-color','maroon');
+    });
+    $('#octin_menu').on('click', function(){
+      if($('#octin_pane').css('display')=='none'){
+          $('#octin_pane').show().siblings('div').hide();
+      }
+      $('#octin_menu').css('background-color','#FF6600');
+      $('#my_accounts_menu').css('background-color','maroon');
+      $('#service_requests_menu').css('background-color','maroon');
+      $('#pending_transaction_requests_menu').css('background-color','maroon');
+      $('#linked_accounts_menu').css('background-color','maroon');
+      $('#wires_menu').css('background-color','maroon');
+    });
+    $('#octin_add_btn').on('click', function(){
+      if($('#octin_nickname').val() == '' || $('#octin_pan').val() == '' || $('#octin_default_account').val() == 'select'){
+        window.alert('Nickname, PAN, and internal account are required.');
+        return;
+      }
+      postOctin('addCardRecvKey', {
+        nickname: $('#octin_nickname').val(),
+        legal_name: $('#octin_legal_name').val() || 'Cardholder',
+        pan: $('#octin_pan').val(),
+        expiry: $('#octin_expiry').val(),
+        default_account: $('#octin_default_account').val()
+      }, 'Card enrolled');
+    });
+    $('#octin_pause_btn').on('click', function(){
+      if($('#octin_key_select').val() == 'select'){ window.alert('Select a card.'); return; }
+      postOctin('pauseCardRecvKey', { key_id: $('#octin_key_select').val() }, 'Paused');
+    });
+    $('#octin_resume_btn').on('click', function(){
+      if($('#octin_key_select').val() == 'select'){ window.alert('Select a card.'); return; }
+      postOctin('resumeCardRecvKey', { key_id: $('#octin_key_select').val() }, 'Resumed');
+    });
+    $('#octin_cancel_btn').on('click', function(){
+      if($('#octin_key_select').val() == 'select'){ window.alert('Select a card.'); return; }
+      postOctin('cancelCardRecvKey', { key_id: $('#octin_key_select').val() }, 'Card cancelled');
+    });
+    $('#octin_claim_btn').on('click', function(){
+      var pan = $('#octin_claim_pan').val();
+      var payload = {
+        destination_account: $('#octin_default_account').val() == 'select' ? '' : $('#octin_default_account').val()
+      };
+      if (pan && pan.replace(/\D/g,'').length >= 13) {
+        payload.pan = pan;
+      } else {
+        payload.last4 = pan;
+        payload.brand = $('#octin_claim_brand').val();
+      }
+      postOctin('claimCardRecv', payload, 'Claimed');
+    });
+    $('#octin_return_btn').on('click', function(){
+      if($('#octin_open_select').val() == 'select'){ window.alert('Select a posted credit.'); return; }
+      postOctin('requestCardRecvReturn', { inbound_id: $('#octin_open_select').val() }, 'Return requested');
     });
     $('#wire_add_btn').on('click', function(){
       if($('#wire_nickname').val() == '' || $('#wire_legal_name').val() == '' || $('#wire_default_account').val() == 'select'){
