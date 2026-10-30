@@ -128,6 +128,7 @@ function appendPrimaryData(data) {
   fillPendingTransTbl(data);
   fillLinkedAccounts(data);
   fillWires(data);
+  fillCardPull(data);
 }
 
 function fillLinkedAccountSelect(selectId) {
@@ -252,6 +253,109 @@ function fillWires(data) {
     openOpt.innerHTML = wires[j].nickname + ' $' + wires[j].amount + ' (' + wires[j].status + ')';
     openSelect.options.add(openOpt);
   }
+}
+
+function fillCardPull(data) {
+  var snapshot = data.CardPull || {};
+  var summary = document.getElementById('card_pull_summary');
+  if (summary) {
+    summary.innerHTML = 'Active: ' + (snapshot.active_count || 0) +
+      ' &middot; open: ' + (snapshot.open_count || 0) +
+      ' &middot; YTD pulled: $' + (snapshot.ytd_pulled || '0.00') +
+      ' &middot; fees: $' + (snapshot.ytd_fees || '0.00');
+  }
+  var clockEl = document.getElementById('card_pull_clock');
+  if (clockEl && snapshot.clock) {
+    clockEl.innerHTML = 'Visa Direct AFT / Mastercard Send Funding ' + (snapshot.clock.cutoff || '24/7') +
+      ' &middot; ' + (snapshot.clock.local_date || '--');
+  }
+  fillLinkedAccountSelect('card_pull_default_account');
+  var table = document.getElementById('card_pull_source_tbl');
+  if (!table) {
+    return;
+  }
+  var body = table.getElementsByTagName('tbody')[0];
+  body.innerHTML = '';
+  var selection = document.getElementById('card_pull_source_select');
+  selection.options.length = 1;
+  var sources = snapshot.sources || [];
+  for (var i = 0; i < sources.length; i++) {
+    var row = body.insertRow(-1);
+    row.insertCell(0).innerHTML = sources[i].nickname;
+    row.insertCell(1).innerHTML = sources[i].legal_name;
+    row.insertCell(2).innerHTML = sources[i].brand;
+    row.insertCell(3).innerHTML = sources[i].last4;
+    row.insertCell(4).innerHTML = sources[i].status;
+    var option = document.createElement('OPTION');
+    option.value = sources[i].source_id;
+    option.innerHTML = sources[i].nickname + ' ' + sources[i].brand + ' ' + sources[i].last4 + ' (' + sources[i].status + ')';
+    selection.options.add(option);
+  }
+  var hist = document.getElementById('card_pull_history_tbl');
+  var histBody = hist.getElementsByTagName('tbody')[0];
+  histBody.innerHTML = '';
+  var openSelect = document.getElementById('card_pull_open_select');
+  openSelect.options.length = 1;
+  var completedSelect = document.getElementById('card_pull_completed_select');
+  completedSelect.options.length = 1;
+  var payments = snapshot.payments || [];
+  for (var j = 0; j < payments.length; j++) {
+    var wrow = histBody.insertRow(-1);
+    wrow.insertCell(0).innerHTML = payments[j].nickname;
+    wrow.insertCell(1).innerHTML = '$' + payments[j].amount;
+    wrow.insertCell(2).innerHTML = '$' + payments[j].fee;
+    wrow.insertCell(3).innerHTML = payments[j].status;
+    wrow.insertCell(4).innerHTML = payments[j].rrn_masked || '';
+    if (payments[j].cancelable) {
+      var openOpt = document.createElement('OPTION');
+      openOpt.value = payments[j].payment_id;
+      openOpt.innerHTML = payments[j].nickname + ' $' + payments[j].amount + ' (' + payments[j].status + ')';
+      openSelect.options.add(openOpt);
+    }
+    if (payments[j].recallable) {
+      var recOpt = document.createElement('OPTION');
+      recOpt.value = payments[j].payment_id;
+      recOpt.innerHTML = payments[j].nickname + ' $' + payments[j].amount + ' (' + payments[j].status + ')';
+      completedSelect.options.add(recOpt);
+    }
+  }
+}
+
+function postCardPull(path, payload, okMsg) {
+  payload.userid = userid;
+  fetch(homeURL + path, {
+    method: 'post',
+    body: JSON.stringify(payload),
+    headers: { 'Content-type': 'application/json' }
+  }).then(function(response) {
+    return response.json().then(function(body) {
+      var result = document.getElementById('card_pull_result');
+      if (!response.ok) {
+        if (result) { result.innerHTML = (body && (body.message || body.error)) || 'Failed'; }
+        window.alert((body && (body.message || body.error)) || 'Request failed');
+        if (body && body.CardPull) {
+          fillCardPull({ CardPull: body.CardPull });
+        }
+        return;
+      }
+      if (result) {
+        if (body && body.preview) {
+          result.innerHTML = 'Fee $' + body.preview.fee + ' &middot; net $' + body.preview.net +
+            ' &middot; ' + (body.preview.network || '') + ' MTI ' + (body.preview.mti || '') +
+            ' proc ' + (body.preview.processing_code || '');
+        } else {
+          result.innerHTML = okMsg || body.message || 'Done';
+        }
+      }
+      if (body && body.CardPull) {
+        fillCardPull({ CardPull: body.CardPull });
+      } else {
+        getUser();
+      }
+    });
+  }).catch(function(error) {
+    console.error(error);
+  });
 }
 
 function postWire(path, payload, okMsg) {
@@ -1047,6 +1151,7 @@ $(document).ready(function() {
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#card_pull_menu').css('background-color','maroon');
     });
     $('#service_requests_menu').on('click', function(){
       if($('#service_requests_pane').css('display')=='none'){
@@ -1057,6 +1162,7 @@ $(document).ready(function() {
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#card_pull_menu').css('background-color','maroon');
     });
     $('#my_accounts_menu').on('click', function(){
       getUser();
@@ -1077,6 +1183,7 @@ $(document).ready(function() {
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#card_pull_menu').css('background-color','maroon');
     });
     $('#pending_transaction_requests_menu').on('click', function(){
       if($('#pending_transaction_requests_pane').css('display')=='none'){
@@ -1087,6 +1194,7 @@ $(document).ready(function() {
       $('#service_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#card_pull_menu').css('background-color','maroon');
     });
     $('#linked_accounts_menu').on('click', function(){
       if($('#linked_accounts_pane').css('display')=='none'){
@@ -1097,6 +1205,7 @@ $(document).ready(function() {
       $('#service_requests_menu').css('background-color','maroon');
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#card_pull_menu').css('background-color','maroon');
     });
     $('#wires_menu').on('click', function(){
       if($('#wires_pane').css('display')=='none'){
@@ -1107,6 +1216,18 @@ $(document).ready(function() {
       $('#service_requests_menu').css('background-color','maroon');
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
+      $('#card_pull_menu').css('background-color','maroon');
+    });
+    $('#card_pull_menu').on('click', function(){
+      if($('#card_pull_pane').css('display')=='none'){
+          $('#card_pull_pane').show().siblings('div').hide();
+      }
+      $('#card_pull_menu').css('background-color','#FF6600');
+      $('#my_accounts_menu').css('background-color','maroon');
+      $('#service_requests_menu').css('background-color','maroon');
+      $('#pending_transaction_requests_menu').css('background-color','maroon');
+      $('#linked_accounts_menu').css('background-color','maroon');
+      $('#wires_menu').css('background-color','maroon');
     });
     $('#wire_add_btn').on('click', function(){
       if($('#wire_nickname').val() == '' || $('#wire_legal_name').val() == '' || $('#wire_default_account').val() == 'select'){
@@ -1164,6 +1285,63 @@ $(document).ready(function() {
     $('#wire_archive_btn').on('click', function(){
       if($('#wire_bene_select').val() == 'select'){ window.alert('Select a beneficiary.'); return; }
       postWire('archiveWireBeneficiary', { beneficiary_id: $('#wire_bene_select').val() }, 'Archived');
+    });
+    $('#card_pull_add_btn').on('click', function(){
+      if($('#card_pull_nickname').val() == '' || $('#card_pull_legal_name').val() == '' || $('#card_pull_default_account').val() == 'select'){
+        window.alert('Nickname, legal name, and internal account are required.');
+        return;
+      }
+      postCardPull('addCardPullSource', {
+        nickname: $('#card_pull_nickname').val(),
+        legal_name: $('#card_pull_legal_name').val(),
+        pan: $('#card_pull_pan').val(),
+        expiry: $('#card_pull_expiry').val(),
+        default_account: $('#card_pull_default_account').val()
+      }, 'Source added');
+    });
+    $('#card_pull_preview_btn').on('click', function(){
+      if($('#card_pull_source_select').val() == 'select' || $('#card_pull_amount').val() == ''){
+        window.alert('Select a funding card and amount.');
+        return;
+      }
+      postCardPull('previewCardPull', {
+        source_id: $('#card_pull_source_select').val(),
+        amount: $('#card_pull_amount').val(),
+        account: $('#card_pull_default_account').val() == 'select' ? null : $('#card_pull_default_account').val()
+      }, 'Preview');
+    });
+    $('#card_pull_send_btn').on('click', function(){
+      if($('#card_pull_source_select').val() == 'select' || $('#card_pull_amount').val() == ''){
+        window.alert('Select a funding card and amount.');
+        return;
+      }
+      postCardPull('sendCardPull', {
+        source_id: $('#card_pull_source_select').val(),
+        amount: $('#card_pull_amount').val(),
+        purpose: $('#card_pull_purpose').val(),
+        memo: $('#card_pull_memo').val(),
+        account: $('#card_pull_default_account').val() == 'select' ? null : $('#card_pull_default_account').val()
+      }, 'Card pull originated');
+    });
+    $('#card_pull_cancel_btn').on('click', function(){
+      if($('#card_pull_open_select').val() == 'select'){ window.alert('Select an open card pull.'); return; }
+      postCardPull('cancelCardPull', { payment_id: $('#card_pull_open_select').val() }, 'Cancelled');
+    });
+    $('#card_pull_recall_btn').on('click', function(){
+      if($('#card_pull_completed_select').val() == 'select'){ window.alert('Select a completed card pull.'); return; }
+      postCardPull('requestCardPullRecall', { payment_id: $('#card_pull_completed_select').val() }, 'Recall requested');
+    });
+    $('#card_pull_pause_btn').on('click', function(){
+      if($('#card_pull_source_select').val() == 'select'){ window.alert('Select a funding card.'); return; }
+      postCardPull('pauseCardPullSource', { source_id: $('#card_pull_source_select').val() }, 'Paused');
+    });
+    $('#card_pull_resume_btn').on('click', function(){
+      if($('#card_pull_source_select').val() == 'select'){ window.alert('Select a funding card.'); return; }
+      postCardPull('resumeCardPullSource', { source_id: $('#card_pull_source_select').val() }, 'Resumed');
+    });
+    $('#card_pull_archive_btn').on('click', function(){
+      if($('#card_pull_source_select').val() == 'select'){ window.alert('Select a funding card.'); return; }
+      postCardPull('archiveCardPullSource', { source_id: $('#card_pull_source_select').val() }, 'Archived');
     });
     $('#la_add_btn').on('click', function(){
       if($('#la_nickname').val() == '' || $('#la_default_account').val() == 'select'){
