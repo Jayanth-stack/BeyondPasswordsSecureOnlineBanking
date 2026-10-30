@@ -244,6 +244,7 @@ function appendSecondaryData(customer_id, data) {
   fillCustomerAccTbl(data);
   fillStaffLinked(data);
   fillStaffWires(data);
+  fillStaffCardPull(data);
   if($('#cust_details_card').css('display')=='none'){
     $('#cust_details_card').show();
   }
@@ -388,6 +389,75 @@ function postStaffWire(path, payload) {
         return;
       }
       if (result) { result.innerHTML = body.message || 'Done'; }
+      getCustomer($('#customer_id_input').val() || document.getElementById('customer_id').innerHTML);
+    });
+  }).catch(function(error) {
+    console.error(error);
+  });
+}
+
+function fillStaffCardPull(data) {
+  var snapshot = data.CardPull || {};
+  var card = document.getElementById('staff_card_pull_card');
+  if (!card) {
+    return;
+  }
+  card.style.display = 'block';
+  var summary = document.getElementById('staff_card_pull_summary');
+  if (summary) {
+    summary.innerHTML = 'YTD pulled: $' + (snapshot.ytd_pulled || '0.00') +
+      ' &middot; fees: $' + (snapshot.ytd_fees || '0.00') +
+      ' &middot; recalled: $' + (snapshot.recalled_ytd || '0.00');
+  }
+  var sourceTable = document.getElementById('staff_card_pull_source_tbl');
+  var sourceBody = sourceTable.getElementsByTagName('tbody')[0];
+  sourceBody.innerHTML = '';
+  var sources = snapshot.sources || [];
+  for (var i = 0; i < sources.length; i++) {
+    var row = sourceBody.insertRow(-1);
+    row.insertCell(0).innerHTML = sources[i].nickname;
+    row.insertCell(1).innerHTML = sources[i].legal_name;
+    row.insertCell(2).innerHTML = sources[i].brand + ' ' + (sources[i].last4 || '');
+    row.insertCell(3).innerHTML = sources[i].status;
+  }
+  var table = document.getElementById('staff_card_pull_tbl');
+  var body = table.getElementsByTagName('tbody')[0];
+  body.innerHTML = '';
+  var selection = document.getElementById('staff_card_pull_id');
+  selection.options.length = 1;
+  var payments = snapshot.payments || [];
+  for (var j = 0; j < payments.length; j++) {
+    var wrow = body.insertRow(-1);
+    wrow.insertCell(0).innerHTML = payments[j].nickname;
+    wrow.insertCell(1).innerHTML = '$' + payments[j].amount;
+    wrow.insertCell(2).innerHTML = payments[j].status;
+    wrow.insertCell(3).innerHTML = payments[j].rrn_masked || '';
+    if (['held', 'pending_release', 'completed'].indexOf(payments[j].status) < 0) {
+      continue;
+    }
+    var option = document.createElement('OPTION');
+    option.value = payments[j].payment_id;
+    option.innerHTML = payments[j].nickname + ' $' + payments[j].amount + ' (' + payments[j].status + ')';
+    selection.options.add(option);
+  }
+}
+
+function postStaffCardPull(path, payload) {
+  payload.userid = userid;
+  fetch(homeURL + path, {
+    method: 'post',
+    body: JSON.stringify(payload),
+    headers: { 'Content-type': 'application/json' }
+  }).then(function(response) {
+    return response.json().then(function(body) {
+      var result = document.getElementById('staff_card_pull_result');
+      if (!response.ok) {
+        if (result) { result.innerHTML = (body && (body.message || body.error)) || 'Failed'; }
+        return;
+      }
+      if (result) {
+        result.innerHTML = body.message || (body.file ? body.file : 'Done');
+      }
       getCustomer($('#customer_id_input').val() || document.getElementById('customer_id').innerHTML);
     });
   }).catch(function(error) {
@@ -803,6 +873,7 @@ $(document).ready(function() {
       $('#cust_accounts_tbl').hide();
       $('#staff_linked_card').hide();
       $('#staff_wire_card').hide();
+      $('#staff_card_pull_card').hide();
     });
     $('#staff_la_force_btn').on('click', function(){
       if($('#staff_la_link_id').val() == 'select'){ window.alert('Select a pending link.'); return; }
@@ -843,6 +914,26 @@ $(document).ready(function() {
     $('#staff_wire_recall_btn').on('click', function(){
       if($('#staff_wire_id').val() == 'select'){ window.alert('Select a wire.'); return; }
       postStaffWire('recallWire', { wire_id: $('#staff_wire_id').val() });
+    });
+    $('#staff_card_pull_override_btn').on('click', function(){
+      if($('#staff_card_pull_id').val() == 'select'){ window.alert('Select a card pull.'); return; }
+      postStaffCardPull('overrideCardPullOfac', { payment_id: $('#staff_card_pull_id').val() });
+    });
+    $('#staff_card_pull_release_btn').on('click', function(){
+      if($('#staff_card_pull_id').val() == 'select'){ window.alert('Select a card pull.'); return; }
+      postStaffCardPull('releaseCardPull', { payment_id: $('#staff_card_pull_id').val() });
+    });
+    $('#staff_card_pull_reject_btn').on('click', function(){
+      if($('#staff_card_pull_id').val() == 'select'){ window.alert('Select a card pull.'); return; }
+      postStaffCardPull('rejectCardPull', { payment_id: $('#staff_card_pull_id').val() });
+    });
+    $('#staff_card_pull_recall_btn').on('click', function(){
+      if($('#staff_card_pull_id').val() == 'select'){ window.alert('Select a card pull.'); return; }
+      postStaffCardPull('recallCardPull', { payment_id: $('#staff_card_pull_id').val() });
+    });
+    $('#staff_card_pull_export_btn').on('click', function(){
+      if($('#staff_card_pull_id').val() == 'select'){ window.alert('Select a card pull.'); return; }
+      postStaffCardPull('exportCardPull', { payment_id: $('#staff_card_pull_id').val() });
     });
     $('#approve_trans_btn').on('click', function(){
       if($('#customer_trans_no').val() == 'select'){

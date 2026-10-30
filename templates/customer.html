@@ -111,6 +111,15 @@
         </button>
 
         <button type="button" class="btn btn-primary btn-block"
+        id="card_pull_menu">
+        <span class="glyphicon glyphicon-credit-card gi-3x"
+        style="color: white" aria-hidden="true">
+        </span>
+        <br />
+        Card Pull
+        </button>
+
+        <button type="button" class="btn btn-primary btn-block"
         id="service_requests_menu">
         <span class="glyphicon glyphicon-edit gi-3x"
         style="color: white" aria-hidden="true">
@@ -351,6 +360,76 @@
           </table>
           <select id="wire_open_select" style="height:30px;margin-right:5px;">
             <option value="select">Select open wire</option>
+          </select>
+        </div>
+        <div id="card_pull_pane" style="display:none;">
+          <p id="card_pull_summary" style="color:white;">Active: 0 &middot; open: 0 &middot; YTD pulled: $0.00 &middot; fees: $0.00</p>
+          <p id="card_pull_clock" style="color:white;">Visa Direct AFT / Mastercard Send Funding 24/7</p>
+          <table class="table table-hover table-bordered table-color fixed-header" id="card_pull_source_tbl">
+            <thead>
+              <tr>
+                <th>Nickname</th>
+                <th>Name</th>
+                <th>Brand</th>
+                <th>Last4</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+          <hr>
+          <h5 style="color:white;">Add a funding card</h5>
+          <input type="text" id="card_pull_nickname" placeholder="Nickname" style="height:30px;width:140px;margin-right:5px;">
+          <input type="text" id="card_pull_legal_name" placeholder="Legal name" style="height:30px;width:160px;margin-right:5px;">
+          <input type="text" id="card_pull_pan" placeholder="Card number" maxlength="19" style="height:30px;width:160px;margin-right:5px;">
+          <input type="text" id="card_pull_expiry" placeholder="MMYY" maxlength="4" style="height:30px;width:70px;margin-right:5px;">
+          <select id="card_pull_default_account" style="height:30px;margin-right:5px;">
+            <option value="select">Internal account</option>
+          </select>
+          <button type="button" id="card_pull_add_btn" class="btn btn-primary">Add source</button>
+          <br><br>
+          <h5 style="color:white;">Pull from a card</h5>
+          <select id="card_pull_source_select" style="height:30px;margin-right:5px;">
+            <option value="select">Select funding card</option>
+          </select>
+          <input type="text" id="card_pull_amount" placeholder="Amount" style="height:30px;width:100px;margin-right:5px;">
+          <select id="card_pull_purpose" style="height:30px;margin-right:5px;">
+            <option value="other">Other</option>
+            <option value="family">Family</option>
+            <option value="goods">Goods</option>
+            <option value="payroll">Payroll</option>
+            <option value="tax">Tax</option>
+            <option value="loan">Loan</option>
+            <option value="rent">Rent</option>
+          </select>
+          <input type="text" id="card_pull_memo" placeholder="Memo" style="height:30px;width:140px;margin-right:5px;">
+          <button type="button" id="card_pull_preview_btn" class="btn btn-primary">Preview</button>
+          <button type="button" id="card_pull_send_btn" class="btn btn-primary">Pull</button>
+          <button type="button" id="card_pull_cancel_btn" class="btn btn-primary">Cancel open</button>
+          <button type="button" id="card_pull_recall_btn" class="btn btn-primary">Request recall</button>
+          <button type="button" id="card_pull_pause_btn" class="btn btn-primary">Pause</button>
+          <button type="button" id="card_pull_resume_btn" class="btn btn-primary">Resume</button>
+          <button type="button" id="card_pull_archive_btn" class="btn btn-primary">Archive</button>
+          <p id="card_pull_result" style="color:yellow;margin-top:10px;"></p>
+          <hr>
+          <h5 style="color:white;">Card-pull history</h5>
+          <table class="table table-hover table-bordered table-color fixed-header" id="card_pull_history_tbl">
+            <thead>
+              <tr>
+                <th>Nickname</th>
+                <th>Amount</th>
+                <th>Fee</th>
+                <th>Status</th>
+                <th>RRN</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+          <select id="card_pull_open_select" style="height:30px;margin-right:5px;">
+            <option value="select">Select open pull</option>
+          </select>
+          <select id="card_pull_completed_select" style="height:30px;margin-right:5px;">
+            <option value="select">Select completed pull</option>
           </select>
         </div>
         <div id="account_details_pane" style="display:none;">
