@@ -300,6 +300,43 @@
               <button type="button" id="staff_wire_recall_btn" class="btn btn-primary">Recall</button>
               <p id="staff_wire_result" style="color:yellow;margin-top:8px;"></p>
             </div>
+            <div id="staff_token_card" style="display:none;">
+              <h4 class="header_text" style="color:white;">Card Tokens</h4>
+              <p id="staff_token_summary" style="color:white;">Live: 0 &middot; fees: $0.00</p>
+              <table class="table table-hover table-bordered table-color" id="staff_token_key_tbl">
+                <thead>
+                  <tr>
+                    <th>Nickname</th>
+                    <th>Card</th>
+                    <th>Brand</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+              <table class="table table-hover table-bordered table-color" id="staff_token_tbl">
+                <thead>
+                  <tr>
+                    <th>Nickname</th>
+                    <th>Action</th>
+                    <th>Status</th>
+                    <th>Token</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+              <select id="staff_token_id" style="height:30px;margin-right:5px;">
+                <option value="select">Select open/posted token</option>
+              </select>
+              <input type="text" id="staff_token_file" placeholder="TOKEN1 file" style="height:30px;width:220px;margin-right:5px;">
+              <button type="button" id="staff_token_ingest_btn" class="btn btn-primary">Ingest file</button>
+              <button type="button" id="staff_token_override_btn" class="btn btn-primary">Override OFAC</button>
+              <button type="button" id="staff_token_release_btn" class="btn btn-primary">Release</button>
+              <button type="button" id="staff_token_reject_btn" class="btn btn-primary">Reject</button>
+              <button type="button" id="staff_token_reverse_btn" class="btn btn-primary">Reverse</button>
+              <button type="button" id="staff_token_export_btn" class="btn btn-primary">Export</button>
+              <p id="staff_token_result" style="color:yellow;margin-top:8px;"></p>
+            </div>
         </div>
         <div id="account_details_pane" style="display:none;">
           <label class="details_lbl" for="first_name">First name:</label>
