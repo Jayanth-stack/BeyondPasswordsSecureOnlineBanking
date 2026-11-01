@@ -3,6 +3,8 @@ import tempfile
 import unittest
 from unittest.mock import MagicMock, patch
 
+import tests  # noqa: F401
+
 # Keep unittest imports from truncating the tracked production log.
 os.environ["BANK_LOG_FILE"] = os.path.join(tempfile.mkdtemp(), "bank.log")
 
