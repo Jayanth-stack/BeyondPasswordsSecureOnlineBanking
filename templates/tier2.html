@@ -332,6 +332,43 @@
               <button type="button" id="staff_wire_recall_btn" class="btn btn-primary">Recall</button>
               <p id="staff_wire_result" style="color:yellow;margin-top:8px;"></p>
             </div>
+            <div id="staff_rfi_card" style="display:none;">
+              <h4 class="header_text" style="color:white;">FedNow RFI</h4>
+              <p id="staff_rfi_summary" style="color:white;">Open: 0 &middot; posted: 0 &middot; fees: $0.00</p>
+              <table class="table table-hover table-bordered table-color" id="staff_rfi_key_tbl">
+                <thead>
+                  <tr>
+                    <th>Nickname</th>
+                    <th>Name</th>
+                    <th>Last4</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+              <table class="table table-hover table-bordered table-color" id="staff_rfi_tbl">
+                <thead>
+                  <tr>
+                    <th>Nickname</th>
+                    <th>Reason</th>
+                    <th>Status</th>
+                    <th>Ref</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+              <select id="staff_rfi_id" style="height:30px;margin-right:5px;">
+                <option value="select">Select open RFI</option>
+              </select>
+              <input type="text" id="staff_rfi_file" placeholder="RFI1 file" style="height:30px;width:280px;margin-right:5px;">
+              <button type="button" id="staff_rfi_ingest_btn" class="btn btn-primary">Ingest file</button>
+              <button type="button" id="staff_rfi_override_btn" class="btn btn-primary">Override OFAC</button>
+              <button type="button" id="staff_rfi_release_btn" class="btn btn-primary">Release</button>
+              <button type="button" id="staff_rfi_reject_btn" class="btn btn-primary">Reject</button>
+              <button type="button" id="staff_rfi_reverse_btn" class="btn btn-primary">Reverse</button>
+              <button type="button" id="staff_rfi_export_btn" class="btn btn-primary">Export</button>
+              <p id="staff_rfi_result" style="color:yellow;margin-top:8px;"></p>
+            </div>
           </div>
 
           <div id="account_details_pane" style="display: none">
