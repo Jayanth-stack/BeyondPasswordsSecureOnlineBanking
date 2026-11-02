@@ -10,6 +10,8 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from unittest.mock import patch
 
+from flask import Flask
+
 import tests  # noqa: F401
 
 from utility.crypto_receipt import generate_receipt
@@ -19,6 +21,7 @@ from utility.wire import (
     WireError,
     WirePolicy,
     WireService,
+    attach_wire_routes,
 )
 
 ET = timezone(timedelta(hours=-4))
@@ -244,6 +247,50 @@ class MutatingGetMoneyRouteTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         customers_cls.return_value.fund_request.assert_called_once_with(10, 20, 15)
 
+    def test_get_cashier_cheque_still_issues(self):
+        self._session("cust1", "customer")
+        with patch("app.Customers") as customers_cls:
+            customers_cls.return_value.make_cashier_check.return_value = "Success"
+            response = self.client.get(
+                "/getCashierCheque",
+                json={
+                    "userid": "cust1",
+                    "to_account": 20,
+                    "from_account": 10,
+                    "amount": 15,
+                },
+            )
+        self.assertEqual(response.status_code, 200)
+        customers_cls.return_value.make_cashier_check.assert_called_once_with(
+            "cust1", 20, 10, 15
+        )
+
+    def test_get_open_new_account_still_opens(self):
+        self._session("cust1", "customer")
+        with patch("app.Customers") as customers_cls:
+            customers_cls.return_value.open_account.return_value = "Done"
+            response = self.client.get(
+                "/openNewAccount",
+                json={
+                    "userid": "cust1",
+                    "customer_id": "cust9",
+                    "account_type": "savings",
+                },
+            )
+        self.assertEqual(response.status_code, 200)
+        customers_cls.return_value.open_account.assert_called_once_with("cust9", "savings")
+
+    def test_get_make_appointment_still_books(self):
+        self._session("cust1", "customer")
+        with patch("app.Customers") as customers_cls:
+            customers_cls.return_value.make_appointment.return_value = "Appointment fixed"
+            response = self.client.get(
+                "/makeAppointment",
+                json={"customer_id": "cust1", "time": "10:00"},
+            )
+        self.assertEqual(response.status_code, 200)
+        customers_cls.return_value.make_appointment.assert_called_once_with("cust1", "10:00")
+
 
 class WireIntegrityRegressionTests(unittest.TestCase):
     def setUp(self):
@@ -437,6 +484,257 @@ class WireIntegrityRegressionTests(unittest.TestCase):
         self.assertEqual(wire.userid, "bob")
         self.assertEqual(wire.status, "sent")
         self.assertEqual(self.debits[0], ("2001", "40.00", "wire to BobsChase"))
+
+    def test_missing_credit_fn_recall_marks_recalled_with_no_refund(self):
+        bene = self._add()
+        wire, _ = self.service.originate(
+            owner_userid="alice",
+            actor="alice",
+            actor_type="customer",
+            beneficiary_id=bene.beneficiary_id,
+            amount="35.00",
+            trace_id="no-credit",
+        )
+        self.assertEqual(wire.status, "sent")
+        self.service.credit_fn = None
+        recalled = self.service.recall_wire(
+            wire_id=wire.wire_id, actor="teller", actor_type="tier2"
+        )
+        self.assertEqual(recalled.status, "recalled")
+        self.assertEqual(self.credits, [])
+
+    def test_hmac_recall_credit_runs_then_leaves_sent(self):
+        bene = self._add()
+        wire, _ = self.service.originate(
+            owner_userid="alice",
+            actor="alice",
+            actor_type="customer",
+            beneficiary_id=bene.beneficiary_id,
+            amount="28.00",
+            trace_id="hmac-recall",
+        )
+
+        def credit(account, amount, remark):
+            self.credits.append((account, amount, remark))
+            return generate_receipt(
+                {"to_account": account, "amount": amount, "status": "done"}
+            )
+
+        self.service.credit_fn = credit
+        with self.assertRaises(WireError) as ctx:
+            self.service.recall_wire(
+                wire_id=wire.wire_id, actor="teller", actor_type="tier2"
+            )
+        self.assertEqual(ctx.exception.code, "recall_failed")
+        stored = self.service.store.get_wire(wire.wire_id)
+        self.assertEqual(stored.status, "sent")
+        self.assertEqual(len(self.credits), 1)
+
+        with self.assertRaises(WireError) as ctx:
+            self.service.recall_wire(
+                wire_id=wire.wire_id, actor="teller", actor_type="tier2"
+            )
+        self.assertEqual(ctx.exception.code, "recall_failed")
+        self.assertEqual(len(self.credits), 2)
+        self.assertEqual(self.service.store.get_wire(wire.wire_id).status, "sent")
+
+    def test_missing_debit_fn_still_marks_sent_with_imad(self):
+        self.service.debit_fn = None
+        bene = self._add()
+        wire, created = self.service.originate(
+            owner_userid="alice",
+            actor="alice",
+            actor_type="customer",
+            beneficiary_id=bene.beneficiary_id,
+            amount="45.00",
+            trace_id="no-debit",
+        )
+        self.assertTrue(created)
+        self.assertEqual(wire.status, "sent")
+        self.assertTrue(wire.imad)
+        self.assertEqual(self.debits, [])
+
+    def test_run_due_promotes_queued_to_pending_when_threshold_drops(self):
+        self.now[0] = _ts(2024, 6, 14, 18, 0)
+        bene = self._add()
+        wire, _ = self.service.originate(
+            owner_userid="alice",
+            actor="alice",
+            actor_type="customer",
+            beneficiary_id=bene.beneficiary_id,
+            amount="5000.00",
+            trace_id="threshold-drop",
+        )
+        self.assertEqual(wire.status, "queued")
+        self.assertEqual(self.debits, [])
+
+        self.service.policy.dual_control_threshold = Decimal("1000.00")
+        self.now[0] = _ts(2024, 6, 17, 10, 0)
+        due = self.service.run_due("alice")
+        self.assertEqual(len(due), 1)
+        self.assertEqual(due[0].status, "pending_release")
+        self.assertEqual(self.debits, [])
+        stored = self.service.store.get_wire(wire.wire_id)
+        self.assertEqual(stored.status, "pending_release")
+        self.assertFalse(stored.imad)
+
+
+class ClaimedEmployeeWireGetTests(unittest.TestCase):
+    """Claimed employee GET mutates another customer's wires (EMPLOYEE_ROLES)."""
+
+    def setUp(self):
+        self.now = [_ts(2024, 6, 14, 16, 0)]
+        self.debits = []
+        self.credits = []
+        self.accounts = {
+            "alice": {
+                "checkin": {"Account": 1001, "Balance": 5000},
+                "savings": {"Account": 1002, "Balance": 80},
+                "credit": "None",
+            },
+            "bob": {
+                "checkin": {"Account": 2001, "Balance": 4000},
+                "savings": {"Account": 2002, "Balance": 10},
+                "credit": "None",
+            },
+        }
+
+        def debit_fn(account, amount, remark):
+            self.debits.append((account, amount, remark))
+            return "Amount Debited"
+
+        def credit_fn(account, amount, remark):
+            self.credits.append((account, amount, remark))
+            return "Success"
+
+        self.service = WireService(
+            WirePolicy(
+                outbound_fee=Decimal("25.00"),
+                dual_control_threshold=Decimal("10000.00"),
+            ),
+            MemoryWireStore(),
+            clock=lambda: self.now[0],
+            debit_fn=debit_fn,
+            credit_fn=credit_fn,
+            accounts_fn=lambda userid: self.accounts.get(userid, {}),
+            calendar=WireCalendar(cutoff_hour=17, tz_offset_hours=-4),
+        )
+        app = Flask(__name__)
+        app.secret_key = "test-secret"
+        app.config["TESTING"] = True
+        attach_wire_routes(app, self.service)
+        self.client = app.test_client()
+
+    def _login(self, userid, usertype):
+        with self.client.session_transaction() as sess:
+            sess["userid"] = userid
+            sess["usertype"] = usertype
+
+    def _add_bob_bene(self):
+        return self.service.add_beneficiary(
+            owner_userid="bob",
+            actor="bob",
+            actor_type="customer",
+            nickname="BobsChase",
+            legal_name="Bob Builder",
+            aba="021000021",
+            account_number="55667788",
+            street="2 Federal St",
+            city="Boston",
+            state="MA",
+            postal="02110",
+            default_account="2001",
+        )
+
+    def _send_bob_wire(self, amount="40.00", trace_id="bob-wire"):
+        bene = self._add_bob_bene()
+        wire, created = self.service.originate(
+            owner_userid="bob",
+            actor="bob",
+            actor_type="customer",
+            beneficiary_id=bene.beneficiary_id,
+            amount=amount,
+            trace_id=trace_id,
+        )
+        self.assertTrue(created)
+        self.assertEqual(wire.status, "sent")
+        return wire
+
+    def test_claimed_employee_get_send_wire_debits_another_customer(self):
+        bene = self._add_bob_bene()
+        self._login("emp1", "employee")
+        response = self.client.get(
+            "/sendWire",
+            json={
+                "userid": "emp1",
+                "customer_id": "bob",
+                "beneficiary_id": bene.beneficiary_id,
+                "amount": "40.00",
+                "trace_id": "emp-get-send",
+            },
+        )
+        self.assertEqual(response.status_code, 201)
+        body = response.get_json()
+        self.assertEqual(body["wire"]["userid"], "bob")
+        self.assertEqual(body["wire"]["status"], "sent")
+        self.assertTrue(body["wire"]["imad"])
+        self.assertEqual(self.debits[0], ("2001", "40.00", "wire to BobsChase"))
+
+    def test_claimed_employee_get_complete_wire_completes_foreign_wire(self):
+        wire = self._send_bob_wire(trace_id="emp-get-complete")
+        self._login("emp1", "employee")
+        response = self.client.get(
+            "/completeWire",
+            json={"userid": "emp1", "wire_id": wire.wire_id},
+        )
+        self.assertEqual(response.status_code, 200)
+        body = response.get_json()
+        self.assertEqual(body["wire"]["status"], "completed")
+        self.assertTrue(body["wire"]["omad"])
+        self.assertEqual(body["wire"]["userid"], "bob")
+
+    def test_claimed_employee_get_recall_wire_credits_foreign_wire(self):
+        wire = self._send_bob_wire(amount="18.00", trace_id="emp-get-recall")
+        self._login("emp1", "employee")
+        response = self.client.get(
+            "/recallWire",
+            json={"userid": "emp1", "wire_id": wire.wire_id},
+        )
+        self.assertEqual(response.status_code, 200)
+        body = response.get_json()
+        self.assertEqual(body["wire"]["status"], "recalled")
+        self.assertEqual(body["wire"]["userid"], "bob")
+        self.assertEqual(self.credits[0][0], "2001")
+        self.assertEqual(self.credits[0][1], "18.00")
+
+    def test_owner_get_send_wire_still_mutates(self):
+        bene = self.service.add_beneficiary(
+            owner_userid="alice",
+            actor="alice",
+            actor_type="customer",
+            nickname="Chase Checking",
+            legal_name="Ada Lovelace",
+            aba="021000021",
+            account_number="77881234",
+            street="1 Federal St",
+            city="New York",
+            state="NY",
+            postal="10004",
+            default_account="1001",
+        )
+        self._login("alice", "customer")
+        response = self.client.get(
+            "/sendWire",
+            json={
+                "userid": "alice",
+                "beneficiary_id": bene.beneficiary_id,
+                "amount": "22.00",
+                "trace_id": "owner-get-send",
+            },
+        )
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.get_json()["wire"]["status"], "sent")
+        self.assertEqual(self.debits[0][1], "22.00")
 
 
 if __name__ == "__main__":
