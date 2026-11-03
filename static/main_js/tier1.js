@@ -321,6 +321,7 @@ function appendSecondaryData(customer_id, data) {
   fillCustomerAccTbl(data);
   fillStaffLinked(data);
   fillStaffWires(data);
+  fillStaffNoc(data);
   if($('#cust_details_card').css('display')=='none'){
     $('#cust_details_card').show();
   }
@@ -460,6 +461,79 @@ function postStaffWire(path, payload) {
   }).then(function(response) {
     return response.json().then(function(body) {
       var result = document.getElementById('staff_wire_result');
+      if (!response.ok) {
+        if (result) { result.innerHTML = (body && (body.message || body.error)) || 'Failed'; }
+        return;
+      }
+      if (result) { result.innerHTML = body.message || 'Done'; }
+      getCustomer($('#customer_id_input').val() || document.getElementById('customer_id').innerHTML);
+    });
+  }).catch(function(error) {
+    console.error(error);
+  });
+}
+
+function fillStaffNoc(data) {
+  var snapshot = data.AchNoc || {};
+  var card = document.getElementById('staff_noc_card');
+  if (!card) {
+    return;
+  }
+  card.style.display = 'block';
+  var summary = document.getElementById('staff_noc_summary');
+  if (summary) {
+    summary.innerHTML = 'Applied: ' + (snapshot.applied_count || 0) +
+      ' &middot; fees: $' + (snapshot.ytd_fees || '0.00') +
+      ' &middot; refused: ' + (snapshot.refused_count || 0);
+  }
+  var clockEl = document.getElementById('staff_noc_clock');
+  if (clockEl && snapshot.clock) {
+    clockEl.innerHTML = 'Cutoff ' + (snapshot.clock.cutoff || '16:45') +
+      ' &middot; value date ' + (snapshot.clock.value_date || '--');
+  }
+  var keyTable = document.getElementById('staff_noc_key_tbl');
+  var keyBody = keyTable.getElementsByTagName('tbody')[0];
+  keyBody.innerHTML = '';
+  var keys = snapshot.keys || [];
+  for (var i = 0; i < keys.length; i++) {
+    var row = keyBody.insertRow(-1);
+    row.insertCell(0).innerHTML = keys[i].nickname;
+    row.insertCell(1).innerHTML = keys[i].legal_name;
+    row.insertCell(2).innerHTML = keys[i].aba_masked;
+    row.insertCell(3).innerHTML = keys[i].status;
+  }
+  var table = document.getElementById('staff_noc_tbl');
+  var body = table.getElementsByTagName('tbody')[0];
+  body.innerHTML = '';
+  var selection = document.getElementById('staff_noc_id');
+  selection.options.length = 1;
+  var notices = snapshot.notices || snapshot.inquiries || [];
+  for (var j = 0; j < notices.length; j++) {
+    var nrow = body.insertRow(-1);
+    nrow.insertCell(0).innerHTML = notices[j].nickname;
+    nrow.insertCell(1).innerHTML = notices[j].change_code;
+    nrow.insertCell(2).innerHTML = notices[j].status;
+    nrow.insertCell(3).innerHTML = (notices[j].noc_ref_masked || notices[j].notice_id).slice(0, 12);
+    if (['held', 'queued', 'pending_release', 'open', 'unmatched', 'posted'].indexOf(notices[j].status) < 0) {
+      continue;
+    }
+    var option = document.createElement('OPTION');
+    option.value = notices[j].notice_id;
+    option.innerHTML = notices[j].nickname + ' ' + notices[j].change_code + ' (' + notices[j].status + ')';
+    selection.options.add(option);
+  }
+}
+
+function postStaffNoc(path, payload) {
+  payload.userid = userid;
+  payload.customer_id = $('#customer_id_input').val() || document.getElementById('customer_id').innerHTML;
+  fetch(homeURL + path, {
+    method: 'post',
+    body: JSON.stringify(payload),
+    headers: { 'Content-type': 'application/json' }
+  }).then(function(response) {
+    return response.json().then(function(body) {
+      var result = document.getElementById('staff_noc_result');
       if (!response.ok) {
         if (result) { result.innerHTML = (body && (body.message || body.error)) || 'Failed'; }
         return;
@@ -877,6 +951,7 @@ $(document).ready(function() {
       $('#cust_accounts_tbl').hide();
       $('#staff_linked_card').hide();
       $('#staff_wire_card').hide();
+      $('#staff_noc_card').hide();
     });
     $('#staff_la_force_btn').on('click', function(){
       if($('#staff_la_link_id').val() == 'select'){ window.alert('Select a pending link.'); return; }
@@ -917,6 +992,29 @@ $(document).ready(function() {
     $('#staff_wire_recall_btn').on('click', function(){
       if($('#staff_wire_id').val() == 'select'){ window.alert('Select a wire.'); return; }
       postStaffWire('recallWire', { wire_id: $('#staff_wire_id').val() });
+    });
+    $('#staff_noc_ingest_btn').on('click', function(){
+      if($('#staff_noc_file').val() == ''){ window.alert('Paste a NOC1 record.'); return; }
+      postStaffNoc('ingestAchNocFile', { file: $('#staff_noc_file').val() });
+    });
+    $('#staff_noc_override_btn').on('click', function(){
+      if($('#staff_noc_id').val() == 'select'){ window.alert('Select a NOC.'); return; }
+      postStaffNoc('overrideAchNocOfac', { notice_id: $('#staff_noc_id').val() });
+    });
+    $('#staff_noc_release_btn').on('click', function(){
+      if($('#staff_noc_id').val() == 'select'){ window.alert('Select a NOC.'); return; }
+      postStaffNoc('releaseAchNoc', { notice_id: $('#staff_noc_id').val() });
+    });
+    $('#staff_noc_reject_btn').on('click', function(){
+      if($('#staff_noc_id').val() == 'select'){ window.alert('Select a NOC.'); return; }
+      postStaffNoc('rejectAchNoc', { notice_id: $('#staff_noc_id').val() });
+    });
+    $('#staff_noc_reverse_btn').on('click', function(){
+      if($('#staff_noc_id').val() == 'select'){ window.alert('Select a NOC.'); return; }
+      postStaffNoc('reverseAchNoc', { notice_id: $('#staff_noc_id').val() });
+    });
+    $('#staff_noc_export_btn').on('click', function(){
+      postStaffNoc('exportAchNoc', {});
     });
     $('#approve_req_btn').on('click', function(){
       if($('#customer_req_id').val() == 'select'){

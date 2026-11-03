@@ -128,6 +128,7 @@ function appendPrimaryData(data) {
   fillPendingTransTbl(data);
   fillLinkedAccounts(data);
   fillWires(data);
+  fillAchNoc(data);
 }
 
 function fillLinkedAccountSelect(selectId) {
@@ -252,6 +253,103 @@ function fillWires(data) {
     openOpt.innerHTML = wires[j].nickname + ' $' + wires[j].amount + ' (' + wires[j].status + ')';
     openSelect.options.add(openOpt);
   }
+}
+
+function fillAchNoc(data) {
+  var snapshot = data.AchNoc || {};
+  var summary = document.getElementById('noc_summary');
+  if (summary) {
+    summary.innerHTML = 'Active: ' + (snapshot.active_count || 0) +
+      ' &middot; open: ' + (snapshot.open_count || 0) +
+      ' &middot; applied: ' + (snapshot.applied_count || 0) +
+      ' &middot; fees: $' + (snapshot.ytd_fees || '0.00');
+  }
+  var clockEl = document.getElementById('noc_clock');
+  if (clockEl && snapshot.clock) {
+    clockEl.innerHTML = 'Cutoff ' + (snapshot.clock.cutoff || '16:45') +
+      ' &middot; value date ' + (snapshot.clock.value_date || '--') +
+      (snapshot.clock.after_cutoff ? ' &middot; after cutoff' : '');
+  }
+  fillLinkedAccountSelect('noc_funding_account');
+  var table = document.getElementById('noc_key_tbl');
+  if (!table) {
+    return;
+  }
+  var body = table.getElementsByTagName('tbody')[0];
+  body.innerHTML = '';
+  var selection = document.getElementById('noc_key_select');
+  selection.options.length = 1;
+  var keys = snapshot.keys || [];
+  for (var i = 0; i < keys.length; i++) {
+    var row = body.insertRow(-1);
+    row.insertCell(0).innerHTML = keys[i].nickname;
+    row.insertCell(1).innerHTML = keys[i].legal_name;
+    row.insertCell(2).innerHTML = keys[i].aba_masked;
+    row.insertCell(3).innerHTML = keys[i].last4;
+    row.insertCell(4).innerHTML = keys[i].status;
+    var option = document.createElement('OPTION');
+    option.value = keys[i].key_id;
+    option.innerHTML = keys[i].nickname + ' (' + keys[i].status + ')';
+    selection.options.add(option);
+  }
+  var hist = document.getElementById('noc_history_tbl');
+  var histBody = hist.getElementsByTagName('tbody')[0];
+  histBody.innerHTML = '';
+  var openSelect = document.getElementById('noc_notice_select');
+  openSelect.options.length = 1;
+  var notices = snapshot.notices || snapshot.inquiries || [];
+  for (var j = 0; j < notices.length; j++) {
+    var nrow = histBody.insertRow(-1);
+    nrow.insertCell(0).innerHTML = notices[j].nickname;
+    nrow.insertCell(1).innerHTML = notices[j].change_code;
+    nrow.insertCell(2).innerHTML = '$' + notices[j].fee;
+    nrow.insertCell(3).innerHTML = notices[j].status;
+    nrow.insertCell(4).innerHTML = (notices[j].noc_ref_masked || '').slice(0, 16);
+    if (!notices[j].cancelable && !notices[j].applicable && !notices[j].refusable) {
+      continue;
+    }
+    var openOpt = document.createElement('OPTION');
+    openOpt.value = notices[j].notice_id;
+    openOpt.innerHTML = notices[j].nickname + ' ' + notices[j].change_code + ' (' + notices[j].status + ')';
+    openSelect.options.add(openOpt);
+  }
+}
+
+function postAchNoc(path, payload, okMsg) {
+  payload.userid = userid;
+  fetch(homeURL + path, {
+    method: 'post',
+    body: JSON.stringify(payload),
+    headers: { 'Content-type': 'application/json' }
+  }).then(function(response) {
+    return response.json().then(function(body) {
+      var result = document.getElementById('noc_result');
+      if (!response.ok) {
+        if (result) { result.innerHTML = (body && (body.message || body.error)) || 'Failed'; }
+        window.alert((body && (body.message || body.error)) || 'Request failed');
+        if (body && body.AchNoc) {
+          fillAchNoc({ AchNoc: body.AchNoc });
+        }
+        return;
+      }
+      if (result) {
+        if (body && body.preview) {
+          result.innerHTML = 'Fee $' + body.preview.fee +
+            ' &middot; dual-control ' + body.preview.dual_control +
+            ' &middot; window ' + (body.preview.network_open ? 'open' : 'closed');
+        } else {
+          result.innerHTML = okMsg || body.message || 'Done';
+        }
+      }
+      if (body && body.AchNoc) {
+        fillAchNoc({ AchNoc: body.AchNoc });
+      } else {
+        getUser();
+      }
+    });
+  }).catch(function(error) {
+    console.error(error);
+  });
 }
 
 function postWire(path, payload, okMsg) {
@@ -1047,6 +1145,7 @@ $(document).ready(function() {
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#noc_menu').css('background-color','maroon');
     });
     $('#service_requests_menu').on('click', function(){
       if($('#service_requests_pane').css('display')=='none'){
@@ -1057,6 +1156,7 @@ $(document).ready(function() {
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#noc_menu').css('background-color','maroon');
     });
     $('#my_accounts_menu').on('click', function(){
       getUser();
@@ -1077,6 +1177,7 @@ $(document).ready(function() {
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#noc_menu').css('background-color','maroon');
     });
     $('#pending_transaction_requests_menu').on('click', function(){
       if($('#pending_transaction_requests_pane').css('display')=='none'){
@@ -1087,6 +1188,7 @@ $(document).ready(function() {
       $('#service_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#noc_menu').css('background-color','maroon');
     });
     $('#linked_accounts_menu').on('click', function(){
       if($('#linked_accounts_pane').css('display')=='none'){
@@ -1097,6 +1199,7 @@ $(document).ready(function() {
       $('#service_requests_menu').css('background-color','maroon');
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#noc_menu').css('background-color','maroon');
     });
     $('#wires_menu').on('click', function(){
       if($('#wires_pane').css('display')=='none'){
@@ -1107,6 +1210,71 @@ $(document).ready(function() {
       $('#service_requests_menu').css('background-color','maroon');
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
+      $('#noc_menu').css('background-color','maroon');
+    });
+    $('#noc_menu').on('click', function(){
+      if($('#noc_pane').css('display')=='none'){
+          $('#noc_pane').show().siblings('div').hide();
+      }
+      $('#noc_menu').css('background-color','#FF6600');
+      $('#my_accounts_menu').css('background-color','maroon');
+      $('#service_requests_menu').css('background-color','maroon');
+      $('#pending_transaction_requests_menu').css('background-color','maroon');
+      $('#linked_accounts_menu').css('background-color','maroon');
+      $('#wires_menu').css('background-color','maroon');
+    });
+    $('#noc_add_btn').on('click', function(){
+      if($('#noc_nickname').val() == '' || $('#noc_legal_name').val() == '' || $('#noc_funding_account').val() == 'select'){
+        window.alert('Nickname, legal name, and funding account are required.');
+        return;
+      }
+      postAchNoc('addAchNocKey', {
+        nickname: $('#noc_nickname').val(),
+        legal_name: $('#noc_legal_name').val(),
+        dest_aba: $('#noc_dest_aba').val(),
+        dest_account: $('#noc_dest_account').val(),
+        funding_account: $('#noc_funding_account').val(),
+        tran_code: $('#noc_tran_code').val()
+      }, 'Destination enrolled');
+    });
+    $('#noc_preview_btn').on('click', function(){
+      if($('#noc_notice_select').val() == 'select'){ window.alert('Select a NOC.'); return; }
+      postAchNoc('previewAchNoc', { notice_id: $('#noc_notice_select').val() }, 'Preview');
+    });
+    $('#noc_apply_btn').on('click', function(){
+      if($('#noc_notice_select').val() == 'select'){ window.alert('Select a NOC.'); return; }
+      postAchNoc('applyAchNoc', { notice_id: $('#noc_notice_select').val() }, 'NOC applied');
+    });
+    $('#noc_refuse_btn').on('click', function(){
+      if($('#noc_notice_select').val() == 'select'){ window.alert('Select a NOC.'); return; }
+      postAchNoc('refuseAchNoc', { notice_id: $('#noc_notice_select').val(), refuse: 'C65' }, 'NOC refused');
+    });
+    $('#noc_claim_btn').on('click', function(){
+      if($('#noc_funding_account').val() == 'select'){ window.alert('Select a funding account.'); return; }
+      postAchNoc('claimAchNoc', {
+        notice_id: $('#noc_notice_select').val() == 'select' ? null : $('#noc_notice_select').val(),
+        dest_account: $('#noc_dest_account').val(),
+        dest_aba: $('#noc_dest_aba').val(),
+        funding_account: $('#noc_funding_account').val(),
+        nickname: $('#noc_nickname').val(),
+        legal_name: $('#noc_legal_name').val()
+      }, 'Claimed');
+    });
+    $('#noc_cancel_btn').on('click', function(){
+      if($('#noc_notice_select').val() == 'select'){ window.alert('Select a NOC.'); return; }
+      postAchNoc('cancelAchNoc', { notice_id: $('#noc_notice_select').val() }, 'Cancelled');
+    });
+    $('#noc_pause_btn').on('click', function(){
+      if($('#noc_key_select').val() == 'select'){ window.alert('Select a destination.'); return; }
+      postAchNoc('pauseAchNocKey', { key_id: $('#noc_key_select').val() }, 'Paused');
+    });
+    $('#noc_resume_btn').on('click', function(){
+      if($('#noc_key_select').val() == 'select'){ window.alert('Select a destination.'); return; }
+      postAchNoc('resumeAchNocKey', { key_id: $('#noc_key_select').val() }, 'Resumed');
+    });
+    $('#noc_cancel_key_btn').on('click', function(){
+      if($('#noc_key_select').val() == 'select'){ window.alert('Select a destination.'); return; }
+      postAchNoc('cancelAchNocKey', { key_id: $('#noc_key_select').val() }, 'Destination cancelled');
     });
     $('#wire_add_btn').on('click', function(){
       if($('#wire_nickname').val() == '' || $('#wire_legal_name').val() == '' || $('#wire_default_account').val() == 'select'){
