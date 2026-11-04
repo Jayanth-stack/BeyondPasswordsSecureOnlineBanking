@@ -347,6 +347,64 @@ class MutatingGetMoneyRouteTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         emp_cls.return_value.deactivate_customer.assert_called_once_with("emp9", "cust1")
 
+    def test_get_modify_employee_rewrites_another_emp(self):
+        self._session("emp1", "employee", emp_tier=1)
+        with patch("app.Employee") as emp_cls:
+            emp_cls.return_value.update_account_info.return_value = "updated"
+            response = self.client.get(
+                "/modifyEmployee",
+                json={
+                    "userid": "emp1",
+                    "emp_id": "emp9",
+                    "last_name": "L",
+                    "middle_name": "",
+                    "first_name": "F",
+                    "contact_no": "1",
+                    "email_id": "a@b.com",
+                    "ssn": "1",
+                    "dob": "d",
+                    "address": "x",
+                    "tier": 3,
+                },
+            )
+        self.assertEqual(response.status_code, 200)
+        emp_cls.return_value.update_account_info.assert_called_once_with(
+            "emp9", "L", "", "F", "1", "a@b.com", "1", "d", "x", 3
+        )
+
+    def test_get_deactivate_account_still_closes(self):
+        self._session("emp1", "tier2", emp_tier=2)
+        with patch("app.Employee") as emp_cls:
+            emp_cls.return_value.deactivate_account.return_value = "Account Closed"
+            response = self.client.get(
+                "/deactivateAccount",
+                json={"userid": "emp1", "account_no": 10},
+            )
+        self.assertEqual(response.status_code, 200)
+        emp_cls.return_value.deactivate_account.assert_called_once_with("emp1", 10)
+
+    def test_get_approve_update_info_still_writes_pii(self):
+        self._session("emp1", "employee", emp_tier=2)
+        with patch("app.Employee") as emp_cls:
+            emp_cls.return_value.approve_update_info.return_value = "Customer Updated"
+            response = self.client.get(
+                "/approveUpdateInfo",
+                json={"userid": "emp1", "update_req_no": 9},
+            )
+        self.assertEqual(response.status_code, 200)
+        emp_cls.return_value.approve_update_info.assert_called_once_with("emp1", 9)
+
+    def test_get_deny_update_info_skips_userid_match(self):
+        self._session("emp1", "employee", emp_tier=2)
+        with patch("app.Employee") as emp_cls:
+            emp_cls.return_value.deny_update_info.return_value = "Done"
+            response = self.client.get(
+                "/denyUpdateInfo",
+                json={"userid": "emp9", "update_req_no": 9},
+            )
+        self.assertEqual(response.status_code, 200)
+        emp_cls.return_value.deny_update_info.assert_called_once_with("emp9", 9)
+
 
 class WireIntegrityRegressionTests(unittest.TestCase):
     def setUp(self):
@@ -1028,6 +1086,169 @@ class ClaimedEmployeeWireGetTests(unittest.TestCase):
         self.assertEqual(stored.status, "sent")
         self.assertTrue(stored.imad)
         self.assertEqual(self.debits[0], ("2001", "37.00", "wire to BobsChase"))
+
+    def test_claimed_employee_get_list_beneficiaries_transmits_foreign_queued(self):
+        wire, _ = self._queue_bob_wire(amount="38.00", trace_id="emp-get-benes")
+        self.now[0] = _ts(2024, 6, 17, 10, 0)
+        self._login("emp1", "employee")
+        response = self.client.get(
+            "/listWireBeneficiaries",
+            json={"userid": "emp1", "customer_id": "bob"},
+        )
+        self.assertEqual(response.status_code, 200)
+        stored = self.service.store.get_wire(wire.wire_id)
+        self.assertEqual(stored.status, "sent")
+        self.assertTrue(stored.imad)
+        self.assertEqual(self.debits[0], ("2001", "38.00", "wire to BobsChase"))
+
+    def test_claimed_employee_get_reject_wire_rejects_foreign_queued(self):
+        wire, _ = self._queue_bob_wire(trace_id="emp-get-reject")
+        self._login("emp1", "employee")
+        response = self.client.get(
+            "/rejectWire",
+            json={"userid": "emp1", "wire_id": wire.wire_id},
+        )
+        self.assertEqual(response.status_code, 200)
+        body = response.get_json()
+        self.assertEqual(body["wire"]["status"], "rejected")
+        self.assertEqual(body["wire"]["userid"], "bob")
+        self.assertEqual(self.debits, [])
+
+    def test_claimed_employee_get_pause_beneficiary_pauses_foreign(self):
+        bene = self._add_bob_bene()
+        self._login("emp1", "employee")
+        response = self.client.get(
+            "/pauseWireBeneficiary",
+            json={"userid": "emp1", "beneficiary_id": bene.beneficiary_id},
+        )
+        self.assertEqual(response.status_code, 200)
+        body = response.get_json()
+        self.assertEqual(body["beneficiary"]["status"], "paused")
+        self.assertEqual(body["beneficiary"]["userid"], "bob")
+        stored = self.service.store.get_beneficiary(bene.beneficiary_id)
+        self.assertEqual(stored.status, "paused")
+
+    def test_claimed_employee_get_archive_beneficiary_archives_foreign(self):
+        bene = self._add_bob_bene()
+        self._login("emp1", "employee")
+        response = self.client.get(
+            "/archiveWireBeneficiary",
+            json={"userid": "emp1", "beneficiary_id": bene.beneficiary_id},
+        )
+        self.assertEqual(response.status_code, 200)
+        body = response.get_json()
+        self.assertEqual(body["beneficiary"]["status"], "archived")
+        self.assertEqual(body["beneficiary"]["userid"], "bob")
+        stored = self.service.store.get_beneficiary(bene.beneficiary_id)
+        self.assertEqual(stored.status, "archived")
+
+    def test_claimed_employee_get_resume_beneficiary_reactivates_foreign(self):
+        bene = self._add_bob_bene()
+        self.service.set_beneficiary_status(
+            beneficiary_id=bene.beneficiary_id,
+            actor="bob",
+            actor_type="customer",
+            status="paused",
+        )
+        self._login("emp1", "employee")
+        response = self.client.get(
+            "/resumeWireBeneficiary",
+            json={"userid": "emp1", "beneficiary_id": bene.beneficiary_id},
+        )
+        self.assertEqual(response.status_code, 200)
+        body = response.get_json()
+        self.assertEqual(body["beneficiary"]["status"], "active")
+        self.assertEqual(body["beneficiary"]["userid"], "bob")
+        stored = self.service.store.get_beneficiary(bene.beneficiary_id)
+        self.assertEqual(stored.status, "active")
+
+    def test_claimed_admin_get_cancel_wire_cancels_foreign_queued(self):
+        wire, _ = self._queue_bob_wire(trace_id="admin-get-cancel")
+        self._login("admin1", "admin")
+        response = self.client.get(
+            "/cancelWire",
+            json={"userid": "admin1", "wire_id": wire.wire_id},
+        )
+        self.assertEqual(response.status_code, 200)
+        body = response.get_json()
+        self.assertEqual(body["wire"]["status"], "cancelled")
+        self.assertEqual(body["wire"]["userid"], "bob")
+        self.assertEqual(self.debits, [])
+
+    def test_claimed_admin_get_run_due_transmits_foreign_queued(self):
+        wire, _ = self._queue_bob_wire(amount="42.00", trace_id="admin-get-rundue")
+        self.now[0] = _ts(2024, 6, 17, 10, 0)
+        self._login("admin1", "admin")
+        response = self.client.get(
+            "/runDueWires",
+            json={"userid": "admin1", "customer_id": "bob"},
+        )
+        self.assertEqual(response.status_code, 200)
+        stored = self.service.store.get_wire(wire.wire_id)
+        self.assertEqual(stored.status, "sent")
+        self.assertTrue(stored.imad)
+        self.assertEqual(self.debits[0], ("2001", "42.00", "wire to BobsChase"))
+
+    def test_claimed_admin_get_release_wire_debits_foreign_pending(self):
+        bene = self._add_bob_bene()
+        wire, created = self.service.originate(
+            owner_userid="bob",
+            actor="bob",
+            actor_type="customer",
+            beneficiary_id=bene.beneficiary_id,
+            amount="10000.00",
+            trace_id="admin-get-release",
+        )
+        self.assertTrue(created)
+        self.assertEqual(wire.status, "pending_release")
+        self._login("admin1", "admin")
+        response = self.client.get(
+            "/releaseWire",
+            json={"userid": "admin1", "wire_id": wire.wire_id},
+        )
+        self.assertEqual(response.status_code, 200)
+        body = response.get_json()
+        self.assertEqual(body["wire"]["status"], "sent")
+        self.assertTrue(body["wire"]["imad"])
+        self.assertEqual(body["wire"]["userid"], "bob")
+        self.assertEqual(self.debits[0], ("2001", "10000.00", "wire to BobsChase"))
+
+    def test_claimed_admin_get_override_ofac_transmits_foreign_hold(self):
+        bene = self.service.add_beneficiary(
+            owner_userid="bob",
+            actor="bob",
+            actor_type="customer",
+            nickname="Blocked",
+            legal_name="Blocked Person",
+            aba="021000021",
+            account_number="55667799",
+            street="2 Federal St",
+            city="Boston",
+            state="MA",
+            postal="02110",
+            default_account="2001",
+        )
+        wire, created = self.service.originate(
+            owner_userid="bob",
+            actor="bob",
+            actor_type="customer",
+            beneficiary_id=bene.beneficiary_id,
+            amount="40.00",
+            trace_id="admin-get-ofac",
+        )
+        self.assertTrue(created)
+        self.assertEqual(wire.status, "held")
+        self._login("admin1", "admin")
+        response = self.client.get(
+            "/overrideOfac",
+            json={"userid": "admin1", "wire_id": wire.wire_id},
+        )
+        self.assertEqual(response.status_code, 200)
+        body = response.get_json()
+        self.assertEqual(body["wire"]["status"], "sent")
+        self.assertTrue(body["wire"]["imad"])
+        self.assertEqual(body["wire"]["userid"], "bob")
+        self.assertEqual(self.debits[0], ("2001", "40.00", "wire to Blocked"))
 
 
 if __name__ == "__main__":
