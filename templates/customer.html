@@ -111,6 +111,15 @@
         </button>
 
         <button type="button" class="btn btn-primary btn-block"
+        id="rtp_rfi_menu">
+        <span class="glyphicon glyphicon-question-sign gi-3x"
+        style="color: white" aria-hidden="true">
+        </span>
+        <br />
+        RTP RFI
+        </button>
+
+        <button type="button" class="btn btn-primary btn-block"
         id="service_requests_menu">
         <span class="glyphicon glyphicon-edit gi-3x"
         style="color: white" aria-hidden="true">
@@ -351,6 +360,60 @@
           </table>
           <select id="wire_open_select" style="height:30px;margin-right:5px;">
             <option value="select">Select open wire</option>
+          </select>
+        </div>
+        <div id="rtp_rfi_pane" style="display:none;">
+          <p id="rtp_rfi_summary" style="color:white;">Active: 0 &middot; open: 0 &middot; posted: 0 &middot; fees: $0.00</p>
+          <p id="rtp_rfi_clock" style="color:white;">TCH RTP 24/7 &middot; USRTPP &middot; 5-day SLA</p>
+          <table class="table table-hover table-bordered table-color fixed-header" id="rtp_rfi_key_tbl">
+            <thead>
+              <tr>
+                <th>Nickname</th>
+                <th>Name</th>
+                <th>Last4</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+          <hr>
+          <h5 style="color:white;">Enroll an RTP alias</h5>
+          <input type="text" id="rtp_rfi_nickname" placeholder="Nickname" style="height:30px;width:140px;margin-right:5px;">
+          <input type="text" id="rtp_rfi_legal_name" placeholder="Legal name" style="height:30px;width:160px;margin-right:5px;">
+          <select id="rtp_rfi_default_account" style="height:30px;margin-right:5px;">
+            <option value="select">Internal account</option>
+          </select>
+          <button type="button" id="rtp_rfi_add_btn" class="btn btn-primary">Enroll alias</button>
+          <br><br>
+          <h5 style="color:white;">Respond to an RTP RFI</h5>
+          <select id="rtp_rfi_inquiry_select" style="height:30px;margin-right:5px;">
+            <option value="select">Select open RFI</option>
+          </select>
+          <input type="text" id="rtp_rfi_response" placeholder="Additional payment information" style="height:30px;width:260px;margin-right:5px;">
+          <button type="button" id="rtp_rfi_preview_btn" class="btn btn-primary">Preview</button>
+          <button type="button" id="rtp_rfi_respond_btn" class="btn btn-primary">Respond</button>
+          <button type="button" id="rtp_rfi_cancel_btn" class="btn btn-primary">Cancel open</button>
+          <button type="button" id="rtp_rfi_claim_btn" class="btn btn-primary">Claim</button>
+          <button type="button" id="rtp_rfi_reverse_btn" class="btn btn-primary">Request reverse</button>
+          <button type="button" id="rtp_rfi_pause_btn" class="btn btn-primary">Pause</button>
+          <button type="button" id="rtp_rfi_resume_btn" class="btn btn-primary">Resume</button>
+          <button type="button" id="rtp_rfi_cancel_key_btn" class="btn btn-primary">Cancel alias</button>
+          <p id="rtp_rfi_result" style="color:yellow;margin-top:10px;"></p>
+          <hr>
+          <h5 style="color:white;">RTP RFI history</h5>
+          <table class="table table-hover table-bordered table-color fixed-header" id="rtp_rfi_history_tbl">
+            <thead>
+              <tr>
+                <th>Nickname</th>
+                <th>Reason</th>
+                <th>Status</th>
+                <th>Ref</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+          <select id="rtp_rfi_key_select" style="height:30px;margin-right:5px;">
+            <option value="select">Select alias</option>
           </select>
         </div>
         <div id="account_details_pane" style="display:none;">
