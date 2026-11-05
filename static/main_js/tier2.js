@@ -244,6 +244,7 @@ function appendSecondaryData(customer_id, data) {
   fillCustomerAccTbl(data);
   fillStaffLinked(data);
   fillStaffWires(data);
+  fillStaffRtr(data);
   if($('#cust_details_card').css('display')=='none'){
     $('#cust_details_card').show();
   }
@@ -372,6 +373,72 @@ function fillStaffWires(data) {
     option.innerHTML = wires[j].nickname + ' $' + wires[j].amount + ' (' + wires[j].status + ')';
     selection.options.add(option);
   }
+}
+
+function fillStaffRtr(data) {
+  var snapshot = data.RtpRtr || {};
+  var card = document.getElementById('staff_rtr_card');
+  if (!card) {
+    return;
+  }
+  card.style.display = 'block';
+  var summary = document.getElementById('staff_rtr_summary');
+  if (summary) {
+    summary.innerHTML = 'YTD returned: $' + (snapshot.ytd_returned || '0.00') +
+      ' &middot; open: ' + (snapshot.open_count || 0);
+  }
+  var keyTable = document.getElementById('staff_rtr_key_tbl');
+  var keyBody = keyTable.getElementsByTagName('tbody')[0];
+  keyBody.innerHTML = '';
+  var keys = snapshot.keys || [];
+  for (var i = 0; i < keys.length; i++) {
+    var row = keyBody.insertRow(-1);
+    row.insertCell(0).innerHTML = keys[i].nickname;
+    row.insertCell(1).innerHTML = keys[i].legal_name;
+    row.insertCell(2).innerHTML = keys[i].last4;
+    row.insertCell(3).innerHTML = keys[i].status;
+  }
+  var table = document.getElementById('staff_rtr_tbl');
+  var body = table.getElementsByTagName('tbody')[0];
+  body.innerHTML = '';
+  var selection = document.getElementById('staff_rtr_id');
+  selection.options.length = 1;
+  var inquiries = snapshot.inquiries || [];
+  for (var j = 0; j < inquiries.length; j++) {
+    var irow = body.insertRow(-1);
+    irow.insertCell(0).innerHTML = inquiries[j].nickname;
+    irow.insertCell(1).innerHTML = '$' + inquiries[j].amount;
+    irow.insertCell(2).innerHTML = inquiries[j].status;
+    irow.insertCell(3).innerHTML = inquiries[j].reason;
+    if (['held', 'open', 'pending_release', 'unmatched', 'posted'].indexOf(inquiries[j].status) < 0) {
+      continue;
+    }
+    var option = document.createElement('OPTION');
+    option.value = inquiries[j].inquiry_id;
+    option.innerHTML = (inquiries[j].nickname || 'unmatched') + ' $' + inquiries[j].amount + ' (' + inquiries[j].status + ')';
+    selection.options.add(option);
+  }
+}
+
+function postStaffRtr(path, payload) {
+  payload.userid = userid;
+  fetch(homeURL + path, {
+    method: 'post',
+    body: JSON.stringify(payload),
+    headers: { 'Content-type': 'application/json' }
+  }).then(function(response) {
+    return response.json().then(function(body) {
+      var result = document.getElementById('staff_rtr_result');
+      if (!response.ok) {
+        if (result) { result.innerHTML = (body && (body.message || body.error)) || 'Failed'; }
+        return;
+      }
+      if (result) { result.innerHTML = body.message || 'Done'; }
+      getCustomer($('#customer_id_input').val() || document.getElementById('customer_id').innerHTML);
+    });
+  }).catch(function(error) {
+    console.error(error);
+  });
 }
 
 function postStaffWire(path, payload) {
@@ -803,6 +870,7 @@ $(document).ready(function() {
       $('#cust_accounts_tbl').hide();
       $('#staff_linked_card').hide();
       $('#staff_wire_card').hide();
+      $('#staff_rtr_card').hide();
     });
     $('#staff_la_force_btn').on('click', function(){
       if($('#staff_la_link_id').val() == 'select'){ window.alert('Select a pending link.'); return; }
@@ -843,6 +911,29 @@ $(document).ready(function() {
     $('#staff_wire_recall_btn').on('click', function(){
       if($('#staff_wire_id').val() == 'select'){ window.alert('Select a wire.'); return; }
       postStaffWire('recallWire', { wire_id: $('#staff_wire_id').val() });
+    });
+    $('#staff_rtr_ingest_btn').on('click', function(){
+      if($('#staff_rtr_file').val() == ''){ window.alert('Paste an RTP1 line.'); return; }
+      postStaffRtr('ingestRtpRtrFile', { file: $('#staff_rtr_file').val(), customer_id: $('#customer_id_input').val() });
+    });
+    $('#staff_rtr_override_btn').on('click', function(){
+      if($('#staff_rtr_id').val() == 'select'){ window.alert('Select a request.'); return; }
+      postStaffRtr('overrideRtpRtrOfac', { inquiry_id: $('#staff_rtr_id').val() });
+    });
+    $('#staff_rtr_release_btn').on('click', function(){
+      if($('#staff_rtr_id').val() == 'select'){ window.alert('Select a request.'); return; }
+      postStaffRtr('releaseRtpRtr', { inquiry_id: $('#staff_rtr_id').val() });
+    });
+    $('#staff_rtr_reject_btn').on('click', function(){
+      if($('#staff_rtr_id').val() == 'select'){ window.alert('Select a request.'); return; }
+      postStaffRtr('rejectRtpRtr', { inquiry_id: $('#staff_rtr_id').val() });
+    });
+    $('#staff_rtr_reverse_btn').on('click', function(){
+      if($('#staff_rtr_id').val() == 'select'){ window.alert('Select a request.'); return; }
+      postStaffRtr('reverseRtpRtr', { inquiry_id: $('#staff_rtr_id').val() });
+    });
+    $('#staff_rtr_export_btn').on('click', function(){
+      postStaffRtr('exportRtpRtr', { customer_id: $('#customer_id_input').val() });
     });
     $('#approve_trans_btn').on('click', function(){
       if($('#customer_trans_no').val() == 'select'){

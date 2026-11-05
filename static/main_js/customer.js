@@ -128,6 +128,7 @@ function appendPrimaryData(data) {
   fillPendingTransTbl(data);
   fillLinkedAccounts(data);
   fillWires(data);
+  fillRtpRtr(data);
 }
 
 function fillLinkedAccountSelect(selectId) {
@@ -252,6 +253,94 @@ function fillWires(data) {
     openOpt.innerHTML = wires[j].nickname + ' $' + wires[j].amount + ' (' + wires[j].status + ')';
     openSelect.options.add(openOpt);
   }
+}
+
+function fillRtpRtr(data) {
+  var snapshot = data.RtpRtr || {};
+  var summary = document.getElementById('rtr_summary');
+  if (summary) {
+    summary.innerHTML = 'Active: ' + (snapshot.active_count || 0) +
+      ' &middot; open: ' + (snapshot.open_count || 0) +
+      ' &middot; YTD returned: $' + (snapshot.ytd_returned || '0.00');
+  }
+  var clockEl = document.getElementById('rtr_clock');
+  if (clockEl && snapshot.clock) {
+    clockEl.innerHTML = 'TCH RTP 24/7 USRTPP &middot; cycle ' + (snapshot.clock.cycle_date || '--') +
+      ' &middot; ' + (snapshot.clock.sla_days || 10) + '-day SLA';
+  }
+  fillLinkedAccountSelect('rtr_default_account');
+  var table = document.getElementById('rtr_key_tbl');
+  if (!table) {
+    return;
+  }
+  var body = table.getElementsByTagName('tbody')[0];
+  body.innerHTML = '';
+  var keySelect = document.getElementById('rtr_inquiry_select');
+  var keys = snapshot.keys || [];
+  for (var i = 0; i < keys.length; i++) {
+    var row = body.insertRow(-1);
+    row.insertCell(0).innerHTML = keys[i].nickname;
+    row.insertCell(1).innerHTML = keys[i].legal_name;
+    row.insertCell(2).innerHTML = keys[i].last4;
+    row.insertCell(3).innerHTML = keys[i].status;
+  }
+  var hist = document.getElementById('rtr_history_tbl');
+  var histBody = hist.getElementsByTagName('tbody')[0];
+  histBody.innerHTML = '';
+  keySelect.options.length = 1;
+  var inquiries = snapshot.inquiries || [];
+  for (var j = 0; j < inquiries.length; j++) {
+    var irow = histBody.insertRow(-1);
+    irow.insertCell(0).innerHTML = inquiries[j].nickname;
+    irow.insertCell(1).innerHTML = '$' + inquiries[j].amount;
+    irow.insertCell(2).innerHTML = inquiries[j].reason;
+    irow.insertCell(3).innerHTML = inquiries[j].status;
+    irow.insertCell(4).innerHTML = inquiries[j].message_type;
+    if (inquiries[j].acceptable || inquiries[j].cancelable || inquiries[j].unmatched) {
+      var opt = document.createElement('OPTION');
+      opt.value = inquiries[j].inquiry_id;
+      opt.setAttribute('data-key', inquiries[j].key_id || '');
+      opt.innerHTML = (inquiries[j].nickname || 'unmatched') + ' $' + inquiries[j].amount + ' (' + inquiries[j].status + ')';
+      keySelect.options.add(opt);
+    }
+  }
+}
+
+function postRtr(path, payload, okMsg) {
+  payload.userid = userid;
+  fetch(homeURL + path, {
+    method: 'post',
+    body: JSON.stringify(payload),
+    headers: { 'Content-type': 'application/json' }
+  }).then(function(response) {
+    return response.json().then(function(body) {
+      var result = document.getElementById('rtr_result');
+      if (!response.ok) {
+        if (result) { result.innerHTML = (body && (body.message || body.error)) || 'Failed'; }
+        window.alert((body && (body.message || body.error)) || 'Request failed');
+        if (body && body.RtpRtr) {
+          fillRtpRtr({ RtpRtr: body.RtpRtr });
+        }
+        return;
+      }
+      if (result) {
+        if (body && body.preview) {
+          result.innerHTML = 'Return $' + body.preview.amount +
+            (body.preview.dual_control ? ' &middot; dual-control' : '') +
+            ' &middot; ' + (body.preview.message_type || 'pacs.004');
+        } else {
+          result.innerHTML = okMsg || body.message || 'Done';
+        }
+      }
+      if (body && body.RtpRtr) {
+        fillRtpRtr({ RtpRtr: body.RtpRtr });
+      } else {
+        getUser();
+      }
+    });
+  }).catch(function(error) {
+    console.error(error);
+  });
 }
 
 function postWire(path, payload, okMsg) {
@@ -1047,6 +1136,7 @@ $(document).ready(function() {
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#rtr_menu').css('background-color','maroon');
     });
     $('#service_requests_menu').on('click', function(){
       if($('#service_requests_pane').css('display')=='none'){
@@ -1057,6 +1147,7 @@ $(document).ready(function() {
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#rtr_menu').css('background-color','maroon');
     });
     $('#my_accounts_menu').on('click', function(){
       getUser();
@@ -1077,6 +1168,7 @@ $(document).ready(function() {
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#rtr_menu').css('background-color','maroon');
     });
     $('#pending_transaction_requests_menu').on('click', function(){
       if($('#pending_transaction_requests_pane').css('display')=='none'){
@@ -1087,6 +1179,7 @@ $(document).ready(function() {
       $('#service_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#rtr_menu').css('background-color','maroon');
     });
     $('#linked_accounts_menu').on('click', function(){
       if($('#linked_accounts_pane').css('display')=='none'){
@@ -1097,6 +1190,7 @@ $(document).ready(function() {
       $('#service_requests_menu').css('background-color','maroon');
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#rtr_menu').css('background-color','maroon');
     });
     $('#wires_menu').on('click', function(){
       if($('#wires_pane').css('display')=='none'){
@@ -1107,6 +1201,75 @@ $(document).ready(function() {
       $('#service_requests_menu').css('background-color','maroon');
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
+      $('#rtr_menu').css('background-color','maroon');
+    });
+    $('#rtr_menu').on('click', function(){
+      if($('#rtr_pane').css('display')=='none'){
+          $('#rtr_pane').show().siblings('div').hide();
+      }
+      $('#rtr_menu').css('background-color','#FF6600');
+      $('#my_accounts_menu').css('background-color','maroon');
+      $('#service_requests_menu').css('background-color','maroon');
+      $('#pending_transaction_requests_menu').css('background-color','maroon');
+      $('#linked_accounts_menu').css('background-color','maroon');
+      $('#wires_menu').css('background-color','maroon');
+    });
+    $('#rtr_add_btn').on('click', function(){
+      if($('#rtr_nickname').val() == '' || $('#rtr_legal_name').val() == '' || $('#rtr_default_account').val() == 'select'){
+        window.alert('Nickname, legal name, and internal account are required.');
+        return;
+      }
+      postRtr('addRtpRtrKey', {
+        nickname: $('#rtr_nickname').val(),
+        legal_name: $('#rtr_legal_name').val(),
+        default_account: $('#rtr_default_account').val()
+      }, 'Alias enrolled');
+    });
+    $('#rtr_preview_btn').on('click', function(){
+      if($('#rtr_inquiry_select').val() == 'select'){ window.alert('Select a request.'); return; }
+      postRtr('previewRtpRtr', { inquiry_id: $('#rtr_inquiry_select').val() }, 'Preview');
+    });
+    $('#rtr_accept_btn').on('click', function(){
+      if($('#rtr_inquiry_select').val() == 'select'){ window.alert('Select a request.'); return; }
+      postRtr('acceptRtpRtr', { inquiry_id: $('#rtr_inquiry_select').val() }, 'Return accepted');
+    });
+    $('#rtr_decline_btn').on('click', function(){
+      if($('#rtr_inquiry_select').val() == 'select'){ window.alert('Select a request.'); return; }
+      postRtr('declineRtpRtr', { inquiry_id: $('#rtr_inquiry_select').val(), decline: 'LEGL' }, 'Declined');
+    });
+    $('#rtr_cancel_btn').on('click', function(){
+      if($('#rtr_inquiry_select').val() == 'select'){ window.alert('Select a request.'); return; }
+      postRtr('cancelRtpRtr', { inquiry_id: $('#rtr_inquiry_select').val() }, 'Cancelled');
+    });
+    $('#rtr_claim_btn').on('click', function(){
+      if($('#rtr_inquiry_select').val() == 'select' || $('#rtr_default_account').val() == 'select'){
+        window.alert('Select a request and internal account.');
+        return;
+      }
+      postRtr('claimRtpRtr', {
+        inquiry_id: $('#rtr_inquiry_select').val(),
+        default_account: $('#rtr_default_account').val(),
+        nickname: $('#rtr_nickname').val() || 'RTP alias',
+        legal_name: $('#rtr_legal_name').val() || userid
+      }, 'Claimed');
+    });
+    $('#rtr_pause_btn').on('click', function(){
+      var opt = $('#rtr_inquiry_select option:selected');
+      var keyId = opt.attr('data-key');
+      if (!keyId) { window.alert('Select a request with an alias.'); return; }
+      postRtr('pauseRtpRtrKey', { key_id: keyId }, 'Paused');
+    });
+    $('#rtr_resume_btn').on('click', function(){
+      var opt = $('#rtr_inquiry_select option:selected');
+      var keyId = opt.attr('data-key');
+      if (!keyId) { window.alert('Select a request with an alias.'); return; }
+      postRtr('resumeRtpRtrKey', { key_id: keyId }, 'Resumed');
+    });
+    $('#rtr_cancel_key_btn').on('click', function(){
+      var opt = $('#rtr_inquiry_select option:selected');
+      var keyId = opt.attr('data-key');
+      if (!keyId) { window.alert('Select a request with an alias.'); return; }
+      postRtr('cancelRtpRtrKey', { key_id: keyId }, 'Alias cancelled');
     });
     $('#wire_add_btn').on('click', function(){
       if($('#wire_nickname').val() == '' || $('#wire_legal_name').val() == '' || $('#wire_default_account').val() == 'select'){
