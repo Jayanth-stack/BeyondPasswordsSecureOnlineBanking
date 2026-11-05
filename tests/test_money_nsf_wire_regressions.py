@@ -15,6 +15,12 @@ from flask import Flask
 import tests  # noqa: F401
 
 from utility.crypto_receipt import generate_receipt
+from utility.link import (
+    LinkPolicy,
+    LinkService,
+    MemoryLinkStore,
+    attach_link_routes,
+)
 from utility.wire import (
     MemoryWireStore,
     WireCalendar,
@@ -1249,6 +1255,293 @@ class ClaimedEmployeeWireGetTests(unittest.TestCase):
         self.assertTrue(body["wire"]["imad"])
         self.assertEqual(body["wire"]["userid"], "bob")
         self.assertEqual(self.debits[0], ("2001", "40.00", "wire to Blocked"))
+
+    def test_claimed_admin_get_reject_wire_rejects_foreign_queued(self):
+        wire, _ = self._queue_bob_wire(trace_id="admin-get-reject")
+        self._login("admin1", "admin")
+        response = self.client.get(
+            "/rejectWire",
+            json={"userid": "admin1", "wire_id": wire.wire_id},
+        )
+        self.assertEqual(response.status_code, 200)
+        body = response.get_json()
+        self.assertEqual(body["wire"]["status"], "rejected")
+        self.assertEqual(body["wire"]["userid"], "bob")
+        self.assertEqual(self.debits, [])
+
+    def test_claimed_admin_get_pause_beneficiary_pauses_foreign(self):
+        bene = self._add_bob_bene()
+        self._login("admin1", "admin")
+        response = self.client.get(
+            "/pauseWireBeneficiary",
+            json={"userid": "admin1", "beneficiary_id": bene.beneficiary_id},
+        )
+        self.assertEqual(response.status_code, 200)
+        body = response.get_json()
+        self.assertEqual(body["beneficiary"]["status"], "paused")
+        self.assertEqual(body["beneficiary"]["userid"], "bob")
+        stored = self.service.store.get_beneficiary(bene.beneficiary_id)
+        self.assertEqual(stored.status, "paused")
+
+    def test_claimed_admin_get_archive_beneficiary_archives_foreign(self):
+        bene = self._add_bob_bene()
+        self._login("admin1", "admin")
+        response = self.client.get(
+            "/archiveWireBeneficiary",
+            json={"userid": "admin1", "beneficiary_id": bene.beneficiary_id},
+        )
+        self.assertEqual(response.status_code, 200)
+        body = response.get_json()
+        self.assertEqual(body["beneficiary"]["status"], "archived")
+        self.assertEqual(body["beneficiary"]["userid"], "bob")
+        stored = self.service.store.get_beneficiary(bene.beneficiary_id)
+        self.assertEqual(stored.status, "archived")
+
+    def test_claimed_admin_get_resume_beneficiary_reactivates_foreign(self):
+        bene = self._add_bob_bene()
+        self.service.set_beneficiary_status(
+            beneficiary_id=bene.beneficiary_id,
+            actor="bob",
+            actor_type="customer",
+            status="paused",
+        )
+        self._login("admin1", "admin")
+        response = self.client.get(
+            "/resumeWireBeneficiary",
+            json={"userid": "admin1", "beneficiary_id": bene.beneficiary_id},
+        )
+        self.assertEqual(response.status_code, 200)
+        body = response.get_json()
+        self.assertEqual(body["beneficiary"]["status"], "active")
+        self.assertEqual(body["beneficiary"]["userid"], "bob")
+        stored = self.service.store.get_beneficiary(bene.beneficiary_id)
+        self.assertEqual(stored.status, "active")
+
+    def test_claimed_admin_get_list_beneficiaries_transmits_foreign_queued(self):
+        wire, _ = self._queue_bob_wire(amount="39.00", trace_id="admin-get-benes")
+        self.now[0] = _ts(2024, 6, 17, 10, 0)
+        self._login("admin1", "admin")
+        response = self.client.get(
+            "/listWireBeneficiaries",
+            json={"userid": "admin1", "customer_id": "bob"},
+        )
+        self.assertEqual(response.status_code, 200)
+        stored = self.service.store.get_wire(wire.wire_id)
+        self.assertEqual(stored.status, "sent")
+        self.assertTrue(stored.imad)
+        self.assertEqual(self.debits[0], ("2001", "39.00", "wire to BobsChase"))
+
+    def test_claimed_tier1_get_cancel_wire_cancels_foreign_queued(self):
+        wire, _ = self._queue_bob_wire(trace_id="tier1-get-cancel")
+        self._login("t1", "tier1")
+        response = self.client.get(
+            "/cancelWire",
+            json={"userid": "t1", "wire_id": wire.wire_id},
+        )
+        self.assertEqual(response.status_code, 200)
+        body = response.get_json()
+        self.assertEqual(body["wire"]["status"], "cancelled")
+        self.assertEqual(body["wire"]["userid"], "bob")
+        self.assertEqual(self.debits, [])
+
+    def test_claimed_tier1_get_run_due_transmits_foreign_queued(self):
+        wire, _ = self._queue_bob_wire(amount="43.00", trace_id="tier1-get-rundue")
+        self.now[0] = _ts(2024, 6, 17, 10, 0)
+        self._login("t1", "tier1")
+        response = self.client.get(
+            "/runDueWires",
+            json={"userid": "t1", "customer_id": "bob"},
+        )
+        self.assertEqual(response.status_code, 200)
+        stored = self.service.store.get_wire(wire.wire_id)
+        self.assertEqual(stored.status, "sent")
+        self.assertTrue(stored.imad)
+        self.assertEqual(self.debits[0], ("2001", "43.00", "wire to BobsChase"))
+
+    def test_claimed_tier1_get_release_wire_debits_foreign_pending(self):
+        bene = self._add_bob_bene()
+        wire, created = self.service.originate(
+            owner_userid="bob",
+            actor="bob",
+            actor_type="customer",
+            beneficiary_id=bene.beneficiary_id,
+            amount="10000.00",
+            trace_id="tier1-get-release",
+        )
+        self.assertTrue(created)
+        self.assertEqual(wire.status, "pending_release")
+        self._login("t1", "tier1")
+        response = self.client.get(
+            "/releaseWire",
+            json={"userid": "t1", "wire_id": wire.wire_id},
+        )
+        self.assertEqual(response.status_code, 200)
+        body = response.get_json()
+        self.assertEqual(body["wire"]["status"], "sent")
+        self.assertTrue(body["wire"]["imad"])
+        self.assertEqual(body["wire"]["userid"], "bob")
+        self.assertEqual(self.debits[0], ("2001", "10000.00", "wire to BobsChase"))
+
+    def test_claimed_tier1_get_override_ofac_transmits_foreign_hold(self):
+        bene = self.service.add_beneficiary(
+            owner_userid="bob",
+            actor="bob",
+            actor_type="customer",
+            nickname="Blocked",
+            legal_name="Blocked Person",
+            aba="021000021",
+            account_number="55667799",
+            street="2 Federal St",
+            city="Boston",
+            state="MA",
+            postal="02110",
+            default_account="2001",
+        )
+        wire, created = self.service.originate(
+            owner_userid="bob",
+            actor="bob",
+            actor_type="customer",
+            beneficiary_id=bene.beneficiary_id,
+            amount="40.00",
+            trace_id="tier1-get-ofac",
+        )
+        self.assertTrue(created)
+        self.assertEqual(wire.status, "held")
+        self._login("t1", "tier1")
+        response = self.client.get(
+            "/overrideOfac",
+            json={"userid": "t1", "wire_id": wire.wire_id},
+        )
+        self.assertEqual(response.status_code, 200)
+        body = response.get_json()
+        self.assertEqual(body["wire"]["status"], "sent")
+        self.assertTrue(body["wire"]["imad"])
+        self.assertEqual(body["wire"]["userid"], "bob")
+        self.assertEqual(self.debits[0], ("2001", "40.00", "wire to Blocked"))
+
+
+class ClaimedEmployeeLinkGetTests(unittest.TestCase):
+    """Claimed employee GET mutates another customer's ACH links (EMPLOYEE_ROLES)."""
+
+    def setUp(self):
+        self.now = [1_718_409_600.0]
+        self.debits = []
+        self.credits = []
+        self.amounts = [(Decimal("0.12"), Decimal("0.47"))]
+        self.accounts = {
+            "alice": {
+                "checkin": {"Account": 1001, "Balance": 500},
+                "savings": {"Account": 1002, "Balance": 80},
+                "credit": "None",
+            },
+            "bob": {
+                "checkin": {"Account": 2001, "Balance": 400},
+                "savings": {"Account": 2002, "Balance": 10},
+                "credit": "None",
+            },
+        }
+
+        def debit_fn(account, amount, remark):
+            self.debits.append((account, amount, remark))
+            return "Amount Debited"
+
+        def credit_fn(account, amount, remark):
+            self.credits.append((account, amount, remark))
+            return "Success"
+
+        self.service = LinkService(
+            LinkPolicy(
+                challenge_secret="unit-secret",
+                prenote_wait_seconds=86400,
+                pending_ttl_seconds=86400,
+            ),
+            MemoryLinkStore(),
+            clock=lambda: self.now[0],
+            debit_fn=debit_fn,
+            credit_fn=credit_fn,
+            accounts_fn=lambda userid: self.accounts.get(userid, {}),
+            amount_fn=lambda: self.amounts[0],
+        )
+        app = Flask(__name__)
+        app.secret_key = "test-secret"
+        app.config["TESTING"] = True
+        attach_link_routes(app, self.service)
+        self.client = app.test_client()
+
+    def _login(self, userid, usertype):
+        with self.client.session_transaction() as sess:
+            sess["userid"] = userid
+            sess["usertype"] = usertype
+
+    def _add_bob_pending(self, nickname="BobsChase", **kwargs):
+        return self.service.add_link(
+            owner_userid="bob",
+            actor="bob",
+            actor_type="customer",
+            nickname=nickname,
+            default_account="2001",
+            routing_last4=kwargs.pop("routing_last4", "0210"),
+            account_last4=kwargs.pop("account_last4", "7788"),
+            **kwargs,
+        )
+
+    def test_claimed_employee_get_force_verify_verifies_foreign_pending(self):
+        link = self._add_bob_pending()
+        self.assertEqual(link.status, "pending")
+        self._login("emp1", "employee")
+        response = self.client.get(
+            "/forceVerifyLinkedAccount",
+            json={"userid": "emp1", "link_id": link.link_id},
+        )
+        self.assertEqual(response.status_code, 200)
+        body = response.get_json()
+        self.assertEqual(body["link"]["status"], "verified")
+        self.assertEqual(body["link"]["userid"], "bob")
+        stored = self.service.store.get_link(link.link_id)
+        self.assertEqual(stored.status, "verified")
+
+    def test_claimed_employee_get_accept_prenote_verifies_foreign(self):
+        link = self._add_bob_pending(nickname="BobsPrenote", method="prenote")
+        self.assertEqual(link.status, "pending")
+        self.now[0] += 86400
+        self._login("emp1", "employee")
+        response = self.client.get(
+            "/acceptPrenote",
+            json={"userid": "emp1", "link_id": link.link_id},
+        )
+        self.assertEqual(response.status_code, 200)
+        body = response.get_json()
+        self.assertEqual(body["link"]["status"], "verified")
+        self.assertEqual(body["link"]["userid"], "bob")
+        stored = self.service.store.get_link(link.link_id)
+        self.assertEqual(stored.status, "verified")
+
+    def test_claimed_employee_get_pull_credits_foreign_account(self):
+        link = self._add_bob_pending()
+        self.service.confirm_micro(
+            link_id=link.link_id,
+            actor="bob",
+            actor_type="customer",
+            amount1="0.12",
+            amount2="0.47",
+        )
+        self._login("emp1", "employee")
+        response = self.client.get(
+            "/pullFromLinked",
+            json={
+                "userid": "emp1",
+                "customer_id": "bob",
+                "link_id": link.link_id,
+                "amount": "25.00",
+                "trace_id": "emp-get-pull",
+            },
+        )
+        self.assertEqual(response.status_code, 201)
+        body = response.get_json()
+        self.assertEqual(body["movement"]["status"], "sent")
+        self.assertEqual(body["movement"]["userid"], "bob")
+        self.assertEqual(body["movement"]["amount"], "25.00")
+        self.assertEqual(self.credits[0], ("2001", "25.00", "ach from BobsChase"))
 
 
 if __name__ == "__main__":
