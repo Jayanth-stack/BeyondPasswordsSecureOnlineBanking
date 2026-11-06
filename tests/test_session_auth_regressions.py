@@ -226,6 +226,21 @@ class TransactionOwnershipQueryTests(unittest.TestCase):
         self.cust_cursor.fetchone.return_value = None
         self.assertFalse(Customers().owns_pending_transaction("alice", 10))
 
+    def test_fund_transfers_txn_minus_one_no_transactions_row_regular_transfer(self):
+        """Cheque deposit calls fund_transfers(..., -1); no Transactions row must not crash."""
+        from customer import Customers
+
+        self.cust_cursor.fetchall.side_effect = [
+            [(1,)],  # receiver account active
+            [],  # no row for transaction_no=-1 (not a deposit pseudo-txn)
+            [(100.0, 1, "savings")],  # sender: balance, active, type
+        ]
+
+        result = Customers().fund_transfers(1, 2, 10.0, -1)
+
+        self.assertEqual(result, "done")
+        self.cust_db.commit.assert_called()
+
 
 if __name__ == "__main__":
     unittest.main()
