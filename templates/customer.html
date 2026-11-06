@@ -111,6 +111,15 @@
         </button>
 
         <button type="button" class="btn btn-primary btn-block"
+        id="npp_menu">
+        <span class="glyphicon glyphicon-flash gi-3x"
+        style="color: white" aria-hidden="true">
+        </span>
+        <br />
+        NPP / PayID
+        </button>
+
+        <button type="button" class="btn btn-primary btn-block"
         id="service_requests_menu">
         <span class="glyphicon glyphicon-edit gi-3x"
         style="color: white" aria-hidden="true">
@@ -351,6 +360,80 @@
           </table>
           <select id="wire_open_select" style="height:30px;margin-right:5px;">
             <option value="select">Select open wire</option>
+          </select>
+        </div>
+        <div id="npp_pane" style="display:none;">
+          <p id="npp_summary" style="color:white;">Active: 0 &middot; open: 0 &middot; YTD sent: $0.00 &middot; fees: $0.00</p>
+          <p id="npp_clock" style="color:white;">AEST cutoff 17:00 &middot; Osko 24/7</p>
+          <table class="table table-hover table-bordered table-color fixed-header" id="npp_bene_tbl">
+            <thead>
+              <tr>
+                <th>Nickname</th>
+                <th>Name</th>
+                <th>Rail</th>
+                <th>PayID</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+          <hr>
+          <h5 style="color:white;">Add an NPP / PayID beneficiary</h5>
+          <input type="text" id="npp_nickname" placeholder="Nickname" style="height:30px;width:140px;margin-right:5px;">
+          <input type="text" id="npp_legal_name" placeholder="Legal name" style="height:30px;width:160px;margin-right:5px;">
+          <select id="npp_rail" style="height:30px;margin-right:5px;">
+            <option value="osko">Osko</option>
+            <option value="npp">NPP</option>
+            <option value="de">Direct Entry</option>
+          </select>
+          <select id="npp_default_account" style="height:30px;margin-right:5px;">
+            <option value="select">Internal account</option>
+          </select>
+          <br><br>
+          <input type="text" id="npp_payid" placeholder="PayID email/mobile/ABN" style="height:30px;width:200px;margin-right:5px;">
+          <input type="text" id="npp_bsb" placeholder="BSB" maxlength="7" style="height:30px;width:90px;margin-right:5px;">
+          <input type="text" id="npp_account_number" placeholder="Account no." style="height:30px;width:120px;margin-right:5px;">
+          <button type="button" id="npp_lookup_btn" class="btn btn-primary">Confirm PayID</button>
+          <button type="button" id="npp_add_btn" class="btn btn-primary">Add beneficiary</button>
+          <br><br>
+          <h5 style="color:white;">Send AUD</h5>
+          <select id="npp_bene_select" style="height:30px;margin-right:5px;">
+            <option value="select">Select beneficiary</option>
+          </select>
+          <input type="text" id="npp_amount" placeholder="Amount" style="height:30px;width:100px;margin-right:5px;">
+          <select id="npp_purpose" style="height:30px;margin-right:5px;">
+            <option value="other">Other</option>
+            <option value="family">Family</option>
+            <option value="goods">Goods</option>
+            <option value="payroll">Payroll</option>
+            <option value="tax">Tax</option>
+            <option value="loan">Loan</option>
+            <option value="rent">Rent</option>
+          </select>
+          <input type="text" id="npp_memo" placeholder="Memo" style="height:30px;width:140px;margin-right:5px;">
+          <button type="button" id="npp_preview_btn" class="btn btn-primary">Preview</button>
+          <button type="button" id="npp_send_btn" class="btn btn-primary">Send NPP</button>
+          <button type="button" id="npp_cancel_btn" class="btn btn-primary">Cancel open</button>
+          <button type="button" id="npp_pause_btn" class="btn btn-primary">Pause</button>
+          <button type="button" id="npp_resume_btn" class="btn btn-primary">Resume</button>
+          <button type="button" id="npp_archive_btn" class="btn btn-primary">Archive</button>
+          <p id="npp_result" style="color:yellow;margin-top:10px;"></p>
+          <hr>
+          <h5 style="color:white;">NPP history</h5>
+          <table class="table table-hover table-bordered table-color fixed-header" id="npp_history_tbl">
+            <thead>
+              <tr>
+                <th>Nickname</th>
+                <th>Amount</th>
+                <th>Rail</th>
+                <th>Status</th>
+                <th>E2E</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+          <select id="npp_open_select" style="height:30px;margin-right:5px;">
+            <option value="select">Select open NPP</option>
           </select>
         </div>
         <div id="account_details_pane" style="display:none;">
