@@ -195,8 +195,17 @@ class Customers:
             """ % (transaction_no)
         cursor.execute(query)
         result = cursor.fetchall()
+        if len(result) == 0:
+            # Cheque/casual transfers use transaction_no=-1 and have no Transactions row.
+            if transaction_no == -1:
+                is_deposit = 0
+            else:
+                print('Transaction record missing for transaction_no', transaction_no)
+                return 'Invalid transaction details'
+        else:
+            is_deposit = result[0][0]
         # IF DEPOSIT
-        if (result[0][0] == 1):
+        if is_deposit == 1:
             query = """ 
                     UPDATE Accounts SET balance=balance + %f where account_no = %d; 
                 """ % (amount, account2)
