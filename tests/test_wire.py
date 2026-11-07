@@ -259,6 +259,60 @@ class WireServiceTests(unittest.TestCase):
         self.assertEqual(ctx.exception.extra['wire'].status, 'nsf')
         self.assertEqual(ctx.exception.extra['wire'].imad, '')
 
+    def test_fee_nsf_leaves_principal_sent_with_imad(self):
+        # Principal debit succeeds; fee debit NSF does not unwind the wire.
+        def debit_fn(account, amount, remark):
+            self.debits.append((account, amount, remark))
+            if 'wire fee' in remark:
+                return 'Insufficient Balance'
+            return 'Amount Debited'
+
+        self.service.debit_fn = debit_fn
+        bene = self._add()
+        wire, created = self.service.originate(
+            owner_userid='alice', actor='alice', actor_type='customer',
+            beneficiary_id=bene.beneficiary_id, amount='40.00', trace_id='fee-nsf',
+        )
+        self.assertTrue(created)
+        self.assertEqual(wire.status, 'sent')
+        self.assertTrue(wire.imad.startswith('20240614KONOHA01'))
+        self.assertEqual(wire.fee_status, 'nsf')
+        self.assertEqual(self.debits[0], ('1001', '40.00', 'wire to Chase Checking'))
+        self.assertEqual(self.debits[1][1], '25.00')
+        self.assertIn('wire fee', self.debits[1][2])
+        self.assertEqual(self.credits, [])
+
+    def test_hmac_receipt_is_classified_as_failed_after_debit(self):
+        # Live debit_request currently returns 'Amount Debited', but fund_transfers
+        # already returns a signed receipt dict. Classifying that dict as failed
+        # leaves money moved with no IMAD if debit_fn ever returns a receipt.
+        from utility.wire import _classify_money_result
+
+        receipt = {
+            'from_account': 1001,
+            'to_account': 'external',
+            'amount': 40.0,
+            'signature': 'deadbeef',
+        }
+        self.assertEqual(_classify_money_result('Amount Debited'), 'ok')
+        self.assertEqual(_classify_money_result(receipt), 'failed')
+
+        def debit_fn(account, amount, remark):
+            self.debits.append((account, amount, remark))
+            return receipt
+
+        self.service.debit_fn = debit_fn
+        bene = self._add()
+        with self.assertRaises(WireError) as ctx:
+            self.service.originate(
+                owner_userid='alice', actor='alice', actor_type='customer',
+                beneficiary_id=bene.beneficiary_id, amount='40.00', trace_id='receipt-1',
+            )
+        self.assertEqual(ctx.exception.code, 'failed')
+        self.assertEqual(ctx.exception.extra['wire'].status, 'failed')
+        self.assertEqual(ctx.exception.extra['wire'].imad, '')
+        self.assertEqual(len(self.debits), 1)
+
     def test_complete_assigns_omad_recall_credits(self):
         bene = self._add()
         wire, _ = self.service.originate(
