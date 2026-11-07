@@ -111,6 +111,15 @@
         </button>
 
         <button type="button" class="btn btn-primary btn-block"
+        id="npp_in_menu">
+        <span class="glyphicon glyphicon-download-alt gi-3x"
+        style="color: white" aria-hidden="true">
+        </span>
+        <br />
+        PayID receive
+        </button>
+
+        <button type="button" class="btn btn-primary btn-block"
         id="service_requests_menu">
         <span class="glyphicon glyphicon-edit gi-3x"
         style="color: white" aria-hidden="true">
@@ -351,6 +360,66 @@
           </table>
           <select id="wire_open_select" style="height:30px;margin-right:5px;">
             <option value="select">Select open wire</option>
+          </select>
+        </div>
+        <div id="npp_in_pane" style="display:none;">
+          <p id="npp_in_summary" style="color:white;">Active PayIDs: 0 &middot; open: 0 &middot; YTD received: $0.00</p>
+          <p id="npp_in_clock" style="color:white;">AEST session --</p>
+          <table class="table table-hover table-bordered table-color fixed-header" id="npp_in_key_tbl">
+            <thead>
+              <tr>
+                <th>Nickname</th>
+                <th>Type</th>
+                <th>PayID</th>
+                <th>Last4</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+          <hr>
+          <h5 style="color:white;">Enroll a PayID</h5>
+          <input type="text" id="npp_in_nickname" placeholder="Nickname" style="height:30px;width:140px;margin-right:5px;">
+          <select id="npp_in_type" style="height:30px;margin-right:5px;">
+            <option value="email">Email</option>
+            <option value="phone">Mobile</option>
+            <option value="abn">ABN</option>
+            <option value="acn">ACN</option>
+            <option value="orgid">Org ID</option>
+          </select>
+          <input type="text" id="npp_in_payid" placeholder="PayID" style="height:30px;width:180px;margin-right:5px;">
+          <select id="npp_in_account" style="height:30px;margin-right:5px;">
+            <option value="select">Internal account</option>
+          </select>
+          <button type="button" id="npp_in_add_btn" class="btn btn-primary">Enroll</button>
+          <button type="button" id="npp_in_pause_btn" class="btn btn-primary">Pause</button>
+          <button type="button" id="npp_in_resume_btn" class="btn btn-primary">Resume</button>
+          <button type="button" id="npp_in_cancel_btn" class="btn btn-primary">Cancel</button>
+          <br><br>
+          <h5 style="color:white;">Claim unmatched NPP</h5>
+          <input type="text" id="npp_in_claim_payid" placeholder="PayID to claim" style="height:30px;width:180px;margin-right:5px;">
+          <button type="button" id="npp_in_claim_btn" class="btn btn-primary">Claim</button>
+          <button type="button" id="npp_in_return_btn" class="btn btn-primary">Request return</button>
+          <p id="npp_in_result" style="color:yellow;margin-top:10px;"></p>
+          <hr>
+          <h5 style="color:white;">Inbound NPP history</h5>
+          <table class="table table-hover table-bordered table-color fixed-header" id="npp_in_hist_tbl">
+            <thead>
+              <tr>
+                <th>Sender</th>
+                <th>Amount</th>
+                <th>Rail</th>
+                <th>Status</th>
+                <th>E2E</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+          <select id="npp_in_select" style="height:30px;margin-right:5px;">
+            <option value="select">Select PayID</option>
+          </select>
+          <select id="npp_in_open_select" style="height:30px;margin-right:5px;">
+            <option value="select">Select inbound</option>
           </select>
         </div>
         <div id="account_details_pane" style="display:none;">
