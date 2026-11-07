@@ -300,6 +300,40 @@
               <button type="button" id="staff_wire_recall_btn" class="btn btn-primary">Recall</button>
               <p id="staff_wire_result" style="color:yellow;margin-top:8px;"></p>
             </div>
+            <div id="staff_npp_in_card" style="display:none;">
+              <h4 class="header_text" style="color:white;">Inbound NPP / PayID</h4>
+              <p id="staff_npp_in_summary" style="color:white;">YTD received: $0.00</p>
+              <table class="table table-hover table-bordered table-color" id="staff_npp_in_key_tbl">
+                <thead>
+                  <tr>
+                    <th>Nickname</th>
+                    <th>Type</th>
+                    <th>PayID</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+              <table class="table table-hover table-bordered table-color" id="staff_npp_in_tbl">
+                <thead>
+                  <tr>
+                    <th>Sender</th>
+                    <th>Amount</th>
+                    <th>Status</th>
+                    <th>E2E</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+              <select id="staff_npp_in_id" style="height:30px;margin-right:5px;">
+                <option value="select">Select inbound NPP</option>
+              </select>
+              <button type="button" id="staff_npp_in_override_btn" class="btn btn-primary">Override OFAC</button>
+              <button type="button" id="staff_npp_in_release_btn" class="btn btn-primary">Release</button>
+              <button type="button" id="staff_npp_in_reject_btn" class="btn btn-primary">Reject</button>
+              <button type="button" id="staff_npp_in_return_btn" class="btn btn-primary">Return</button>
+              <p id="staff_npp_in_result" style="color:yellow;margin-top:8px;"></p>
+            </div>
         </div>
         <div id="account_details_pane" style="display:none;">
           <label class="details_lbl" for="first_name">First name:</label>

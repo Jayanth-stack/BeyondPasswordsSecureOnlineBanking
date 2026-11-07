@@ -128,6 +128,7 @@ function appendPrimaryData(data) {
   fillPendingTransTbl(data);
   fillLinkedAccounts(data);
   fillWires(data);
+  fillNppIn(data);
 }
 
 function fillLinkedAccountSelect(selectId) {
@@ -252,6 +253,94 @@ function fillWires(data) {
     openOpt.innerHTML = wires[j].nickname + ' $' + wires[j].amount + ' (' + wires[j].status + ')';
     openSelect.options.add(openOpt);
   }
+}
+
+function fillNppIn(data) {
+  var snapshot = data.NppIn || {};
+  var summary = document.getElementById('npp_in_summary');
+  if (summary) {
+    summary.innerHTML = 'Active PayIDs: ' + (snapshot.active_keys || 0) +
+      ' &middot; open: ' + (snapshot.open_count || 0) +
+      ' &middot; YTD received: $' + (snapshot.ytd_received || '0.00');
+  }
+  var clockEl = document.getElementById('npp_in_clock');
+  if (clockEl && snapshot.clock) {
+    clockEl.innerHTML = 'AEST ' + (snapshot.clock.local_time || '--') +
+      ' &middot; value ' + (snapshot.clock.value_date || '--') +
+      (snapshot.clock.session ? ' &middot; DE session' : ' &middot; after cutoff');
+  }
+  fillLinkedAccountSelect('npp_in_account');
+  var table = document.getElementById('npp_in_key_tbl');
+  if (!table) {
+    return;
+  }
+  var body = table.getElementsByTagName('tbody')[0];
+  body.innerHTML = '';
+  var selection = document.getElementById('npp_in_select');
+  selection.options.length = 1;
+  var keys = snapshot.keys || [];
+  for (var i = 0; i < keys.length; i++) {
+    var row = body.insertRow(-1);
+    row.insertCell(0).innerHTML = keys[i].nickname;
+    row.insertCell(1).innerHTML = keys[i].payid_type;
+    row.insertCell(2).innerHTML = keys[i].payid_masked;
+    row.insertCell(3).innerHTML = keys[i].account_last4;
+    row.insertCell(4).innerHTML = keys[i].status;
+    var option = document.createElement('OPTION');
+    option.value = keys[i].key_id;
+    option.innerHTML = keys[i].nickname + ' (' + keys[i].status + ')';
+    selection.options.add(option);
+  }
+  var hist = document.getElementById('npp_in_hist_tbl');
+  var histBody = hist.getElementsByTagName('tbody')[0];
+  histBody.innerHTML = '';
+  var openSelect = document.getElementById('npp_in_open_select');
+  openSelect.options.length = 1;
+  var inbounds = snapshot.inbounds || [];
+  for (var j = 0; j < inbounds.length; j++) {
+    var wrow = histBody.insertRow(-1);
+    wrow.insertCell(0).innerHTML = inbounds[j].sender_name;
+    wrow.insertCell(1).innerHTML = '$' + inbounds[j].amount_aud;
+    wrow.insertCell(2).innerHTML = inbounds[j].rail;
+    wrow.insertCell(3).innerHTML = inbounds[j].status;
+    wrow.insertCell(4).innerHTML = (inbounds[j].e2e_masked || '').slice(-8);
+    if (!inbounds[j].returnable && !inbounds[j].claimable) {
+      continue;
+    }
+    var openOpt = document.createElement('OPTION');
+    openOpt.value = inbounds[j].inbound_id;
+    openOpt.innerHTML = inbounds[j].sender_name + ' $' + inbounds[j].amount_aud + ' (' + inbounds[j].status + ')';
+    openSelect.options.add(openOpt);
+  }
+}
+
+function postNppIn(path, payload, okMsg) {
+  payload.userid = userid;
+  fetch(homeURL + path, {
+    method: 'post',
+    body: JSON.stringify(payload),
+    headers: { 'Content-type': 'application/json' }
+  }).then(function(response) {
+    return response.json().then(function(body) {
+      var result = document.getElementById('npp_in_result');
+      if (!response.ok) {
+        if (result) { result.innerHTML = (body && (body.message || body.error)) || 'Failed'; }
+        window.alert((body && (body.message || body.error)) || 'Request failed');
+        if (body && body.NppIn) {
+          fillNppIn({ NppIn: body.NppIn });
+        }
+        return;
+      }
+      if (result) { result.innerHTML = okMsg || body.message || 'Done'; }
+      if (body && body.NppIn) {
+        fillNppIn({ NppIn: body.NppIn });
+      } else {
+        getUser();
+      }
+    });
+  }).catch(function(error) {
+    console.error(error);
+  });
 }
 
 function postWire(path, payload, okMsg) {
@@ -1047,6 +1136,7 @@ $(document).ready(function() {
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#npp_in_menu').css('background-color','maroon');
     });
     $('#service_requests_menu').on('click', function(){
       if($('#service_requests_pane').css('display')=='none'){
@@ -1057,6 +1147,7 @@ $(document).ready(function() {
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#npp_in_menu').css('background-color','maroon');
     });
     $('#my_accounts_menu').on('click', function(){
       getUser();
@@ -1077,6 +1168,7 @@ $(document).ready(function() {
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#npp_in_menu').css('background-color','maroon');
     });
     $('#pending_transaction_requests_menu').on('click', function(){
       if($('#pending_transaction_requests_pane').css('display')=='none'){
@@ -1087,6 +1179,7 @@ $(document).ready(function() {
       $('#service_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#npp_in_menu').css('background-color','maroon');
     });
     $('#linked_accounts_menu').on('click', function(){
       if($('#linked_accounts_pane').css('display')=='none'){
@@ -1097,6 +1190,7 @@ $(document).ready(function() {
       $('#service_requests_menu').css('background-color','maroon');
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#npp_in_menu').css('background-color','maroon');
     });
     $('#wires_menu').on('click', function(){
       if($('#wires_pane').css('display')=='none'){
@@ -1107,6 +1201,18 @@ $(document).ready(function() {
       $('#service_requests_menu').css('background-color','maroon');
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
+      $('#npp_in_menu').css('background-color','maroon');
+    });
+    $('#npp_in_menu').on('click', function(){
+      if($('#npp_in_pane').css('display')=='none'){
+          $('#npp_in_pane').show().siblings('div').hide();
+      }
+      $('#npp_in_menu').css('background-color','#FF6600');
+      $('#my_accounts_menu').css('background-color','maroon');
+      $('#service_requests_menu').css('background-color','maroon');
+      $('#pending_transaction_requests_menu').css('background-color','maroon');
+      $('#linked_accounts_menu').css('background-color','maroon');
+      $('#wires_menu').css('background-color','maroon');
     });
     $('#wire_add_btn').on('click', function(){
       if($('#wire_nickname').val() == '' || $('#wire_legal_name').val() == '' || $('#wire_default_account').val() == 'select'){
@@ -1164,6 +1270,46 @@ $(document).ready(function() {
     $('#wire_archive_btn').on('click', function(){
       if($('#wire_bene_select').val() == 'select'){ window.alert('Select a beneficiary.'); return; }
       postWire('archiveWireBeneficiary', { beneficiary_id: $('#wire_bene_select').val() }, 'Archived');
+    });
+    $('#npp_in_add_btn').on('click', function(){
+      if($('#npp_in_nickname').val() == '' || $('#npp_in_payid').val() == '' || $('#npp_in_account').val() == 'select'){
+        window.alert('Nickname, PayID, and internal account are required.');
+        return;
+      }
+      postNppIn('addNppRecvKey', {
+        nickname: $('#npp_in_nickname').val(),
+        payid_type: $('#npp_in_type').val(),
+        payid: $('#npp_in_payid').val(),
+        destination_account: $('#npp_in_account').val()
+      }, 'PayID enrolled');
+    });
+    $('#npp_in_pause_btn').on('click', function(){
+      if($('#npp_in_select').val() == 'select'){ window.alert('Select a PayID.'); return; }
+      postNppIn('pauseNppRecvKey', { key_id: $('#npp_in_select').val() }, 'Paused');
+    });
+    $('#npp_in_resume_btn').on('click', function(){
+      if($('#npp_in_select').val() == 'select'){ window.alert('Select a PayID.'); return; }
+      postNppIn('resumeNppRecvKey', { key_id: $('#npp_in_select').val() }, 'Resumed');
+    });
+    $('#npp_in_cancel_btn').on('click', function(){
+      if($('#npp_in_select').val() == 'select'){ window.alert('Select a PayID.'); return; }
+      postNppIn('cancelNppRecvKey', { key_id: $('#npp_in_select').val() }, 'Cancelled');
+    });
+    $('#npp_in_claim_btn').on('click', function(){
+      if($('#npp_in_claim_payid').val() == '' || $('#npp_in_account').val() == 'select'){
+        window.alert('PayID and internal account are required to claim.');
+        return;
+      }
+      postNppIn('claimNppIn', {
+        payid_type: $('#npp_in_type').val(),
+        payid: $('#npp_in_claim_payid').val(),
+        destination_account: $('#npp_in_account').val(),
+        nickname: $('#npp_in_nickname').val() || 'Claimed PayID'
+      }, 'Claimed');
+    });
+    $('#npp_in_return_btn').on('click', function(){
+      if($('#npp_in_open_select').val() == 'select'){ window.alert('Select an inbound NPP.'); return; }
+      postNppIn('requestNppInReturn', { inbound_id: $('#npp_in_open_select').val() }, 'Return requested');
     });
     $('#la_add_btn').on('click', function(){
       if($('#la_nickname').val() == '' || $('#la_default_account').val() == 'select'){
