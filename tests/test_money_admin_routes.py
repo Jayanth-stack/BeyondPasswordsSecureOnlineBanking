@@ -98,6 +98,29 @@ class MoneyAdminRouteTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         customers_cls.return_value.deposit_check.assert_called_once_with("cust1", 7)
 
+    def test_deposit_check_hmac_receipt_serializes_as_json_message(self):
+        # fund_transfers returns a signed receipt dict; the route jsonifies it
+        # as message without consuming the cheque (see test_cheque_deposit).
+        receipt = {
+            "transaction_no": -1,
+            "from_account": 10,
+            "to_account": 20,
+            "amount": 75.0,
+            "signature": "deadbeef",
+        }
+        self._session("cust1", "customer")
+        with patch("app.Customers") as customers_cls:
+            customers_cls.return_value.deposit_check.return_value = receipt
+            response = self.client.post(
+                "/depositCheck",
+                json={"userid": "cust1", "cheque_no": 7},
+            )
+        self.assertEqual(response.status_code, 200)
+        body = response.get_json()
+        self.assertEqual(body["message"]["signature"], "deadbeef")
+        self.assertEqual(body["message"]["amount"], 75.0)
+        self.assertIsInstance(body["message"], dict)
+
     def test_load_customer_returns_dashboard_payload(self):
         self._session("cust1", "customer")
         with patch("app.Customers") as customers_cls:

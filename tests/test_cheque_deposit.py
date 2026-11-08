@@ -74,6 +74,26 @@ class ChequeDepositTests(unittest.TestCase):
         self.assertFalse(any("UPDATE Cheque SET active=0" in sql for sql in executed))
         self.db.commit.assert_not_called()
 
+    def test_hmac_receipt_allows_repeat_deposit_of_the_same_cheque(self):
+        # Because active is never flipped, a second deposit still moves money.
+        self.cursor.fetchall.return_value = [(20, 10, 75.0, 1)]
+        customer = self.Customers()
+        receipt = {
+            "transaction_no": -1,
+            "from_account": 10,
+            "to_account": 20,
+            "amount": 75.0,
+            "signature": "deadbeef",
+        }
+        with patch.object(customer, "fund_transfers", return_value=receipt) as transfer:
+            self.assertEqual(customer.deposit_check("cust1", 5), receipt)
+            self.assertEqual(customer.deposit_check("cust1", 5), receipt)
+            self.assertEqual(transfer.call_count, 2)
+            transfer.assert_called_with(10, 20, 75.0)
+
+        executed = [str(call.args[0]) for call in self.cursor.execute.call_args_list]
+        self.assertFalse(any("UPDATE Cheque SET active=0" in sql for sql in executed))
+
     def test_commit_failure_after_done_does_not_report_success(self):
         self.cursor.fetchall.return_value = [(20, 10, 75.0, 1)]
         self.db.commit.side_effect = RuntimeError("disk full")
