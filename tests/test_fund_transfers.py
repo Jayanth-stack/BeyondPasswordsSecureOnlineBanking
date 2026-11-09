@@ -74,6 +74,28 @@ class FundTransfersTests(unittest.TestCase):
             "Insufficient Balance in Credit Card",
         )
 
+    def test_credit_overdraft_cancels_pending_transaction(self):
+        customer = self.Customers()
+        self.cursor.fetchall.side_effect = self._regular_transfer_rows((0.0, 1, "credit"))
+        with patch.object(customer, "_cancel_pending_transaction") as cancel:
+            self.assertEqual(
+                customer.fund_transfers(10, 20, 5001.0, transaction_no=44),
+                "Insufficient Balance in Credit Card",
+            )
+            cancel.assert_called_once_with(44)
+
+    def test_checking_nsf_leaves_pending_transaction_open(self):
+        # Credit-card NSF cancels the request; checking NSF does not, so the
+        # same pending transfer can be retried after a later deposit.
+        customer = self.Customers()
+        self.cursor.fetchall.side_effect = self._regular_transfer_rows((50.0, 1, "checkin"))
+        with patch.object(customer, "_cancel_pending_transaction") as cancel:
+            self.assertEqual(
+                customer.fund_transfers(10, 20, 100.0, transaction_no=44),
+                "Insufficient Balance",
+            )
+            cancel.assert_not_called()
+
     def test_credit_within_limit_succeeds(self):
         customer = self.Customers()
         self.cursor.fetchall.side_effect = self._regular_transfer_rows((0.0, 1, "credit"))

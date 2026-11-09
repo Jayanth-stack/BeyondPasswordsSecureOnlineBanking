@@ -98,6 +98,38 @@ class MoneyAdminRouteTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         customers_cls.return_value.deposit_check.assert_called_once_with("cust1", 7)
 
+    def test_deposit_check_json_serializes_nested_hmac_receipt(self):
+        # fund_transfers now returns a signed receipt dict. deposit_check still
+        # treats anything other than the string "done" as failure and returns
+        # that dict; the route jsonifies it instead of crashing.
+        receipt = {
+            "transaction_no": -1,
+            "from_account": 10,
+            "to_account": 20,
+            "amount": 75.0,
+            "signature": "deadbeef",
+        }
+        self._session("cust1", "customer")
+        with patch("app.Customers") as customers_cls:
+            customers_cls.return_value.deposit_check.return_value = receipt
+            response = self.client.post(
+                "/depositCheck",
+                json={"userid": "cust1", "cheque_no": 5},
+            )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json()["message"], receipt)
+
+    def test_get_deposit_check_still_mutates(self):
+        self._session("cust1", "customer")
+        with patch("app.Customers") as customers_cls:
+            customers_cls.return_value.deposit_check.return_value = "Success"
+            response = self.client.get(
+                "/depositCheck",
+                json={"userid": "cust1", "cheque_no": 7},
+            )
+        self.assertEqual(response.status_code, 200)
+        customers_cls.return_value.deposit_check.assert_called_once_with("cust1", 7)
+
     def test_load_customer_returns_dashboard_payload(self):
         self._session("cust1", "customer")
         with patch("app.Customers") as customers_cls:
@@ -200,7 +232,7 @@ class MoneyAdminRouteTests(unittest.TestCase):
                 json={"userid": "emp1", "customer_id": "cust1"},
             )
         self.assertEqual(response.status_code, 200)
-        emp_cls.return_value.deactivate_customer.assert_called_once_with("cust1")
+        emp_cls.return_value.deactivate_customer.assert_called_once_with("emp1", "cust1")
 
     def test_deactivate_employee_authorized_calls_helper(self):
         self._session("admin1", "admin", emp_tier=3)
@@ -222,7 +254,7 @@ class MoneyAdminRouteTests(unittest.TestCase):
                 json={"userid": "emp1", "update_req_no": 9},
             )
         self.assertEqual(response.status_code, 200)
-        emp_cls.return_value.approve_update_info.assert_called_once_with(9)
+        emp_cls.return_value.approve_update_info.assert_called_once_with("emp1", 9)
 
     def test_deny_update_info_authorized_employee(self):
         self._session("emp1", "employee", emp_tier=2)
