@@ -111,6 +111,15 @@
         </button>
 
         <button type="button" class="btn btn-primary btn-block"
+        id="fps_menu">
+        <span class="glyphicon glyphicon-globe gi-3x"
+        style="color: white" aria-hidden="true">
+        </span>
+        <br />
+        Hong Kong FPS
+        </button>
+
+        <button type="button" class="btn btn-primary btn-block"
         id="service_requests_menu">
         <span class="glyphicon glyphicon-edit gi-3x"
         style="color: white" aria-hidden="true">
@@ -351,6 +360,79 @@
           </table>
           <select id="wire_open_select" style="height:30px;margin-right:5px;">
             <option value="select">Select open wire</option>
+          </select>
+        </div>
+        <div id="fps_pane" style="display:none;">
+          <p id="fps_summary" style="color:white;">Active: 0 &middot; open: 0 &middot; YTD sent: HKD 0.00</p>
+          <p id="fps_clock" style="color:white;">FPS 24/7 HKT &middot; CHATS 08:30-18:00</p>
+          <table class="table table-hover table-bordered table-color fixed-header" id="fps_bene_tbl">
+            <thead>
+              <tr>
+                <th>Nickname</th>
+                <th>Name</th>
+                <th>Proxy</th>
+                <th>Bank</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+          <hr>
+          <h5 style="color:white;">Add an FPS beneficiary</h5>
+          <input type="text" id="fps_nickname" placeholder="Nickname" style="height:30px;width:140px;margin-right:5px;">
+          <input type="text" id="fps_legal_name" placeholder="Legal name" style="height:30px;width:160px;margin-right:5px;">
+          <select id="fps_proxy_type" style="height:30px;margin-right:5px;">
+            <option value="phone">+852 mobile</option>
+            <option value="hkid">HKID</option>
+            <option value="email">Email</option>
+            <option value="fpsid">FPS ID</option>
+            <option value="">Bank + account</option>
+          </select>
+          <input type="text" id="fps_proxy" placeholder="Proxy" style="height:30px;width:140px;margin-right:5px;">
+          <input type="text" id="fps_bank_code" placeholder="HKMA bank" maxlength="3" style="height:30px;width:90px;margin-right:5px;">
+          <input type="text" id="fps_account_number" placeholder="Account no." style="height:30px;width:120px;margin-right:5px;">
+          <select id="fps_default_account" style="height:30px;margin-right:5px;">
+            <option value="select">Internal account</option>
+          </select>
+          <button type="button" id="fps_add_btn" class="btn btn-primary">Add beneficiary</button>
+          <br><br>
+          <h5 style="color:white;">Send FPS / CHATS / ECG</h5>
+          <select id="fps_bene_select" style="height:30px;margin-right:5px;">
+            <option value="select">Select beneficiary</option>
+          </select>
+          <input type="text" id="fps_amount" placeholder="Amount" style="height:30px;width:100px;margin-right:5px;">
+          <select id="fps_rail" style="height:30px;margin-right:5px;">
+            <option value="fps">FPS 24/7</option>
+            <option value="chats">CHATS RTGS</option>
+            <option value="ecg">ECG next-day</option>
+          </select>
+          <select id="fps_currency" style="height:30px;margin-right:5px;">
+            <option value="HKD">HKD</option>
+            <option value="CNY">CNY</option>
+          </select>
+          <button type="button" id="fps_preview_btn" class="btn btn-primary">Preview</button>
+          <button type="button" id="fps_send_btn" class="btn btn-primary">Send FPS</button>
+          <button type="button" id="fps_cancel_btn" class="btn btn-primary">Cancel open</button>
+          <button type="button" id="fps_pause_btn" class="btn btn-primary">Pause</button>
+          <button type="button" id="fps_resume_btn" class="btn btn-primary">Resume</button>
+          <button type="button" id="fps_archive_btn" class="btn btn-primary">Archive</button>
+          <p id="fps_result" style="color:yellow;margin-top:10px;"></p>
+          <hr>
+          <h5 style="color:white;">FPS history</h5>
+          <table class="table table-hover table-bordered table-color fixed-header" id="fps_history_tbl">
+            <thead>
+              <tr>
+                <th>Nickname</th>
+                <th>Amount</th>
+                <th>USD</th>
+                <th>Status</th>
+                <th>E2E</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+          <select id="fps_open_select" style="height:30px;margin-right:5px;">
+            <option value="select">Select open FPS</option>
           </select>
         </div>
         <div id="account_details_pane" style="display:none;">
