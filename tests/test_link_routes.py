@@ -227,6 +227,64 @@ class LinkRouteTests(unittest.TestCase):
         self.assertEqual(rejected.status_code, 200)
         self.assertEqual(rejected.get_json()['link']['status'], 'rejected')
 
+    def _verified_link(self, nickname='Chase'):
+        added = self.client.post('/addLinkedAccount', json={
+            'userid': 'alice', 'nickname': nickname, 'default_account': '1001',
+            'routing_last4': '0210', 'account_last4': '7788',
+        })
+        self.assertEqual(added.status_code, 201)
+        link_id = added.get_json()['link']['link_id']
+        confirmed = self.client.post('/confirmLinkedAccount', json={
+            'userid': 'alice', 'link_id': link_id, 'amount1': '0.12', 'amount2': '0.47',
+        })
+        self.assertEqual(confirmed.status_code, 200)
+        return link_id
+
+    def test_pause_resume_close_and_get_pause_still_mutates(self):
+        self.login()
+        link_id = self._verified_link()
+        paused = self.client.get(
+            '/pauseLinkedAccount',
+            json={'userid': 'alice', 'link_id': link_id},
+        )
+        self.assertEqual(paused.status_code, 200)
+        self.assertEqual(paused.get_json()['link']['status'], 'paused')
+        blocked = self.client.post('/pushToLinked', json={
+            'userid': 'alice', 'link_id': link_id, 'amount': '10.00',
+        })
+        self.assertEqual(blocked.status_code, 403)
+        self.assertEqual(blocked.get_json()['error'], 'link_paused')
+        resumed = self.client.post(
+            '/resumeLinkedAccount',
+            json={'userid': 'alice', 'link_id': link_id},
+        )
+        self.assertEqual(resumed.status_code, 200)
+        self.assertEqual(resumed.get_json()['link']['status'], 'verified')
+        closed = self.client.post(
+            '/closeLinkedAccount',
+            json={'userid': 'alice', 'link_id': link_id},
+        )
+        self.assertEqual(closed.status_code, 200)
+        self.assertEqual(closed.get_json()['link']['status'], 'closed')
+        reopen = self.client.post(
+            '/resumeLinkedAccount',
+            json={'userid': 'alice', 'link_id': link_id},
+        )
+        self.assertEqual(reopen.status_code, 409)
+        self.assertEqual(reopen.get_json()['error'], 'already_closed')
+
+    def test_customer_cannot_pause_foreign_link(self):
+        self.login()
+        link_id = self._verified_link(nickname='Ally')
+        self.login('bob', 'customer')
+        paused = self.client.post(
+            '/pauseLinkedAccount',
+            json={'userid': 'bob', 'link_id': link_id},
+        )
+        self.assertEqual(paused.status_code, 403)
+        self.assertEqual(paused.get_json()['error'], 'link_forbidden')
+
 
 if __name__ == '__main__':
     unittest.main()
+

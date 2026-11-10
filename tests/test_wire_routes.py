@@ -231,6 +231,73 @@ class WireRouteTests(unittest.TestCase):
         self.assertEqual(rejected.status_code, 200)
         self.assertEqual(rejected.get_json()['wire']['status'], 'rejected')
 
+    def test_pause_resume_archive_and_get_pause_still_mutates(self):
+        self.login()
+        added = self.client.post('/addWireBeneficiary', json=self._bene_payload())
+        self.assertEqual(added.status_code, 201)
+        bene_id = added.get_json()['beneficiary']['beneficiary_id']
+        paused = self.client.get(
+            '/pauseWireBeneficiary',
+            json={'userid': 'alice', 'beneficiary_id': bene_id},
+        )
+        self.assertEqual(paused.status_code, 200)
+        self.assertEqual(paused.get_json()['beneficiary']['status'], 'paused')
+        blocked = self.client.post('/sendWire', json={
+            'userid': 'alice', 'beneficiary_id': bene_id, 'amount': '40.00',
+        })
+        self.assertEqual(blocked.status_code, 403)
+        self.assertEqual(blocked.get_json()['error'], 'beneficiary_paused')
+        resumed = self.client.post(
+            '/resumeWireBeneficiary',
+            json={'userid': 'alice', 'beneficiary_id': bene_id},
+        )
+        self.assertEqual(resumed.status_code, 200)
+        self.assertEqual(resumed.get_json()['beneficiary']['status'], 'active')
+        archived = self.client.post(
+            '/archiveWireBeneficiary',
+            json={'userid': 'alice', 'beneficiary_id': bene_id},
+        )
+        self.assertEqual(archived.status_code, 200)
+        self.assertEqual(archived.get_json()['beneficiary']['status'], 'archived')
+        reopen = self.client.post(
+            '/resumeWireBeneficiary',
+            json={'userid': 'alice', 'beneficiary_id': bene_id},
+        )
+        self.assertEqual(reopen.status_code, 409)
+        self.assertEqual(reopen.get_json()['error'], 'already_archived')
+
+    def test_customer_cannot_pause_foreign_beneficiary(self):
+        self.login()
+        added = self.client.post('/addWireBeneficiary', json=self._bene_payload())
+        bene_id = added.get_json()['beneficiary']['beneficiary_id']
+        self.login('bob', 'customer')
+        paused = self.client.post(
+            '/pauseWireBeneficiary',
+            json={'userid': 'bob', 'beneficiary_id': bene_id},
+        )
+        self.assertEqual(paused.status_code, 403)
+        self.assertEqual(paused.get_json()['error'], 'wire_forbidden')
+
+    def test_run_due_wires_transmits_queued(self):
+        self.now[0] = ts(2024, 6, 14, 18, 0)
+        self.login()
+        added = self.client.post('/addWireBeneficiary', json=self._bene_payload())
+        bene_id = added.get_json()['beneficiary']['beneficiary_id']
+        queued = self.client.post('/sendWire', json={
+            'userid': 'alice', 'beneficiary_id': bene_id, 'amount': '33.00',
+            'trace_id': 'due-1',
+        })
+        self.assertEqual(queued.status_code, 201)
+        self.assertEqual(queued.get_json()['wire']['status'], 'queued')
+        self.assertEqual(self.debits, [])
+        self.now[0] = ts(2024, 6, 17, 10, 0)
+        due = self.client.post('/runDueWires', json={'userid': 'alice'})
+        self.assertEqual(due.status_code, 200)
+        wires = due.get_json()['Wires']['wires']
+        self.assertEqual(wires[0]['status'], 'sent')
+        self.assertEqual(self.debits[0], ('1001', '33.00', 'wire to Chase'))
+
 
 if __name__ == '__main__':
     unittest.main()
+
