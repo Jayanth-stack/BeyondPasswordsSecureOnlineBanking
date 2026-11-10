@@ -244,6 +244,7 @@ function appendSecondaryData(customer_id, data) {
   fillCustomerAccTbl(data);
   fillStaffLinked(data);
   fillStaffWires(data);
+  fillStaffFps(data);
   if($('#cust_details_card').css('display')=='none'){
     $('#cust_details_card').show();
   }
@@ -383,6 +384,73 @@ function postStaffWire(path, payload) {
   }).then(function(response) {
     return response.json().then(function(body) {
       var result = document.getElementById('staff_wire_result');
+      if (!response.ok) {
+        if (result) { result.innerHTML = (body && (body.message || body.error)) || 'Failed'; }
+        return;
+      }
+      if (result) { result.innerHTML = body.message || 'Done'; }
+      getCustomer($('#customer_id_input').val() || document.getElementById('customer_id').innerHTML);
+    });
+  }).catch(function(error) {
+    console.error(error);
+  });
+}
+
+function fillStaffFps(data) {
+  var snapshot = data.Fps || {};
+  var card = document.getElementById('staff_fps_card');
+  if (!card) {
+    return;
+  }
+  card.style.display = 'block';
+  var summary = document.getElementById('staff_fps_summary');
+  if (summary) {
+    summary.innerHTML = 'YTD sent: HKD ' + (snapshot.ytd_sent || '0.00') +
+      ' &middot; fees: HKD ' + (snapshot.ytd_fees || '0.00') +
+      ' &middot; recalled: HKD ' + (snapshot.recalled_ytd || '0.00');
+  }
+  var beneTable = document.getElementById('staff_fps_bene_tbl');
+  var beneBody = beneTable.getElementsByTagName('tbody')[0];
+  beneBody.innerHTML = '';
+  var benes = snapshot.beneficiaries || [];
+  for (var i = 0; i < benes.length; i++) {
+    var row = beneBody.insertRow(-1);
+    row.insertCell(0).innerHTML = benes[i].nickname;
+    row.insertCell(1).innerHTML = benes[i].legal_name;
+    row.insertCell(2).innerHTML = benes[i].proxy_mask || benes[i].proxy_type || '';
+    row.insertCell(3).innerHTML = benes[i].status;
+  }
+  var table = document.getElementById('staff_fps_tbl');
+  var body = table.getElementsByTagName('tbody')[0];
+  body.innerHTML = '';
+  var selection = document.getElementById('staff_fps_id');
+  selection.options.length = 1;
+  var pays = snapshot.payments || [];
+  for (var j = 0; j < pays.length; j++) {
+    var prow = body.insertRow(-1);
+    prow.insertCell(0).innerHTML = pays[j].nickname;
+    prow.insertCell(1).innerHTML = (pays[j].currency || 'HKD') + ' ' + pays[j].instructed_amount;
+    prow.insertCell(2).innerHTML = pays[j].status;
+    prow.insertCell(3).innerHTML = (pays[j].e2e_id || pays[j].payment_id).slice(0, 12);
+    if (['held', 'queued', 'pending_release', 'sent'].indexOf(pays[j].status) < 0) {
+      continue;
+    }
+    var option = document.createElement('OPTION');
+    option.value = pays[j].payment_id;
+    option.innerHTML = pays[j].nickname + ' ' + pays[j].instructed_amount + ' (' + pays[j].status + ')';
+    selection.options.add(option);
+  }
+}
+
+function postStaffFps(path, payload) {
+  payload.userid = userid;
+  fetch(homeURL + path, {
+    method: 'post',
+    body: JSON.stringify(payload),
+    headers: { 'Content-type': 'application/json' }
+  }).then(function(response) {
+    return response.json().then(function(body) {
+      var result = document.getElementById('staff_fps_result');
       if (!response.ok) {
         if (result) { result.innerHTML = (body && (body.message || body.error)) || 'Failed'; }
         return;
@@ -803,6 +871,7 @@ $(document).ready(function() {
       $('#cust_accounts_tbl').hide();
       $('#staff_linked_card').hide();
       $('#staff_wire_card').hide();
+      $('#staff_fps_card').hide();
     });
     $('#staff_la_force_btn').on('click', function(){
       if($('#staff_la_link_id').val() == 'select'){ window.alert('Select a pending link.'); return; }
@@ -843,6 +912,26 @@ $(document).ready(function() {
     $('#staff_wire_recall_btn').on('click', function(){
       if($('#staff_wire_id').val() == 'select'){ window.alert('Select a wire.'); return; }
       postStaffWire('recallWire', { wire_id: $('#staff_wire_id').val() });
+    });
+    $('#staff_fps_override_btn').on('click', function(){
+      if($('#staff_fps_id').val() == 'select'){ window.alert('Select an FPS payment.'); return; }
+      postStaffFps('overrideFpsOfac', { payment_id: $('#staff_fps_id').val() });
+    });
+    $('#staff_fps_release_btn').on('click', function(){
+      if($('#staff_fps_id').val() == 'select'){ window.alert('Select an FPS payment.'); return; }
+      postStaffFps('releaseFps', { payment_id: $('#staff_fps_id').val() });
+    });
+    $('#staff_fps_reject_btn').on('click', function(){
+      if($('#staff_fps_id').val() == 'select'){ window.alert('Select an FPS payment.'); return; }
+      postStaffFps('rejectFps', { payment_id: $('#staff_fps_id').val() });
+    });
+    $('#staff_fps_complete_btn').on('click', function(){
+      if($('#staff_fps_id').val() == 'select'){ window.alert('Select an FPS payment.'); return; }
+      postStaffFps('completeFps', { payment_id: $('#staff_fps_id').val() });
+    });
+    $('#staff_fps_recall_btn').on('click', function(){
+      if($('#staff_fps_id').val() == 'select'){ window.alert('Select an FPS payment.'); return; }
+      postStaffFps('recallFps', { payment_id: $('#staff_fps_id').val() });
     });
     $('#approve_trans_btn').on('click', function(){
       if($('#customer_trans_no').val() == 'select'){
