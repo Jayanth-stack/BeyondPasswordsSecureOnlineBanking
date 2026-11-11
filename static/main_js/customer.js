@@ -128,6 +128,7 @@ function appendPrimaryData(data) {
   fillPendingTransTbl(data);
   fillLinkedAccounts(data);
   fillWires(data);
+  fillFpsIn(data);
 }
 
 function fillLinkedAccountSelect(selectId) {
@@ -252,6 +253,90 @@ function fillWires(data) {
     openOpt.innerHTML = wires[j].nickname + ' $' + wires[j].amount + ' (' + wires[j].status + ')';
     openSelect.options.add(openOpt);
   }
+}
+
+function fillFpsIn(data) {
+  var snapshot = data.FpsIn || {};
+  var summary = document.getElementById('fps_in_summary');
+  if (summary) {
+    summary.innerHTML = 'Active keys: ' + (snapshot.active_keys || 0) +
+      ' &middot; open: ' + (snapshot.open_count || 0) +
+      ' &middot; YTD received: $' + (snapshot.ytd_received || '0.00');
+  }
+  var clockEl = document.getElementById('fps_in_clock');
+  if (clockEl && snapshot.clock) {
+    clockEl.innerHTML = 'HKT cutoff ' + (snapshot.clock.cutoff || '18:00') +
+      ' &middot; value date ' + (snapshot.clock.value_date || '--') +
+      (snapshot.clock.after_cutoff ? ' &middot; after cutoff' : '');
+  }
+  fillLinkedAccountSelect('fps_in_account');
+  var keyTable = document.getElementById('fps_in_key_tbl');
+  if (!keyTable) {
+    return;
+  }
+  var keyBody = keyTable.getElementsByTagName('tbody')[0];
+  keyBody.innerHTML = '';
+  var keySelect = document.getElementById('fps_in_key_select');
+  keySelect.options.length = 1;
+  var keys = snapshot.keys || [];
+  for (var i = 0; i < keys.length; i++) {
+    var row = keyBody.insertRow(-1);
+    row.insertCell(0).innerHTML = keys[i].nickname;
+    row.insertCell(1).innerHTML = keys[i].proxy_type + ' ' + (keys[i].proxy_masked || '');
+    row.insertCell(2).innerHTML = keys[i].account_last4 || '';
+    row.insertCell(3).innerHTML = keys[i].status;
+    var option = document.createElement('OPTION');
+    option.value = keys[i].key_id;
+    option.innerHTML = keys[i].nickname + ' (' + keys[i].status + ')';
+    keySelect.options.add(option);
+  }
+  var hist = document.getElementById('fps_in_tbl');
+  var histBody = hist.getElementsByTagName('tbody')[0];
+  histBody.innerHTML = '';
+  var openSelect = document.getElementById('fps_in_open_select');
+  openSelect.options.length = 1;
+  var inbounds = snapshot.inbounds || [];
+  for (var j = 0; j < inbounds.length; j++) {
+    var wrow = histBody.insertRow(-1);
+    wrow.insertCell(0).innerHTML = inbounds[j].sender_name;
+    wrow.insertCell(1).innerHTML = (inbounds[j].currency || 'HKD') + ' ' + inbounds[j].amount_instructed;
+    wrow.insertCell(2).innerHTML = inbounds[j].rail;
+    wrow.insertCell(3).innerHTML = inbounds[j].status;
+    wrow.insertCell(4).innerHTML = inbounds[j].e2e_masked || '';
+    var openOpt = document.createElement('OPTION');
+    openOpt.value = inbounds[j].inbound_id;
+    openOpt.innerHTML = inbounds[j].sender_name + ' ' + inbounds[j].amount_instructed + ' (' + inbounds[j].status + ')';
+    openSelect.options.add(openOpt);
+  }
+}
+
+function postFpsIn(path, payload, okMsg) {
+  payload.userid = userid;
+  fetch(homeURL + path, {
+    method: 'post',
+    body: JSON.stringify(payload),
+    headers: { 'Content-type': 'application/json' }
+  }).then(function(response) {
+    return response.json().then(function(body) {
+      var result = document.getElementById('fps_in_result');
+      if (!response.ok) {
+        if (result) { result.innerHTML = (body && (body.message || body.error)) || 'Failed'; }
+        window.alert((body && (body.message || body.error)) || 'Request failed');
+        if (body && body.FpsIn) {
+          fillFpsIn({ FpsIn: body.FpsIn });
+        }
+        return;
+      }
+      if (result) {
+        result.innerHTML = okMsg || body.message || 'Done';
+      }
+      if (body && body.FpsIn) {
+        fillFpsIn({ FpsIn: body.FpsIn });
+      } else {
+        getUser();
+      }
+    });
+  });
 }
 
 function postWire(path, payload, okMsg) {
@@ -1047,6 +1132,7 @@ $(document).ready(function() {
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#fps_in_menu').css('background-color','maroon');
     });
     $('#service_requests_menu').on('click', function(){
       if($('#service_requests_pane').css('display')=='none'){
@@ -1057,6 +1143,7 @@ $(document).ready(function() {
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#fps_in_menu').css('background-color','maroon');
     });
     $('#my_accounts_menu').on('click', function(){
       getUser();
@@ -1077,6 +1164,7 @@ $(document).ready(function() {
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#fps_in_menu').css('background-color','maroon');
     });
     $('#pending_transaction_requests_menu').on('click', function(){
       if($('#pending_transaction_requests_pane').css('display')=='none'){
@@ -1087,6 +1175,7 @@ $(document).ready(function() {
       $('#service_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#fps_in_menu').css('background-color','maroon');
     });
     $('#linked_accounts_menu').on('click', function(){
       if($('#linked_accounts_pane').css('display')=='none'){
@@ -1097,6 +1186,7 @@ $(document).ready(function() {
       $('#service_requests_menu').css('background-color','maroon');
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#fps_in_menu').css('background-color','maroon');
     });
     $('#wires_menu').on('click', function(){
       if($('#wires_pane').css('display')=='none'){
@@ -1107,6 +1197,58 @@ $(document).ready(function() {
       $('#service_requests_menu').css('background-color','maroon');
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
+      $('#fps_in_menu').css('background-color','maroon');
+    });
+    $('#fps_in_menu').on('click', function(){
+      if($('#fps_in_pane').css('display')=='none'){
+          $('#fps_in_pane').show().siblings('div').hide();
+      }
+      $('#fps_in_menu').css('background-color','#FF6600');
+      $('#my_accounts_menu').css('background-color','maroon');
+      $('#service_requests_menu').css('background-color','maroon');
+      $('#pending_transaction_requests_menu').css('background-color','maroon');
+      $('#linked_accounts_menu').css('background-color','maroon');
+      $('#wires_menu').css('background-color','maroon');
+    });
+    $('#fps_in_add_btn').on('click', function(){
+      if($('#fps_in_nickname').val() == '' || $('#fps_in_proxy').val() == '' || $('#fps_in_account').val() == 'select'){
+        window.alert('Nickname, proxy, and internal account are required.');
+        return;
+      }
+      postFpsIn('addFpsRecvKey', {
+        nickname: $('#fps_in_nickname').val(),
+        proxy_type: $('#fps_in_proxy_type').val(),
+        proxy: $('#fps_in_proxy').val(),
+        destination_account: $('#fps_in_account').val()
+      }, 'FPS proxy enrolled');
+    });
+    $('#fps_in_pause_btn').on('click', function(){
+      if($('#fps_in_key_select').val() == 'select'){ window.alert('Select a proxy.'); return; }
+      postFpsIn('pauseFpsRecvKey', { key_id: $('#fps_in_key_select').val() }, 'Paused');
+    });
+    $('#fps_in_resume_btn').on('click', function(){
+      if($('#fps_in_key_select').val() == 'select'){ window.alert('Select a proxy.'); return; }
+      postFpsIn('resumeFpsRecvKey', { key_id: $('#fps_in_key_select').val() }, 'Resumed');
+    });
+    $('#fps_in_cancel_btn').on('click', function(){
+      if($('#fps_in_key_select').val() == 'select'){ window.alert('Select a proxy.'); return; }
+      postFpsIn('cancelFpsRecvKey', { key_id: $('#fps_in_key_select').val() }, 'Cancelled');
+    });
+    $('#fps_in_claim_btn').on('click', function(){
+      if($('#fps_in_claim_proxy').val() == '' || $('#fps_in_account').val() == 'select'){
+        window.alert('Proxy and destination account are required to claim.');
+        return;
+      }
+      postFpsIn('claimFpsIn', {
+        proxy_type: $('#fps_in_proxy_type').val(),
+        proxy: $('#fps_in_claim_proxy').val(),
+        destination_account: $('#fps_in_account').val(),
+        nickname: $('#fps_in_nickname').val() || 'FPS proxy'
+      }, 'FPS claimed');
+    });
+    $('#fps_in_return_btn').on('click', function(){
+      if($('#fps_in_open_select').val() == 'select'){ window.alert('Select an inbound.'); return; }
+      postFpsIn('requestFpsInReturn', { inbound_id: $('#fps_in_open_select').val() }, 'Return requested');
     });
     $('#wire_add_btn').on('click', function(){
       if($('#wire_nickname').val() == '' || $('#wire_legal_name').val() == '' || $('#wire_default_account').val() == 'select'){

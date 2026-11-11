@@ -111,6 +111,15 @@
         </button>
 
         <button type="button" class="btn btn-primary btn-block"
+        id="fps_in_menu">
+        <span class="glyphicon glyphicon-import gi-3x"
+        style="color: white" aria-hidden="true">
+        </span>
+        <br />
+        FPS Receive
+        </button>
+
+        <button type="button" class="btn btn-primary btn-block"
         id="service_requests_menu">
         <span class="glyphicon glyphicon-edit gi-3x"
         style="color: white" aria-hidden="true">
@@ -351,6 +360,64 @@
           </table>
           <select id="wire_open_select" style="height:30px;margin-right:5px;">
             <option value="select">Select open wire</option>
+          </select>
+        </div>
+        <div id="fps_in_pane" style="display:none;">
+          <p id="fps_in_summary" style="color:white;">Active keys: 0 &middot; open: 0 &middot; YTD received: $0.00</p>
+          <p id="fps_in_clock" style="color:white;">HKT cutoff 18:00 &middot; value date --</p>
+          <table class="table table-hover table-bordered table-color fixed-header" id="fps_in_key_tbl">
+            <thead>
+              <tr>
+                <th>Nickname</th>
+                <th>Proxy</th>
+                <th>Last4</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+          <hr>
+          <h5 style="color:white;">Enroll an FPS proxy</h5>
+          <input type="text" id="fps_in_nickname" placeholder="Nickname" style="height:30px;width:140px;margin-right:5px;">
+          <select id="fps_in_proxy_type" style="height:30px;margin-right:5px;">
+            <option value="phone">+852 mobile</option>
+            <option value="hkid">HKID</option>
+            <option value="email">Email</option>
+            <option value="fpsid">FPS ID</option>
+          </select>
+          <input type="text" id="fps_in_proxy" placeholder="Proxy" style="height:30px;width:180px;margin-right:5px;">
+          <select id="fps_in_account" style="height:30px;margin-right:5px;">
+            <option value="select">Internal account</option>
+          </select>
+          <button type="button" id="fps_in_add_btn" class="btn btn-primary">Enroll</button>
+          <button type="button" id="fps_in_pause_btn" class="btn btn-primary">Pause</button>
+          <button type="button" id="fps_in_resume_btn" class="btn btn-primary">Resume</button>
+          <button type="button" id="fps_in_cancel_btn" class="btn btn-primary">Cancel</button>
+          <br><br>
+          <h5 style="color:white;">Claim unmatched FPS credit</h5>
+          <select id="fps_in_key_select" style="height:30px;margin-right:5px;">
+            <option value="select">Select enrolled proxy</option>
+          </select>
+          <input type="text" id="fps_in_claim_proxy" placeholder="Present proxy" style="height:30px;width:160px;margin-right:5px;">
+          <button type="button" id="fps_in_claim_btn" class="btn btn-primary">Claim</button>
+          <button type="button" id="fps_in_return_btn" class="btn btn-primary">Request return</button>
+          <p id="fps_in_result" style="color:yellow;margin-top:10px;"></p>
+          <hr>
+          <h5 style="color:white;">Inbound FPS / CHATS / ECG</h5>
+          <table class="table table-hover table-bordered table-color fixed-header" id="fps_in_tbl">
+            <thead>
+              <tr>
+                <th>Sender</th>
+                <th>Amount</th>
+                <th>Rail</th>
+                <th>Status</th>
+                <th>E2E</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+          <select id="fps_in_open_select" style="height:30px;margin-right:5px;">
+            <option value="select">Select inbound</option>
           </select>
         </div>
         <div id="account_details_pane" style="display:none;">
