@@ -38,6 +38,17 @@ class CreditRequestTests(unittest.TestCase):
         self.assertIn("10", executed)
         self.db.commit.assert_called()
 
+    def test_remark_is_written_into_transaction_history(self):
+        # Fedwire recall / ACH return pass a rail-specific remark through credit_request.
+        self.cursor.fetchall.return_value = [(1,)]
+        self.assertEqual(
+            self.Customers().credit_request(10, "15.00", remark="wire recalled from Chase"),
+            "Success",
+        )
+        executed = " ".join(str(call.args[0]) for call in self.cursor.execute.call_args_list)
+        self.assertIn("wire recalled from Chase", executed)
+        self.assertNotIn("direct deposited", executed)
+
     def test_commit_failure_rolls_back(self):
         self.cursor.fetchall.return_value = [(1,)]
         self.db.commit.side_effect = RuntimeError("disk full")
@@ -301,11 +312,16 @@ class DenyFundsAndLookupTests(unittest.TestCase):
         self.cursor.fetchall.side_effect = None
 
     def test_deny_marks_transaction_closed(self):
-        self.assertEqual(self.Customers().deny_funds_requested(42), "Request Cancelled")
-        sql = self.cursor.execute.call_args.args[0]
+        self.cursor.rowcount = 1
+        self.assertEqual(
+            self.Customers().deny_funds_requested(42, "alice"),
+            "Request Cancelled",
+        )
+        sql, params = self.cursor.execute.call_args[0]
         self.assertIn("Request Denied", sql)
         self.assertIn("status=0", sql)
-        self.assertIn("42", sql)
+        self.assertIn("approver1_id", sql)
+        self.assertEqual(params, (42, "alice"))
         self.db.commit.assert_called()
 
     def test_get_all_account_maps_types(self):
