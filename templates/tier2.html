@@ -332,6 +332,45 @@
               <button type="button" id="staff_wire_recall_btn" class="btn btn-primary">Recall</button>
               <p id="staff_wire_result" style="color:yellow;margin-top:8px;"></p>
             </div>
+            <div id="staff_fps_in_card" style="display:none;">
+              <h4 class="header_text" style="color:white;">Inbound FPS / CHATS / ECG</h4>
+              <p id="staff_fps_in_summary" style="color:white;">YTD received: $0.00 &middot; open: 0</p>
+              <table class="table table-hover table-bordered table-color" id="staff_fps_in_key_tbl">
+                <thead>
+                  <tr>
+                    <th>Nickname</th>
+                    <th>Proxy</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+              <table class="table table-hover table-bordered table-color" id="staff_fps_in_tbl">
+                <thead>
+                  <tr>
+                    <th>Sender</th>
+                    <th>Amount</th>
+                    <th>Status</th>
+                    <th>E2E</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+              <select id="staff_fps_in_id" style="height:30px;margin-right:5px;">
+                <option value="select">Select inbound</option>
+              </select>
+              <input type="text" id="staff_fps_in_e2e" placeholder="E2E ID" style="height:30px;width:160px;margin-right:5px;">
+              <input type="text" id="staff_fps_in_amount" placeholder="HKD amount" style="height:30px;width:100px;margin-right:5px;">
+              <input type="text" id="staff_fps_in_name" placeholder="Sender name" style="height:30px;width:140px;margin-right:5px;">
+              <input type="text" id="staff_fps_in_proxy" placeholder="Proxy" style="height:30px;width:140px;margin-right:5px;">
+              <button type="button" id="staff_fps_in_ingest_btn" class="btn btn-primary">Ingest</button>
+              <button type="button" id="staff_fps_in_override_btn" class="btn btn-primary">Override OFAC</button>
+              <button type="button" id="staff_fps_in_release_btn" class="btn btn-primary">Release</button>
+              <button type="button" id="staff_fps_in_reject_btn" class="btn btn-primary">Reject</button>
+              <button type="button" id="staff_fps_in_return_btn" class="btn btn-primary">Return</button>
+              <button type="button" id="staff_fps_in_export_btn" class="btn btn-primary">Export FPS1</button>
+              <p id="staff_fps_in_result" style="color:yellow;margin-top:8px;"></p>
+            </div>
           </div>
 
           <div id="account_details_pane" style="display: none">
