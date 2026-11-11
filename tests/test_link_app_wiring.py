@@ -231,6 +231,37 @@ class LinkAppWiringTests(unittest.TestCase):
         self.assertIn("ach to Chase", executed)
         customer_module.db.commit.side_effect = None
 
+    def test_claimed_employee_get_pause_another_customer(self):
+        self._session()
+        with patch("app.Customers") as customers_cls:
+            customers_cls.return_value.get_all_account.return_value = _accounts()
+            added = self.client.post("/addLinkedAccount", json=self._add_payload())
+            link_id = added.get_json()["link"]["link_id"]
+            confirmed = self.client.post(
+                "/confirmLinkedAccount",
+                json={
+                    "userid": "alice",
+                    "link_id": link_id,
+                    "amount1": "0.12",
+                    "amount2": "0.47",
+                },
+            )
+        self.assertEqual(confirmed.status_code, 200)
+        self._session("alice", "employee")
+        paused = self.client.get(
+            "/pauseLinkedAccount",
+            json={"userid": "alice", "link_id": link_id},
+        )
+        self.assertEqual(paused.status_code, 200)
+        self.assertEqual(paused.get_json()["link"]["status"], "paused")
+        resumed = self.client.get(
+            "/resumeLinkedAccount",
+            json={"userid": "alice", "link_id": link_id},
+        )
+        self.assertEqual(resumed.status_code, 200)
+        self.assertEqual(resumed.get_json()["link"]["status"], "verified")
+
 
 if __name__ == "__main__":
     unittest.main()
+
