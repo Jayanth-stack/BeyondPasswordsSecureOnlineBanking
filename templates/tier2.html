@@ -332,6 +332,42 @@
               <button type="button" id="staff_wire_recall_btn" class="btn btn-primary">Recall</button>
               <p id="staff_wire_result" style="color:yellow;margin-top:8px;"></p>
             </div>
+            <div id="staff_ukfps_card" style="display:none;">
+              <h4 class="header_text" style="color:white;">UK Faster Payments</h4>
+              <p id="staff_ukfps_summary" style="color:white;">YTD sent: &pound;0.00 &middot; fees: &pound;0.00</p>
+              <table class="table table-hover table-bordered table-color" id="staff_ukfps_bene_tbl">
+                <thead>
+                  <tr>
+                    <th>Nickname</th>
+                    <th>Name</th>
+                    <th>Sort</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+              <table class="table table-hover table-bordered table-color" id="staff_ukfps_tbl">
+                <thead>
+                  <tr>
+                    <th>Nickname</th>
+                    <th>Amount</th>
+                    <th>Status</th>
+                    <th>E2E</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+              <select id="staff_ukfps_id" style="height:30px;margin-right:5px;">
+                <option value="select">Select open/sent UK FPS</option>
+              </select>
+              <button type="button" id="staff_ukfps_override_btn" class="btn btn-primary">Override OFAC</button>
+              <button type="button" id="staff_ukfps_cop_btn" class="btn btn-primary">Override CoP</button>
+              <button type="button" id="staff_ukfps_release_btn" class="btn btn-primary">Release</button>
+              <button type="button" id="staff_ukfps_reject_btn" class="btn btn-primary">Reject</button>
+              <button type="button" id="staff_ukfps_complete_btn" class="btn btn-primary">Complete</button>
+              <button type="button" id="staff_ukfps_recall_btn" class="btn btn-primary">Recall</button>
+              <p id="staff_ukfps_result" style="color:yellow;margin-top:8px;"></p>
+            </div>
           </div>
 
           <div id="account_details_pane" style="display: none">
