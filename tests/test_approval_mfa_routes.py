@@ -59,6 +59,7 @@ class ApprovalAndMfaRouteTests(unittest.TestCase):
     def test_approve_request_customer_escalates_over_threshold(self):
         self._session("cust1", "customer", customer_id="cust1")
         with patch("app.Employee") as emp_cls, patch("app.Customers") as customers_cls:
+            customers_cls.return_value.owns_pending_transaction.return_value = True
             emp_cls.return_value.get_amount_of_transaction.return_value = 1500
             emp_cls.return_value.transfer_transaction_to_tier2.return_value = (
                 "Request Sent to Tier2 employee"
@@ -68,7 +69,27 @@ class ApprovalAndMfaRouteTests(unittest.TestCase):
                 json={"customer_id": "cust1", "transaction_no": 8},
             )
         self.assertEqual(response.status_code, 200)
+        customers_cls.return_value.owns_pending_transaction.assert_called_once_with(
+            "cust1", 8
+        )
         emp_cls.return_value.transfer_transaction_to_tier2.assert_called_once_with(8)
+        customers_cls.return_value.fund_transfers.assert_not_called()
+
+    def test_approve_request_large_amount_still_requires_ownership(self):
+        self._session("cust1", "customer")
+        with patch("app.Employee") as emp_cls, patch("app.Customers") as customers_cls:
+            customers_cls.return_value.owns_pending_transaction.return_value = False
+            emp_cls.return_value.get_amount_of_transaction.return_value = 1500
+            response = self.client.post(
+                "/approveRequest",
+                json={"customer_id": "cust1", "transaction_no": 8},
+            )
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(
+            response.get_json()["message"], "Unauthorized or invalid transaction"
+        )
+        emp_cls.return_value.get_amount_of_transaction.assert_not_called()
+        emp_cls.return_value.transfer_transaction_to_tier2.assert_not_called()
         customers_cls.return_value.fund_transfers.assert_not_called()
 
     def test_approve_request_customer_executes_at_or_below_threshold(self):
@@ -219,7 +240,7 @@ class ApprovalAndMfaRouteTests(unittest.TestCase):
     def test_reset_password_approved_otp_calls_reset(self):
         with patch("app.Customers") as customers_cls, patch("app.twilio_client") as twilio:
             customers_cls.return_value.retrieve_phone_number.return_value = "+14155552671"
-            customers_cls.return_value.reset_password.return_value = "Password Updated"
+            customers_cls.return_value.reset_fpassword.return_value = "Password Updated"
             twilio.verify.v2.services.return_value.verification_checks.create.return_value.status = (
                 "approved"
             )
@@ -233,8 +254,8 @@ class ApprovalAndMfaRouteTests(unittest.TestCase):
                 },
             )
         self.assertEqual(response.status_code, 200)
-        # Route currently forwards (userid, newPassword) — no old-password proof.
-        customers_cls.return_value.reset_password.assert_called_once_with("cust1", "n3w")
+        customers_cls.return_value.reset_fpassword.assert_called_once_with("cust1", "n3w")
+        customers_cls.return_value.reset_password.assert_not_called()
 
     def test_get_cheque_list_rejects_employee_session(self):
         self._session("emp1", "tier1", emp_tier=1)
@@ -382,8 +403,7 @@ class ApprovalAndMfaRouteTests(unittest.TestCase):
                 json={"userid": "emp1", "account_no": 10},
             )
         self.assertEqual(response.status_code, 200)
-        # Route does not pass the acting userid into the helper.
-        emp_cls.return_value.deactivate_account.assert_called_once_with(10)
+        emp_cls.return_value.deactivate_account.assert_called_once_with("emp1", 10)
 
 
 if __name__ == "__main__":

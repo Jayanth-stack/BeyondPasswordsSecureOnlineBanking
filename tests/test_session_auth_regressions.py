@@ -176,6 +176,22 @@ class SessionAuthRegressionTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         employee_cls.return_value.deactivate_account.assert_called_once_with("tier2emp", 42)
 
+    @patch("app.Customers")
+    def test_deny_request_helper_failure_is_500(self, customers_cls):
+        self._login_customer_session("alice")
+        customers_cls.return_value.deny_funds_requested.return_value = (
+            "Please try again later"
+        )
+        response = self.client.post(
+            "/denyRequest",
+            json={"userid": "alice", "transaction_no": 99},
+        )
+        self.assertEqual(response.status_code, 500)
+        self.assertEqual(response.get_json()["message"], "Please try again later")
+        customers_cls.return_value.deny_funds_requested.assert_called_once_with(
+            99, "alice"
+        )
+
 
 class TransactionOwnershipQueryTests(unittest.TestCase):
     def setUp(self):
@@ -185,6 +201,8 @@ class TransactionOwnershipQueryTests(unittest.TestCase):
         self.cust_db = cust_db
         self.cust_cursor.reset_mock()
         self.cust_db.reset_mock()
+        self.cust_db.commit.side_effect = None
+        self.cust_db.rollback.side_effect = None
 
     def test_deny_funds_requested_filters_by_approver(self):
         from customer import Customers
@@ -225,6 +243,27 @@ class TransactionOwnershipQueryTests(unittest.TestCase):
 
         self.cust_cursor.fetchone.return_value = None
         self.assertFalse(Customers().owns_pending_transaction("alice", 10))
+
+    def test_cancel_pending_transaction_has_no_owner_filter(self):
+        from customer import Customers
+
+        result = Customers()._cancel_pending_transaction(99)
+        sql, params = self.cust_cursor.execute.call_args[0]
+        self.assertNotIn("approver1_id", sql)
+        self.assertIn("status = 1", sql)
+        self.assertEqual(params, (99,))
+        self.assertEqual(result, "Request Cancelled")
+        self.cust_db.commit.assert_called_once()
+
+    def test_cancel_pending_transaction_commit_failure_rolls_back(self):
+        from customer import Customers
+
+        self.cust_db.commit.side_effect = RuntimeError("disk full")
+        self.assertEqual(
+            Customers()._cancel_pending_transaction(99),
+            "Please try again later",
+        )
+        self.cust_db.rollback.assert_called()
 
 
 if __name__ == "__main__":

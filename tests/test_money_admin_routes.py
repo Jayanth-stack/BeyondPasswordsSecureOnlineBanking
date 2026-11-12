@@ -200,7 +200,7 @@ class MoneyAdminRouteTests(unittest.TestCase):
                 json={"userid": "emp1", "customer_id": "cust1"},
             )
         self.assertEqual(response.status_code, 200)
-        emp_cls.return_value.deactivate_customer.assert_called_once_with("cust1")
+        emp_cls.return_value.deactivate_customer.assert_called_once_with("emp1", "cust1")
 
     def test_deactivate_employee_authorized_calls_helper(self):
         self._session("admin1", "admin", emp_tier=3)
@@ -222,7 +222,7 @@ class MoneyAdminRouteTests(unittest.TestCase):
                 json={"userid": "emp1", "update_req_no": 9},
             )
         self.assertEqual(response.status_code, 200)
-        emp_cls.return_value.approve_update_info.assert_called_once_with(9)
+        emp_cls.return_value.approve_update_info.assert_called_once_with("emp1", 9)
 
     def test_deny_update_info_authorized_employee(self):
         self._session("emp1", "employee", emp_tier=2)
@@ -346,6 +346,77 @@ class MoneyAdminRouteTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         customers_cls.return_value.open_account.assert_called_once_with(
             "cust1", "savings"
+        )
+
+    def test_get_open_account_still_mutates(self):
+        self._session("cust1", "customer")
+        with patch("app.Customers") as customers_cls:
+            customers_cls.return_value.open_account.return_value = "Done"
+            response = self.client.get(
+                "/openNewAccount",
+                json={
+                    "userid": "cust1",
+                    "customer_id": "bob",
+                    "account_type": "savings",
+                },
+            )
+        self.assertEqual(response.status_code, 200)
+        customers_cls.return_value.open_account.assert_called_once_with("bob", "savings")
+
+    def test_get_deactivate_account_still_mutates(self):
+        self._session("tier2emp", "tier2", emp_tier=2)
+        with patch("app.Employee") as emp_cls:
+            emp_cls.return_value.deactivate_account.return_value = "Account Closed"
+            response = self.client.get(
+                "/deactivateAccount",
+                json={"userid": "tier2emp", "account_no": 42},
+            )
+        self.assertEqual(response.status_code, 200)
+        emp_cls.return_value.deactivate_account.assert_called_once_with("tier2emp", 42)
+
+    def test_get_deactivate_customer_still_mutates(self):
+        self._session("tier2emp", "tier2", emp_tier=2)
+        with patch("app.Employee") as emp_cls:
+            emp_cls.return_value.deactivate_customer.return_value = "Customer Closed"
+            response = self.client.get(
+                "/deactivateCustomer",
+                json={"userid": "tier2emp", "customer_id": "alice"},
+            )
+        self.assertEqual(response.status_code, 200)
+        emp_cls.return_value.deactivate_customer.assert_called_once_with(
+            "tier2emp", "alice"
+        )
+
+    def test_get_approve_request_still_mutates(self):
+        self._session("alice", "customer")
+        with patch("app.Employee") as emp_cls, patch("app.Customers") as customers_cls:
+            customers_cls.return_value.owns_pending_transaction.return_value = True
+            emp = emp_cls.return_value
+            emp.get_amount_of_transaction.return_value = 50
+            emp.get_fromAccount_of_transaction.return_value = 1
+            emp.get_toAccount_of_transaction.return_value = 2
+            emp.get_transaction_status.return_value = 1
+            customers_cls.return_value.fund_transfers.return_value = {"amount": 50}
+            response = self.client.get(
+                "/approveRequest",
+                json={"customer_id": "alice", "transaction_no": 10},
+            )
+        self.assertEqual(response.status_code, 200)
+        customers_cls.return_value.fund_transfers.assert_called_once_with(1, 2, 50, 10)
+
+    def test_get_deny_request_still_mutates(self):
+        self._session("alice", "customer")
+        with patch("app.Customers") as customers_cls:
+            customers_cls.return_value.deny_funds_requested.return_value = (
+                "Request Cancelled"
+            )
+            response = self.client.get(
+                "/denyRequest",
+                json={"userid": "alice", "transaction_no": 99},
+            )
+        self.assertEqual(response.status_code, 200)
+        customers_cls.return_value.deny_funds_requested.assert_called_once_with(
+            99, "alice"
         )
 
     def test_modify_customer_userid_mismatch_non_admin(self):
