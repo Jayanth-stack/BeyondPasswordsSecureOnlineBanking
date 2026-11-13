@@ -227,6 +227,119 @@ class LinkRouteTests(unittest.TestCase):
         self.assertEqual(rejected.status_code, 200)
         self.assertEqual(rejected.get_json()['link']['status'], 'rejected')
 
+    def _add_verified(self, nickname='Chase'):
+        added = self.client.post('/addLinkedAccount', json={
+            'userid': 'alice', 'nickname': nickname, 'default_account': '1001',
+            'routing_last4': '0210', 'account_last4': '7788',
+        })
+        self.assertEqual(added.status_code, 201)
+        link_id = added.get_json()['link']['link_id']
+        confirmed = self.client.post('/confirmLinkedAccount', json={
+            'userid': 'alice', 'link_id': link_id, 'amount1': '0.12', 'amount2': '0.47',
+        })
+        self.assertEqual(confirmed.status_code, 200)
+        return link_id
+
+    def test_get_pause_resume_close_still_mutate(self):
+        self.login()
+        link_id = self._add_verified('Ally')
+        paused = self.client.get('/pauseLinkedAccount', json={
+            'userid': 'alice', 'link_id': link_id,
+        })
+        self.assertEqual(paused.status_code, 200)
+        self.assertEqual(paused.get_json()['link']['status'], 'paused')
+        resumed = self.client.post('/resumeLinkedAccount', json={
+            'userid': 'alice', 'link_id': link_id,
+        })
+        self.assertEqual(resumed.status_code, 200)
+        self.assertEqual(resumed.get_json()['link']['status'], 'verified')
+        closed = self.client.get('/closeLinkedAccount', json={
+            'userid': 'alice', 'link_id': link_id,
+        })
+        self.assertEqual(closed.status_code, 200)
+        self.assertEqual(closed.get_json()['link']['status'], 'closed')
+        again = self.client.post('/resumeLinkedAccount', json={
+            'userid': 'alice', 'link_id': link_id,
+        })
+        self.assertEqual(again.status_code, 409)
+        self.assertEqual(again.get_json()['error'], 'already_closed')
+
+    def test_claimed_employee_get_pauses_another_customers_link(self):
+        self.login()
+        link_id = self._add_verified('CapOne')
+        self.login('bob', 'employee')
+        paused = self.client.get('/pauseLinkedAccount', json={
+            'userid': 'bob', 'link_id': link_id,
+        })
+        self.assertEqual(paused.status_code, 200)
+        self.assertEqual(paused.get_json()['link']['status'], 'paused')
+        self.assertEqual(paused.get_json()['link']['userid'], 'alice')
+
+    def test_customer_cannot_pause_foreign_link(self):
+        self.login()
+        link_id = self._add_verified('Wells')
+        self.login('bob', 'customer')
+        denied = self.client.post('/pauseLinkedAccount', json={
+            'userid': 'bob', 'link_id': link_id,
+        })
+        self.assertEqual(denied.status_code, 403)
+        self.assertEqual(denied.get_json()['error'], 'link_forbidden')
+
+    def test_claimed_employee_get_settles_and_returns_another_customers_ach(self):
+        self.login()
+        link_id = self._add_verified('BoA')
+        pushed = self.client.post('/pushToLinked', json={
+            'userid': 'alice', 'link_id': link_id, 'amount': '18.00', 'trace_id': 'settle-get-1',
+        })
+        self.assertEqual(pushed.status_code, 201)
+        movement_id = pushed.get_json()['movement']['movement_id']
+        denied = self.client.post('/settleLinkedAch', json={
+            'userid': 'alice', 'movement_id': movement_id,
+        })
+        self.assertEqual(denied.status_code, 403)
+        self.assertEqual(denied.get_json()['error'], 'link_forbidden')
+
+        other = self.client.post('/pushToLinked', json={
+            'userid': 'alice', 'link_id': link_id, 'amount': '12.00', 'trace_id': 'return-get-1',
+        })
+        self.assertEqual(other.status_code, 201)
+        other_id = other.get_json()['movement']['movement_id']
+
+        self.login('bob', 'employee')
+        settled = self.client.get('/settleLinkedAch', json={
+            'userid': 'bob', 'movement_id': movement_id,
+        })
+        self.assertEqual(settled.status_code, 200)
+        self.assertEqual(settled.get_json()['movement']['status'], 'settled')
+        returned = self.client.get('/returnLinkedAch', json={
+            'userid': 'bob', 'movement_id': other_id, 'reason': 'unauthorized',
+        })
+        self.assertEqual(returned.status_code, 200)
+        self.assertEqual(returned.get_json()['movement']['status'], 'returned')
+        self.assertEqual(self.credits[-1][0], '1001')
+        self.assertEqual(self.credits[-1][1], '12.00')
+
+    def test_staff_accept_prenote_too_soon_then_get_accepts(self):
+        self.login()
+        added = self.client.post('/addLinkedAccount', json={
+            'userid': 'alice', 'nickname': 'Prenote', 'default_account': '1001',
+            'routing_last4': '1210', 'account_last4': '9001', 'method': 'prenote',
+        })
+        self.assertEqual(added.status_code, 201)
+        link_id = added.get_json()['link']['link_id']
+        self.login('teller', 'tier1')
+        too_soon = self.client.post('/acceptPrenote', json={
+            'userid': 'teller', 'link_id': link_id,
+        })
+        self.assertEqual(too_soon.status_code, 400)
+        self.assertEqual(too_soon.get_json()['error'], 'too_soon')
+        self.now[0] += 86400
+        accepted = self.client.get('/acceptPrenote', json={
+            'userid': 'teller', 'link_id': link_id,
+        })
+        self.assertEqual(accepted.status_code, 200)
+        self.assertEqual(accepted.get_json()['link']['status'], 'verified')
+
 
 if __name__ == '__main__':
     unittest.main()
