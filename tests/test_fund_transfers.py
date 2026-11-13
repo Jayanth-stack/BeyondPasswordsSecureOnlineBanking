@@ -65,6 +65,17 @@ class FundTransfersTests(unittest.TestCase):
             "Insufficient Balance",
         )
 
+    def test_checking_nsf_leaves_pending_row_open(self):
+        customer = self.Customers()
+        self.cursor.fetchall.side_effect = self._regular_transfer_rows((50.0, 1, "checkin"))
+
+        self.assertEqual(
+            customer.fund_transfers(10, 20, 100.0, transaction_no=55),
+            "Insufficient Balance",
+        )
+        executed = " ".join(str(call.args[0]) for call in self.cursor.execute.call_args_list)
+        self.assertNotIn("Request Denied", executed)
+
     def test_credit_overdraft_limit(self):
         customer = self.Customers()
         self.cursor.fetchall.side_effect = self._regular_transfer_rows((0.0, 1, "credit"))
@@ -73,6 +84,25 @@ class FundTransfersTests(unittest.TestCase):
             customer.fund_transfers(10, 20, 5001.0),
             "Insufficient Balance in Credit Card",
         )
+
+    def test_credit_overdraft_cancels_pending_without_owner_filter(self):
+        customer = self.Customers()
+        self.cursor.fetchall.side_effect = self._regular_transfer_rows((0.0, 1, "credit"))
+
+        self.assertEqual(
+            customer.fund_transfers(10, 20, 5001.0, transaction_no=55),
+            "Insufficient Balance in Credit Card",
+        )
+        cancel_calls = [
+            call
+            for call in self.cursor.execute.call_args_list
+            if "Request Denied" in str(call.args[0]) and "Transactions" in str(call.args[0])
+        ]
+        self.assertEqual(len(cancel_calls), 1)
+        sql, params = cancel_calls[0].args
+        self.assertNotIn("approver1_id", sql)
+        self.assertEqual(params, (55,))
+        self.db.commit.assert_called()
 
     def test_credit_within_limit_succeeds(self):
         customer = self.Customers()

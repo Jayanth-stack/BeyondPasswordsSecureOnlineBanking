@@ -231,6 +231,122 @@ class LinkAppWiringTests(unittest.TestCase):
         self.assertIn("ach to Chase", executed)
         customer_module.db.commit.side_effect = None
 
+    def _verify_link(self, nickname="Chase"):
+        with patch("app.Customers") as customers_cls:
+            customers_cls.return_value.get_all_account.return_value = _accounts()
+            added = self.client.post("/addLinkedAccount", json=self._add_payload(nickname=nickname))
+            self.assertEqual(added.status_code, 201)
+            link_id = added.get_json()["link"]["link_id"]
+            confirmed = self.client.post(
+                "/confirmLinkedAccount",
+                json={
+                    "userid": "alice",
+                    "link_id": link_id,
+                    "amount1": "0.12",
+                    "amount2": "0.47",
+                },
+            )
+            self.assertEqual(confirmed.status_code, 200)
+            return link_id
+
+    def test_claimed_employee_get_pauses_another_customers_link(self):
+        self._session()
+        link_id = self._verify_link("BobsTarget")
+        self._session("bob", "employee")
+        paused = self.client.get(
+            "/pauseLinkedAccount",
+            json={"userid": "bob", "link_id": link_id},
+        )
+        self.assertEqual(paused.status_code, 200)
+        self.assertEqual(paused.get_json()["link"]["status"], "paused")
+        self.assertEqual(paused.get_json()["link"]["userid"], "alice")
+
+    def test_customer_cannot_pause_foreign_link(self):
+        self._session()
+        link_id = self._verify_link("Foreign")
+        self._session("bob", "customer")
+        denied = self.client.post(
+            "/pauseLinkedAccount",
+            json={"userid": "bob", "link_id": link_id},
+        )
+        self.assertEqual(denied.status_code, 403)
+        self.assertEqual(denied.get_json()["error"], "link_forbidden")
+
+    def test_get_pause_and_close_still_mutate(self):
+        self._session()
+        link_id = self._verify_link("PauseGet")
+        paused = self.client.get(
+            "/pauseLinkedAccount",
+            json={"userid": "alice", "link_id": link_id},
+        )
+        self.assertEqual(paused.status_code, 200)
+        self.assertEqual(paused.get_json()["link"]["status"], "paused")
+        closed = self.client.get(
+            "/closeLinkedAccount",
+            json={"userid": "alice", "link_id": link_id},
+        )
+        self.assertEqual(closed.status_code, 200)
+        self.assertEqual(closed.get_json()["link"]["status"], "closed")
+
+    def test_claimed_employee_get_settles_another_customers_ach(self):
+        self._session()
+        link_id = self._verify_link("SettleGet")
+        with patch("app.Customers") as customers_cls:
+            customers_cls.return_value.get_all_account.return_value = _accounts()
+            customers_cls.return_value.debit_request.return_value = "Amount Debited"
+            pushed = self.client.post(
+                "/pushToLinked",
+                json={
+                    "userid": "alice",
+                    "link_id": link_id,
+                    "amount": "22.00",
+                    "trace_id": "app-settle-1",
+                },
+            )
+        self.assertEqual(pushed.status_code, 201)
+        movement_id = pushed.get_json()["movement"]["movement_id"]
+        denied = self.client.post(
+            "/settleLinkedAch",
+            json={"userid": "alice", "movement_id": movement_id},
+        )
+        self.assertEqual(denied.status_code, 403)
+        self._session("bob", "employee")
+        settled = self.client.get(
+            "/settleLinkedAch",
+            json={"userid": "bob", "movement_id": movement_id},
+        )
+        self.assertEqual(settled.status_code, 200)
+        self.assertEqual(settled.get_json()["movement"]["status"], "settled")
+        self.assertEqual(settled.get_json()["movement"]["userid"], "alice")
+
+    def test_staff_get_accept_prenote_after_wait(self):
+        self.now = [1_718_409_600.0]
+        self.service.clock = lambda: self.now[0]
+        self.service.policy.prenote_wait_seconds = 86400
+        self._session()
+        with patch("app.Customers") as customers_cls:
+            customers_cls.return_value.get_all_account.return_value = _accounts()
+            added = self.client.post(
+                "/addLinkedAccount",
+                json=self._add_payload(nickname="PrenoteBank", method="prenote"),
+            )
+        self.assertEqual(added.status_code, 201)
+        link_id = added.get_json()["link"]["link_id"]
+        self._session("teller", "tier1")
+        too_soon = self.client.post(
+            "/acceptPrenote",
+            json={"userid": "teller", "link_id": link_id},
+        )
+        self.assertEqual(too_soon.status_code, 400)
+        self.assertEqual(too_soon.get_json()["error"], "too_soon")
+        self.now[0] += 86400
+        accepted = self.client.get(
+            "/acceptPrenote",
+            json={"userid": "teller", "link_id": link_id},
+        )
+        self.assertEqual(accepted.status_code, 200)
+        self.assertEqual(accepted.get_json()["link"]["status"], "verified")
+
 
 if __name__ == "__main__":
     unittest.main()
