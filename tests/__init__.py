@@ -8,6 +8,8 @@ os.environ.setdefault("RECEIPT_SECRET", "test-receipt-secret-do-not-use-in-prod"
 # Linked-account service is constructed at app import; keep it in-memory and secret-stable.
 os.environ.setdefault("LINK_STORE", "memory")
 os.environ.setdefault("LINK_CHALLENGE_SECRET", "test-link-challenge-secret")
+os.environ.setdefault("ZENGIN_STORE", "memory")
+os.environ.setdefault("ZENGIN_FX_JPYUSD", "0.0067")
 
 if "mysql" not in sys.modules:
     mysql_mod = MagicMock()
