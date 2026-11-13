@@ -128,6 +128,7 @@ function appendPrimaryData(data) {
   fillPendingTransTbl(data);
   fillLinkedAccounts(data);
   fillWires(data);
+  fillZengin(data);
 }
 
 function fillLinkedAccountSelect(selectId) {
@@ -252,6 +253,102 @@ function fillWires(data) {
     openOpt.innerHTML = wires[j].nickname + ' $' + wires[j].amount + ' (' + wires[j].status + ')';
     openSelect.options.add(openOpt);
   }
+}
+
+function fillZengin(data) {
+  var snapshot = data.Zengin || {};
+  var summary = document.getElementById('zengin_summary');
+  if (summary) {
+    summary.innerHTML = 'Active: ' + (snapshot.active_count || 0) +
+      ' &middot; open: ' + (snapshot.open_count || 0) +
+      ' &middot; YTD sent: &yen;' + (snapshot.ytd_sent || '0.00') +
+      ' &middot; fees: &yen;' + (snapshot.ytd_fees || '0.00');
+  }
+  var clockEl = document.getElementById('zengin_clock');
+  if (clockEl && snapshot.clock) {
+    clockEl.innerHTML = 'More Time 24/7 &middot; Zengin cutoff ' +
+      ((snapshot.zengin_clock && snapshot.zengin_clock.cutoff) || '15:30') +
+      ' &middot; value ' + (snapshot.clock.value_date || '--');
+  }
+  fillLinkedAccountSelect('zengin_default_account');
+  var table = document.getElementById('zengin_bene_tbl');
+  if (!table) {
+    return;
+  }
+  var body = table.getElementsByTagName('tbody')[0];
+  body.innerHTML = '';
+  var selection = document.getElementById('zengin_bene_select');
+  selection.options.length = 1;
+  var benes = snapshot.beneficiaries || [];
+  for (var i = 0; i < benes.length; i++) {
+    var row = body.insertRow(-1);
+    row.insertCell(0).innerHTML = benes[i].nickname;
+    row.insertCell(1).innerHTML = benes[i].legal_name;
+    row.insertCell(2).innerHTML = benes[i].bank_code;
+    row.insertCell(3).innerHTML = benes[i].account_last4;
+    row.insertCell(4).innerHTML = benes[i].status;
+    var option = document.createElement('OPTION');
+    option.value = benes[i].beneficiary_id;
+    option.innerHTML = benes[i].nickname + ' (' + benes[i].status + ')';
+    selection.options.add(option);
+  }
+  var hist = document.getElementById('zengin_history_tbl');
+  var histBody = hist.getElementsByTagName('tbody')[0];
+  histBody.innerHTML = '';
+  var openSelect = document.getElementById('zengin_open_select');
+  openSelect.options.length = 1;
+  var pays = snapshot.payments || [];
+  for (var j = 0; j < pays.length; j++) {
+    var wrow = histBody.insertRow(-1);
+    wrow.insertCell(0).innerHTML = pays[j].nickname;
+    wrow.insertCell(1).innerHTML = '&yen;' + pays[j].instructed_amount;
+    wrow.insertCell(2).innerHTML = '$' + pays[j].usd_amount;
+    wrow.insertCell(3).innerHTML = pays[j].rail;
+    wrow.insertCell(4).innerHTML = pays[j].status;
+    if (!pays[j].cancelable) {
+      continue;
+    }
+    var openOpt = document.createElement('OPTION');
+    openOpt.value = pays[j].payment_id;
+    openOpt.innerHTML = pays[j].nickname + ' &yen;' + pays[j].instructed_amount + ' (' + pays[j].status + ')';
+    openSelect.options.add(openOpt);
+  }
+}
+
+function postZengin(path, payload, okMsg) {
+  payload.userid = userid;
+  fetch(homeURL + path, {
+    method: 'post',
+    body: JSON.stringify(payload),
+    headers: { 'Content-type': 'application/json' }
+  }).then(function(response) {
+    return response.json().then(function(body) {
+      var result = document.getElementById('zengin_result');
+      if (!response.ok) {
+        if (result) { result.innerHTML = (body && (body.message || body.error)) || 'Failed'; }
+        window.alert((body && (body.message || body.error)) || 'Request failed');
+        if (body && body.Zengin) {
+          fillZengin({ Zengin: body.Zengin });
+        }
+        return;
+      }
+      if (result) {
+        if (body && body.preview) {
+          result.innerHTML = 'USD $' + body.preview.usd_amount + ' &middot; fee &yen;' + body.preview.fee +
+            ' &middot; value ' + ((body.preview.clock && body.preview.clock.value_date) || '');
+        } else {
+          result.innerHTML = okMsg || body.message || 'Done';
+        }
+      }
+      if (body && body.Zengin) {
+        fillZengin({ Zengin: body.Zengin });
+      } else {
+        getUser();
+      }
+    });
+  }).catch(function(error) {
+    console.error(error);
+  });
 }
 
 function postWire(path, payload, okMsg) {
@@ -1047,6 +1144,7 @@ $(document).ready(function() {
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#zengin_menu').css('background-color','maroon');
     });
     $('#service_requests_menu').on('click', function(){
       if($('#service_requests_pane').css('display')=='none'){
@@ -1057,6 +1155,7 @@ $(document).ready(function() {
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#zengin_menu').css('background-color','maroon');
     });
     $('#my_accounts_menu').on('click', function(){
       getUser();
@@ -1077,6 +1176,7 @@ $(document).ready(function() {
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#zengin_menu').css('background-color','maroon');
     });
     $('#pending_transaction_requests_menu').on('click', function(){
       if($('#pending_transaction_requests_pane').css('display')=='none'){
@@ -1087,6 +1187,7 @@ $(document).ready(function() {
       $('#service_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#zengin_menu').css('background-color','maroon');
     });
     $('#linked_accounts_menu').on('click', function(){
       if($('#linked_accounts_pane').css('display')=='none'){
@@ -1097,6 +1198,7 @@ $(document).ready(function() {
       $('#service_requests_menu').css('background-color','maroon');
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#zengin_menu').css('background-color','maroon');
     });
     $('#wires_menu').on('click', function(){
       if($('#wires_pane').css('display')=='none'){
@@ -1107,6 +1209,18 @@ $(document).ready(function() {
       $('#service_requests_menu').css('background-color','maroon');
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
+      $('#zengin_menu').css('background-color','maroon');
+    });
+    $('#zengin_menu').on('click', function(){
+      if($('#zengin_pane').css('display')=='none'){
+          $('#zengin_pane').show().siblings('div').hide();
+      }
+      $('#zengin_menu').css('background-color','#FF6600');
+      $('#my_accounts_menu').css('background-color','maroon');
+      $('#service_requests_menu').css('background-color','maroon');
+      $('#pending_transaction_requests_menu').css('background-color','maroon');
+      $('#linked_accounts_menu').css('background-color','maroon');
+      $('#wires_menu').css('background-color','maroon');
     });
     $('#wire_add_btn').on('click', function(){
       if($('#wire_nickname').val() == '' || $('#wire_legal_name').val() == '' || $('#wire_default_account').val() == 'select'){
@@ -1164,6 +1278,63 @@ $(document).ready(function() {
     $('#wire_archive_btn').on('click', function(){
       if($('#wire_bene_select').val() == 'select'){ window.alert('Select a beneficiary.'); return; }
       postWire('archiveWireBeneficiary', { beneficiary_id: $('#wire_bene_select').val() }, 'Archived');
+    });
+    $('#zengin_add_btn').on('click', function(){
+      if($('#zengin_nickname').val() == '' || $('#zengin_legal_name').val() == '' || $('#zengin_default_account').val() == 'select'){
+        window.alert('Nickname, legal name, and internal account are required.');
+        return;
+      }
+      postZengin('addZenginBeneficiary', {
+        nickname: $('#zengin_nickname').val(),
+        legal_name: $('#zengin_legal_name').val(),
+        kana_name: $('#zengin_kana').val(),
+        bank_code: $('#zengin_bank').val(),
+        branch_code: $('#zengin_branch').val(),
+        account_number: $('#zengin_account_number').val(),
+        default_account: $('#zengin_default_account').val()
+      }, 'Beneficiary added');
+    });
+    $('#zengin_preview_btn').on('click', function(){
+      if($('#zengin_bene_select').val() == 'select' || $('#zengin_amount').val() == ''){
+        window.alert('Select a beneficiary and amount.');
+        return;
+      }
+      postZengin('previewZengin', {
+        beneficiary_id: $('#zengin_bene_select').val(),
+        amount: $('#zengin_amount').val(),
+        rail: $('#zengin_rail').val(),
+        account: $('#zengin_default_account').val() == 'select' ? null : $('#zengin_default_account').val()
+      }, 'Preview');
+    });
+    $('#zengin_send_btn').on('click', function(){
+      if($('#zengin_bene_select').val() == 'select' || $('#zengin_amount').val() == ''){
+        window.alert('Select a beneficiary and amount.');
+        return;
+      }
+      postZengin('sendZengin', {
+        beneficiary_id: $('#zengin_bene_select').val(),
+        amount: $('#zengin_amount').val(),
+        rail: $('#zengin_rail').val(),
+        purpose: $('#zengin_purpose').val(),
+        memo: $('#zengin_memo').val(),
+        account: $('#zengin_default_account').val() == 'select' ? null : $('#zengin_default_account').val()
+      }, 'Zengin originated');
+    });
+    $('#zengin_cancel_btn').on('click', function(){
+      if($('#zengin_open_select').val() == 'select'){ window.alert('Select an open payment.'); return; }
+      postZengin('cancelZengin', { payment_id: $('#zengin_open_select').val() }, 'Cancelled');
+    });
+    $('#zengin_pause_btn').on('click', function(){
+      if($('#zengin_bene_select').val() == 'select'){ window.alert('Select a beneficiary.'); return; }
+      postZengin('pauseZenginBeneficiary', { beneficiary_id: $('#zengin_bene_select').val() }, 'Paused');
+    });
+    $('#zengin_resume_btn').on('click', function(){
+      if($('#zengin_bene_select').val() == 'select'){ window.alert('Select a beneficiary.'); return; }
+      postZengin('resumeZenginBeneficiary', { beneficiary_id: $('#zengin_bene_select').val() }, 'Resumed');
+    });
+    $('#zengin_archive_btn').on('click', function(){
+      if($('#zengin_bene_select').val() == 'select'){ window.alert('Select a beneficiary.'); return; }
+      postZengin('archiveZenginBeneficiary', { beneficiary_id: $('#zengin_bene_select').val() }, 'Archived');
     });
     $('#la_add_btn').on('click', function(){
       if($('#la_nickname').val() == '' || $('#la_default_account').val() == 'select'){

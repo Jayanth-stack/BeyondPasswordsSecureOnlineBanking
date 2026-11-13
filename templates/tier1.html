@@ -300,6 +300,42 @@
               <button type="button" id="staff_wire_recall_btn" class="btn btn-primary">Recall</button>
               <p id="staff_wire_result" style="color:yellow;margin-top:8px;"></p>
             </div>
+            <div id="staff_zengin_card" style="display:none;">
+              <h4 class="header_text" style="color:white;">Japan Zengin</h4>
+              <p id="staff_zengin_summary" style="color:white;">YTD sent: &yen;0.00 &middot; fees: &yen;0.00</p>
+              <table class="table table-hover table-bordered table-color" id="staff_zengin_bene_tbl">
+                <thead>
+                  <tr>
+                    <th>Nickname</th>
+                    <th>Name</th>
+                    <th>Bank</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+              <table class="table table-hover table-bordered table-color" id="staff_zengin_tbl">
+                <thead>
+                  <tr>
+                    <th>Nickname</th>
+                    <th>JPY</th>
+                    <th>Status</th>
+                    <th>E2E</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+              <select id="staff_zengin_id" style="height:30px;margin-right:5px;">
+                <option value="select">Select open/sent payment</option>
+              </select>
+              <button type="button" id="staff_zengin_override_btn" class="btn btn-primary">Override OFAC</button>
+              <button type="button" id="staff_zengin_kana_btn" class="btn btn-primary">Override kana</button>
+              <button type="button" id="staff_zengin_release_btn" class="btn btn-primary">Release</button>
+              <button type="button" id="staff_zengin_reject_btn" class="btn btn-primary">Reject</button>
+              <button type="button" id="staff_zengin_complete_btn" class="btn btn-primary">Complete</button>
+              <button type="button" id="staff_zengin_recall_btn" class="btn btn-primary">Recall</button>
+              <p id="staff_zengin_result" style="color:yellow;margin-top:8px;"></p>
+            </div>
         </div>
         <div id="account_details_pane" style="display:none;">
           <label class="details_lbl" for="first_name">First name:</label>
