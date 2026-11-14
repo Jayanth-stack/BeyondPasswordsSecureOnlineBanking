@@ -200,7 +200,7 @@ class MoneyAdminRouteTests(unittest.TestCase):
                 json={"userid": "emp1", "customer_id": "cust1"},
             )
         self.assertEqual(response.status_code, 200)
-        emp_cls.return_value.deactivate_customer.assert_called_once_with("cust1")
+        emp_cls.return_value.deactivate_customer.assert_called_once_with("emp1", "cust1")
 
     def test_deactivate_employee_authorized_calls_helper(self):
         self._session("admin1", "admin", emp_tier=3)
@@ -222,7 +222,7 @@ class MoneyAdminRouteTests(unittest.TestCase):
                 json={"userid": "emp1", "update_req_no": 9},
             )
         self.assertEqual(response.status_code, 200)
-        emp_cls.return_value.approve_update_info.assert_called_once_with(9)
+        emp_cls.return_value.approve_update_info.assert_called_once_with("emp1", 9)
 
     def test_deny_update_info_authorized_employee(self):
         self._session("emp1", "employee", emp_tier=2)
@@ -378,6 +378,139 @@ class MoneyAdminRouteTests(unittest.TestCase):
             },
         )
         self.assertIn(response.status_code, (301, 302))
+
+    def test_get_deposit_request_funds_and_cashier_cheque_still_mutate(self):
+        self._session("cust1", "customer")
+        with patch("app.Employee") as emp_cls, patch("app.Customers") as customers_cls:
+            emp_cls.return_value.add_transaction_deposit.return_value = "queued"
+            customers_cls.return_value.fund_request.return_value = "Request Sent"
+            customers_cls.return_value.make_cashier_check.return_value = "Success"
+            deposit = self.client.get(
+                "/depositAmount",
+                json={"userid": "cust1", "account": 10, "amount": 40},
+            )
+            requested = self.client.get(
+                "/requestFunds",
+                json={"userid": "cust1", "fromAccount": 10, "toAccount": 20, "amount": 15},
+            )
+            cheque = self.client.get(
+                "/getCashierCheque",
+                json={
+                    "userid": "cust1",
+                    "to_account": 20,
+                    "from_account": 10,
+                    "amount": 50,
+                },
+            )
+        self.assertEqual(deposit.status_code, 200)
+        emp_cls.return_value.add_transaction_deposit.assert_called_once_with(10, 40)
+        self.assertEqual(requested.status_code, 200)
+        customers_cls.return_value.fund_request.assert_called_once_with(10, 20, 15)
+        self.assertEqual(cheque.status_code, 200)
+        customers_cls.return_value.make_cashier_check.assert_called_once_with(
+            "cust1", 20, 10, 50
+        )
+
+    def test_cashier_cheque_does_not_require_customer_usertype(self):
+        self._session("cust1", "employee")
+        with patch("app.Customers") as customers_cls:
+            customers_cls.return_value.make_cashier_check.return_value = "Success"
+            response = self.client.post(
+                "/getCashierCheque",
+                json={
+                    "userid": "cust1",
+                    "to_account": 20,
+                    "from_account": 10,
+                    "amount": 50,
+                },
+            )
+        self.assertEqual(response.status_code, 200)
+        customers_cls.return_value.make_cashier_check.assert_called_once_with(
+            "cust1", 20, 10, 50
+        )
+
+    def test_get_open_new_account_still_mutates(self):
+        self._session("cust1", "customer")
+        with patch("app.Customers") as customers_cls:
+            customers_cls.return_value.open_account.return_value = "Done"
+            response = self.client.get(
+                "/openNewAccount",
+                json={
+                    "userid": "cust1",
+                    "customer_id": "cust1",
+                    "account_type": "savings",
+                },
+            )
+        self.assertEqual(response.status_code, 200)
+        customers_cls.return_value.open_account.assert_called_once_with(
+            "cust1", "savings"
+        )
+
+    def test_get_approve_request_still_mutates_when_owned(self):
+        self._session("cust1", "customer")
+        with patch("app.Employee") as emp_cls, patch("app.Customers") as customers_cls:
+            customers_cls.return_value.owns_pending_transaction.return_value = True
+            emp = emp_cls.return_value
+            emp.get_amount_of_transaction.return_value = 75.0
+            emp.get_fromAccount_of_transaction.return_value = 10
+            emp.get_toAccount_of_transaction.return_value = 20
+            emp.get_transaction_status.return_value = 1
+            customers_cls.return_value.fund_transfers.return_value = {"amount": 75.0}
+            response = self.client.get(
+                "/approveRequest",
+                json={"customer_id": "cust1", "transaction_no": 8},
+            )
+        self.assertEqual(response.status_code, 200)
+        customers_cls.return_value.owns_pending_transaction.assert_called_once_with(
+            "cust1", 8
+        )
+        customers_cls.return_value.fund_transfers.assert_called_once_with(10, 20, 75.0, 8)
+
+    def test_large_amount_approve_still_requires_ownership(self):
+        self._session("cust1", "customer")
+        with patch("app.Employee") as emp_cls, patch("app.Customers") as customers_cls:
+            customers_cls.return_value.owns_pending_transaction.return_value = False
+            emp_cls.return_value.get_amount_of_transaction.return_value = 5000
+            response = self.client.post(
+                "/approveRequest",
+                json={"customer_id": "cust1", "transaction_no": 8},
+            )
+        self.assertEqual(response.status_code, 403)
+        emp_cls.return_value.transfer_transaction_to_tier2.assert_not_called()
+        customers_cls.return_value.fund_transfers.assert_not_called()
+
+    def test_deny_request_staff_is_403_and_get_still_mutates_for_customer(self):
+        self._session("emp1", "employee")
+        with patch("app.Customers") as customers_cls:
+            denied = self.client.post(
+                "/denyRequest",
+                json={"userid": "emp1", "transaction_no": 9},
+            )
+        self.assertEqual(denied.status_code, 403)
+        customers_cls.return_value.deny_funds_requested.assert_not_called()
+
+        self._session("cust1", "customer")
+        with patch("app.Customers") as customers_cls:
+            customers_cls.return_value.deny_funds_requested.return_value = (
+                "Request Cancelled"
+            )
+            cancelled = self.client.get(
+                "/denyRequest",
+                json={"userid": "cust1", "transaction_no": 9},
+            )
+        self.assertEqual(cancelled.status_code, 200)
+        customers_cls.return_value.deny_funds_requested.assert_called_once_with(9, "cust1")
+
+    def test_deactivate_customer_uses_json_userid_and_get_still_mutates(self):
+        self._session("real_tier2", "tier2", emp_tier=2)
+        with patch("app.Employee") as emp_cls:
+            emp_cls.return_value.deactivate_customer.return_value = "Done"
+            response = self.client.get(
+                "/deactivateCustomer",
+                json={"userid": "spoof", "customer_id": "cust1"},
+            )
+        self.assertEqual(response.status_code, 200)
+        emp_cls.return_value.deactivate_customer.assert_called_once_with("spoof", "cust1")
 
     def test_get_system_logs_sends_file_when_present(self):
         self._session("admin1", "admin")
