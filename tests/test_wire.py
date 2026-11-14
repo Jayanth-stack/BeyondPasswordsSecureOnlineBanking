@@ -1,9 +1,10 @@
 import os
 import tempfile
 import unittest
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 
+from utility.crypto_receipt import generate_receipt
 from utility.wire import (
     AmountError,
     MemoryWireStore,
@@ -79,6 +80,24 @@ class FoundationTests(unittest.TestCase):
         self.assertEqual(calendar.value_date(july4).isoformat(), '2024-07-05')
         saturday = ts(2024, 6, 15, 11, 0)
         self.assertEqual(calendar.value_date(saturday).isoformat(), '2024-06-17')
+
+    def test_weekend_observed_holidays_and_year_boundary_gap(self):
+        # Christmas 2021 was Saturday → observed Friday 12/24.
+        self.assertIn(date(2021, 12, 24), us_fed_holidays(2021))
+        calendar = WireCalendar(cutoff_hour=17, tz_offset_hours=-4)
+        christmas_observed = ts(2021, 12, 24, 10, 0)
+        self.assertEqual(calendar.value_date(christmas_observed).isoformat(), '2021-12-27')
+        # Juneteenth 2022 was Sunday → observed Monday 6/20.
+        self.assertIn(date(2022, 6, 20), us_fed_holidays(2022))
+        juneteenth = ts(2022, 6, 20, 10, 0)
+        self.assertEqual(calendar.value_date(juneteenth).isoformat(), '2022-06-21')
+        # New Year 2022 was Saturday, observed Friday 2021-12-31. The holiday
+        # set for 2022 includes that Friday, but WireCalendar keys holidays by
+        # the local date's year, so 2021-12-31 still wires as a business day.
+        self.assertIn(date(2021, 12, 31), us_fed_holidays(2022))
+        self.assertFalse(calendar.is_holiday(date(2021, 12, 31)))
+        nye_observed = ts(2021, 12, 31, 10, 0)
+        self.assertEqual(calendar.value_date(nye_observed).isoformat(), '2021-12-31')
 
 
 class WireServiceTests(unittest.TestCase):
@@ -304,6 +323,114 @@ class WireServiceTests(unittest.TestCase):
         with self.assertRaises(WireError) as ctx:
             self.service.cancel_wire(wire_id=live.wire_id, actor='alice', actor_type='customer')
         self.assertEqual(ctx.exception.code, 'not_cancelable')
+
+    def test_hmac_receipt_from_debit_is_failed_after_money_already_moved(self):
+        bene = self._add()
+
+        def debit_fn(account, amount, remark):
+            self.debits.append((account, amount, remark))
+            return generate_receipt({
+                'from_account': account, 'amount': amount, 'status': 'done',
+            })
+
+        self.service.debit_fn = debit_fn
+        with self.assertRaises(WireError) as ctx:
+            self.service.originate(
+                owner_userid='alice', actor='alice', actor_type='customer',
+                beneficiary_id=bene.beneficiary_id, amount='40.00', trace_id='rcpt-wire',
+            )
+        self.assertEqual(ctx.exception.code, 'failed')
+        stored = self.service.store.get_wire_by_trace('rcpt-wire')
+        self.assertEqual(stored.status, 'failed')
+        self.assertEqual(stored.imad, '')
+        self.assertEqual(self.debits[0][1], '40.00')
+
+    def test_trace_id_is_global_so_bob_can_replay_alices_wire(self):
+        def accounts_fn(userid):
+            if userid == 'bob':
+                return {
+                    'checkin': {'Account': 2001, 'Balance': 5000},
+                    'savings': 'None',
+                    'credit': 'None',
+                }
+            return {
+                'checkin': {'Account': 1001, 'Balance': 5000},
+                'savings': {'Account': 1002, 'Balance': 80},
+                'credit': {'Account': 1003, 'Balance': -20},
+            }
+
+        self.service.accounts_fn = accounts_fn
+        alice = self._add()
+        bob = self.service.add_beneficiary(
+            owner_userid='bob', actor='bob', actor_type='customer',
+            nickname='Ally', legal_name='Bob Builder', aba='021000021',
+            account_number='99887766', street='2 Federal St', city='New York',
+            state='NY', postal='10004', default_account='2001',
+        )
+        first, created = self.service.originate(
+            owner_userid='alice', actor='alice', actor_type='customer',
+            beneficiary_id=alice.beneficiary_id, amount='40.00', trace_id='wire-shared',
+        )
+        self.assertTrue(created)
+        replay, created_again = self.service.originate(
+            owner_userid='bob', actor='bob', actor_type='customer',
+            beneficiary_id=bob.beneficiary_id, amount='90.00', trace_id='wire-shared',
+        )
+        self.assertFalse(created_again)
+        self.assertEqual(replay.wire_id, first.wire_id)
+        self.assertEqual(replay.userid, 'alice')
+        self.assertEqual(len([row for row in self.debits if row[1] == '40.00']), 1)
+        self.assertEqual(len([row for row in self.debits if row[1] == '90.00']), 0)
+
+    def test_fee_nsf_still_sends_principal(self):
+        def debit_fn(account, amount, remark):
+            self.debits.append((account, amount, remark))
+            if 'wire fee' in (remark or ''):
+                return 'Insufficient Balance'
+            return 'Amount Debited'
+
+        self.service.debit_fn = debit_fn
+        bene = self._add()
+        wire, created = self.service.originate(
+            owner_userid='alice', actor='alice', actor_type='customer',
+            beneficiary_id=bene.beneficiary_id, amount='40.00', trace_id='fee-nsf',
+        )
+        self.assertTrue(created)
+        self.assertEqual(wire.status, 'sent')
+        self.assertEqual(wire.fee_status, 'nsf')
+        self.assertTrue(wire.imad)
+        self.assertEqual(self.debits[0][1], '40.00')
+        self.assertEqual(self.debits[1][1], '25.00')
+
+    def test_run_due_holds_when_dual_control_threshold_drops_after_queue(self):
+        self.now[0] = ts(2024, 6, 14, 18, 0)
+        bene = self._add()
+        wire, _ = self.service.originate(
+            owner_userid='alice', actor='alice', actor_type='customer',
+            beneficiary_id=bene.beneficiary_id, amount='5000.00', trace_id='drop-dc',
+        )
+        self.assertEqual(wire.status, 'queued')
+        self.assertEqual(self.debits, [])
+        self.service.policy.dual_control_threshold = Decimal('1000.00')
+        self.now[0] = ts(2024, 6, 17, 10, 0)
+        due = self.service.run_due('alice')
+        self.assertEqual(due[0].status, 'pending_release')
+        self.assertEqual(self.debits, [])
+
+    def test_amount_bounds_reject_below_min_and_above_max(self):
+        bene = self._add()
+        with self.assertRaises(WireError) as ctx:
+            self.service.originate(
+                owner_userid='alice', actor='alice', actor_type='customer',
+                beneficiary_id=bene.beneficiary_id, amount='9.99',
+            )
+        self.assertEqual(ctx.exception.code, 'amount_out_of_range')
+        with self.assertRaises(WireError) as ctx:
+            self.service.originate(
+                owner_userid='alice', actor='alice', actor_type='customer',
+                beneficiary_id=bene.beneficiary_id, amount='1000000.01',
+            )
+        self.assertEqual(ctx.exception.code, 'amount_out_of_range')
 
     def test_sqlite_roundtrip_masks_account(self):
         handle, path = tempfile.mkstemp(suffix='.sqlite')
