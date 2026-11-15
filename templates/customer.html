@@ -111,6 +111,15 @@
         </button>
 
         <button type="button" class="btn btn-primary btn-block"
+        id="kftc_menu">
+        <span class="glyphicon glyphicon-globe gi-3x"
+        style="color: white" aria-hidden="true">
+        </span>
+        <br />
+        Korea KFTC
+        </button>
+
+        <button type="button" class="btn btn-primary btn-block"
         id="service_requests_menu">
         <span class="glyphicon glyphicon-edit gi-3x"
         style="color: white" aria-hidden="true">
@@ -351,6 +360,90 @@
           </table>
           <select id="wire_open_select" style="height:30px;margin-right:5px;">
             <option value="select">Select open wire</option>
+          </select>
+        </div>
+        <div id="kftc_pane" style="display:none;">
+          <p id="kftc_summary" style="color:white;">Active: 0 &middot; open: 0 &middot; YTD sent: ₩0.00 &middot; fees: ₩0.00</p>
+          <p id="kftc_clock" style="color:white;">Open Banking 24/7 &middot; KFTC 22:00 KST &middot; BOK-Wire+ 17:30 KST</p>
+          <table class="table table-hover table-bordered table-color fixed-header" id="kftc_bene_tbl">
+            <thead>
+              <tr>
+                <th>Nickname</th>
+                <th>Name</th>
+                <th>Bank</th>
+                <th>Last4</th>
+                <th>Hangul</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+          <hr>
+          <h5 style="color:white;">Add a KFTC beneficiary</h5>
+          <input type="text" id="kftc_nickname" placeholder="Nickname" style="height:30px;width:140px;margin-right:5px;">
+          <input type="text" id="kftc_legal_name" placeholder="Legal name" style="height:30px;width:160px;margin-right:5px;">
+          <input type="text" id="kftc_hangul_name" placeholder="예금주명" style="height:30px;width:120px;margin-right:5px;">
+          <input type="text" id="kftc_bank_code" placeholder="Bank (3)" maxlength="3" style="height:30px;width:80px;margin-right:5px;">
+          <input type="text" id="kftc_account_number" placeholder="Account 9-14" style="height:30px;width:140px;margin-right:5px;">
+          <select id="kftc_default_account" style="height:30px;margin-right:5px;">
+            <option value="select">Internal account</option>
+          </select>
+          <br><br>
+          <select id="kftc_proxy_type" style="height:30px;margin-right:5px;">
+            <option value="">No proxy</option>
+            <option value="phone">Mobile +82 10</option>
+            <option value="email">Email</option>
+            <option value="kftc">Bank+account</option>
+          </select>
+          <input type="text" id="kftc_proxy" placeholder="Phone / email / bank+acct" style="height:30px;width:200px;margin-right:5px;">
+          <button type="button" id="kftc_lookup_btn" class="btn btn-primary">Hangul inquiry</button>
+          <button type="button" id="kftc_add_btn" class="btn btn-primary">Add beneficiary</button>
+          <br><br>
+          <h5 style="color:white;">Send KRW (Open Banking / KFTC / BOK-Wire+)</h5>
+          <select id="kftc_bene_select" style="height:30px;margin-right:5px;">
+            <option value="select">Select beneficiary</option>
+          </select>
+          <input type="text" id="kftc_amount" placeholder="KRW amount" style="height:30px;width:110px;margin-right:5px;">
+          <select id="kftc_rail" style="height:30px;margin-right:5px;">
+            <option value="open">Open Banking 24/7</option>
+            <option value="kftc">KFTC 전자금융</option>
+            <option value="bokwire">BOK-Wire+</option>
+          </select>
+          <select id="kftc_purpose" style="height:30px;margin-right:5px;">
+            <option value="other">Other</option>
+            <option value="family">Family</option>
+            <option value="goods">Goods</option>
+            <option value="payroll">Payroll</option>
+            <option value="tax">Tax</option>
+            <option value="loan">Loan</option>
+            <option value="rent">Rent</option>
+          </select>
+          <input type="text" id="kftc_memo" placeholder="Memo" style="height:30px;width:140px;margin-right:5px;">
+          <button type="button" id="kftc_quote_btn" class="btn btn-primary">Quote FX</button>
+          <button type="button" id="kftc_preview_btn" class="btn btn-primary">Preview</button>
+          <button type="button" id="kftc_send_btn" class="btn btn-primary">Send KRW</button>
+          <button type="button" id="kftc_cancel_btn" class="btn btn-primary">Cancel open</button>
+          <button type="button" id="kftc_pause_btn" class="btn btn-primary">Pause</button>
+          <button type="button" id="kftc_resume_btn" class="btn btn-primary">Resume</button>
+          <button type="button" id="kftc_archive_btn" class="btn btn-primary">Archive</button>
+          <p id="kftc_result" style="color:yellow;margin-top:10px;"></p>
+          <hr>
+          <h5 style="color:white;">KFTC history</h5>
+          <table class="table table-hover table-bordered table-color fixed-header" id="kftc_history_tbl">
+            <thead>
+              <tr>
+                <th>Nickname</th>
+                <th>KRW</th>
+                <th>USD</th>
+                <th>Rail</th>
+                <th>Status</th>
+                <th>E2E</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+          <select id="kftc_open_select" style="height:30px;margin-right:5px;">
+            <option value="select">Select open payment</option>
           </select>
         </div>
         <div id="account_details_pane" style="display:none;">

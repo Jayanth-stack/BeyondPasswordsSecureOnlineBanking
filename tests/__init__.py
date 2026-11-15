@@ -8,6 +8,9 @@ os.environ.setdefault("RECEIPT_SECRET", "test-receipt-secret-do-not-use-in-prod"
 # Linked-account service is constructed at app import; keep it in-memory and secret-stable.
 os.environ.setdefault("LINK_STORE", "memory")
 os.environ.setdefault("LINK_CHALLENGE_SECRET", "test-link-challenge-secret")
+# KFTC / Open Banking is constructed at app import; keep it in-memory and FX-stable.
+os.environ.setdefault("KFTC_STORE", "memory")
+os.environ.setdefault("KFTC_FX_KRWUSD", "0.000720")
 
 if "mysql" not in sys.modules:
     mysql_mod = MagicMock()
