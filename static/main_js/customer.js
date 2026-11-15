@@ -128,6 +128,7 @@ function appendPrimaryData(data) {
   fillPendingTransTbl(data);
   fillLinkedAccounts(data);
   fillWires(data);
+  fillKftc(data);
 }
 
 function fillLinkedAccountSelect(selectId) {
@@ -252,6 +253,117 @@ function fillWires(data) {
     openOpt.innerHTML = wires[j].nickname + ' $' + wires[j].amount + ' (' + wires[j].status + ')';
     openSelect.options.add(openOpt);
   }
+}
+
+function fillKftc(data) {
+  var snapshot = data.Kftc || {};
+  var summary = document.getElementById('kftc_summary');
+  if (summary) {
+    summary.innerHTML = 'Active: ' + (snapshot.active_count || 0) +
+      ' &middot; open: ' + (snapshot.open_count || 0) +
+      ' &middot; YTD sent: ₩' + (snapshot.ytd_sent || '0.00') +
+      ' &middot; fees: ₩' + (snapshot.ytd_fees || '0.00');
+  }
+  var clockEl = document.getElementById('kftc_clock');
+  if (clockEl) {
+    var openClock = snapshot.clock || {};
+    var core = snapshot.kftc_clock || {};
+    var bok = snapshot.bok_clock || {};
+    clockEl.innerHTML = 'Open ' + (openClock.cutoff || '24/7') +
+      ' &middot; KFTC ' + (core.cutoff || '22:00') +
+      ' &middot; BOK-Wire+ ' + (bok.cutoff || '17:30') +
+      ' &middot; KRWUSD ' + (snapshot.fx_rate || snapshot.krw_fx_rate || '0.00072') +
+      (core.after_cutoff ? ' &middot; KFTC after cutoff' : '');
+  }
+  fillLinkedAccountSelect('kftc_default_account');
+  var table = document.getElementById('kftc_bene_tbl');
+  if (!table) {
+    return;
+  }
+  var body = table.getElementsByTagName('tbody')[0];
+  body.innerHTML = '';
+  var selection = document.getElementById('kftc_bene_select');
+  selection.options.length = 1;
+  var benes = snapshot.beneficiaries || [];
+  for (var i = 0; i < benes.length; i++) {
+    var row = body.insertRow(-1);
+    row.insertCell(0).innerHTML = benes[i].nickname;
+    row.insertCell(1).innerHTML = benes[i].legal_name;
+    row.insertCell(2).innerHTML = (benes[i].bank_code || '') + ' ' + (benes[i].bank_name || '');
+    row.insertCell(3).innerHTML = benes[i].account_last4;
+    row.insertCell(4).innerHTML = benes[i].hangul_mask || '';
+    row.insertCell(5).innerHTML = benes[i].status;
+    var option = document.createElement('OPTION');
+    option.value = benes[i].beneficiary_id;
+    option.innerHTML = benes[i].nickname + ' (' + benes[i].status + ')';
+    selection.options.add(option);
+  }
+  var hist = document.getElementById('kftc_history_tbl');
+  var histBody = hist.getElementsByTagName('tbody')[0];
+  histBody.innerHTML = '';
+  var openSelect = document.getElementById('kftc_open_select');
+  openSelect.options.length = 1;
+  var payments = snapshot.payments || [];
+  for (var j = 0; j < payments.length; j++) {
+    var prow = histBody.insertRow(-1);
+    prow.insertCell(0).innerHTML = payments[j].nickname;
+    prow.insertCell(1).innerHTML = '₩' + payments[j].amount;
+    prow.insertCell(2).innerHTML = '$' + payments[j].usd_amount;
+    prow.insertCell(3).innerHTML = payments[j].rail;
+    prow.insertCell(4).innerHTML = payments[j].status;
+    prow.insertCell(5).innerHTML = (payments[j].e2e_id || '').slice(0, 16);
+    if (!payments[j].cancelable) {
+      continue;
+    }
+    var openOpt = document.createElement('OPTION');
+    openOpt.value = payments[j].payment_id;
+    openOpt.innerHTML = payments[j].nickname + ' ₩' + payments[j].amount + ' (' + payments[j].status + ')';
+    openSelect.options.add(openOpt);
+  }
+}
+
+function postKftc(path, payload, okMsg) {
+  payload.userid = userid;
+  fetch(homeURL + path, {
+    method: 'post',
+    body: JSON.stringify(payload),
+    headers: { 'Content-type': 'application/json' }
+  }).then(function(response) {
+    return response.json().then(function(body) {
+      var result = document.getElementById('kftc_result');
+      if (!response.ok) {
+        if (result) { result.innerHTML = (body && (body.message || body.error)) || 'Failed'; }
+        window.alert((body && (body.message || body.error)) || 'Request failed');
+        if (body && body.Kftc) {
+          fillKftc({ Kftc: body.Kftc });
+        }
+        return;
+      }
+      if (result) {
+        if (body && body.quote) {
+          result.innerHTML = '₩' + body.quote.instructed_amount + ' → $' + body.quote.usd_amount +
+            ' @ ' + body.quote.fx_rate;
+        } else if (body && body.preview) {
+          result.innerHTML = '₩' + body.preview.instructed_amount + ' → $' + body.preview.usd_amount +
+            ' &middot; fee ₩' + body.preview.fee +
+            ' &middot; value ' + ((body.preview.clock && body.preview.clock.value_date) || '');
+        } else if (body && body.hangul) {
+          result.innerHTML = 'Hangul inquiry: ' + body.hangul.outcome +
+            ' &middot; ' + (body.hangul.registered_mask || '') +
+            ' vs ' + (body.hangul.presented_mask || '');
+        } else {
+          result.innerHTML = okMsg || body.message || 'Done';
+        }
+      }
+      if (body && body.Kftc) {
+        fillKftc({ Kftc: body.Kftc });
+      } else if (!(body && (body.quote || body.hangul))) {
+        getUser();
+      }
+    });
+  }).catch(function(error) {
+    console.error(error);
+  });
 }
 
 function postWire(path, payload, okMsg) {
@@ -1047,6 +1159,7 @@ $(document).ready(function() {
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#kftc_menu').css('background-color','maroon');
     });
     $('#service_requests_menu').on('click', function(){
       if($('#service_requests_pane').css('display')=='none'){
@@ -1057,6 +1170,7 @@ $(document).ready(function() {
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#kftc_menu').css('background-color','maroon');
     });
     $('#my_accounts_menu').on('click', function(){
       getUser();
@@ -1077,6 +1191,7 @@ $(document).ready(function() {
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#kftc_menu').css('background-color','maroon');
     });
     $('#pending_transaction_requests_menu').on('click', function(){
       if($('#pending_transaction_requests_pane').css('display')=='none'){
@@ -1087,6 +1202,7 @@ $(document).ready(function() {
       $('#service_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#kftc_menu').css('background-color','maroon');
     });
     $('#linked_accounts_menu').on('click', function(){
       if($('#linked_accounts_pane').css('display')=='none'){
@@ -1097,6 +1213,7 @@ $(document).ready(function() {
       $('#service_requests_menu').css('background-color','maroon');
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#kftc_menu').css('background-color','maroon');
     });
     $('#wires_menu').on('click', function(){
       if($('#wires_pane').css('display')=='none'){
@@ -1107,6 +1224,18 @@ $(document).ready(function() {
       $('#service_requests_menu').css('background-color','maroon');
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
+      $('#kftc_menu').css('background-color','maroon');
+    });
+    $('#kftc_menu').on('click', function(){
+      if($('#kftc_pane').css('display')=='none'){
+          $('#kftc_pane').show().siblings('div').hide();
+      }
+      $('#kftc_menu').css('background-color','#FF6600');
+      $('#my_accounts_menu').css('background-color','maroon');
+      $('#service_requests_menu').css('background-color','maroon');
+      $('#pending_transaction_requests_menu').css('background-color','maroon');
+      $('#linked_accounts_menu').css('background-color','maroon');
+      $('#wires_menu').css('background-color','maroon');
     });
     $('#wire_add_btn').on('click', function(){
       if($('#wire_nickname').val() == '' || $('#wire_legal_name').val() == '' || $('#wire_default_account').val() == 'select'){
@@ -1164,6 +1293,84 @@ $(document).ready(function() {
     $('#wire_archive_btn').on('click', function(){
       if($('#wire_bene_select').val() == 'select'){ window.alert('Select a beneficiary.'); return; }
       postWire('archiveWireBeneficiary', { beneficiary_id: $('#wire_bene_select').val() }, 'Archived');
+    });
+    $('#kftc_lookup_btn').on('click', function(){
+      postKftc('lookupKftc', {
+        hangul_name: $('#kftc_hangul_name').val(),
+        legal_name: $('#kftc_legal_name').val(),
+        proxy_type: $('#kftc_proxy_type').val(),
+        proxy: $('#kftc_proxy').val(),
+        bank_code: $('#kftc_bank_code').val(),
+        account_number: $('#kftc_account_number').val()
+      }, 'Hangul inquiry');
+    });
+    $('#kftc_add_btn').on('click', function(){
+      if($('#kftc_nickname').val() == '' || $('#kftc_legal_name').val() == '' || $('#kftc_default_account').val() == 'select'){
+        window.alert('Nickname, legal name, and internal account are required.');
+        return;
+      }
+      postKftc('addKftcBeneficiary', {
+        nickname: $('#kftc_nickname').val(),
+        legal_name: $('#kftc_legal_name').val(),
+        hangul_name: $('#kftc_hangul_name').val(),
+        bank_code: $('#kftc_bank_code').val(),
+        account_number: $('#kftc_account_number').val(),
+        proxy_type: $('#kftc_proxy_type').val(),
+        proxy: $('#kftc_proxy').val(),
+        default_account: $('#kftc_default_account').val()
+      }, 'Beneficiary added');
+    });
+    $('#kftc_quote_btn').on('click', function(){
+      if($('#kftc_amount').val() == ''){
+        window.alert('Enter a KRW amount.');
+        return;
+      }
+      postKftc('quoteKftcFx', {
+        amount: $('#kftc_amount').val(),
+        rail: $('#kftc_rail').val()
+      }, 'Quoted');
+    });
+    $('#kftc_preview_btn').on('click', function(){
+      if($('#kftc_bene_select').val() == 'select' || $('#kftc_amount').val() == ''){
+        window.alert('Select a beneficiary and amount.');
+        return;
+      }
+      postKftc('previewKftc', {
+        beneficiary_id: $('#kftc_bene_select').val(),
+        amount: $('#kftc_amount').val(),
+        rail: $('#kftc_rail').val(),
+        account: $('#kftc_default_account').val() == 'select' ? null : $('#kftc_default_account').val()
+      }, 'Preview');
+    });
+    $('#kftc_send_btn').on('click', function(){
+      if($('#kftc_bene_select').val() == 'select' || $('#kftc_amount').val() == ''){
+        window.alert('Select a beneficiary and amount.');
+        return;
+      }
+      postKftc('sendKftc', {
+        beneficiary_id: $('#kftc_bene_select').val(),
+        amount: $('#kftc_amount').val(),
+        rail: $('#kftc_rail').val(),
+        purpose: $('#kftc_purpose').val(),
+        memo: $('#kftc_memo').val(),
+        account: $('#kftc_default_account').val() == 'select' ? null : $('#kftc_default_account').val()
+      }, 'KFTC originated');
+    });
+    $('#kftc_cancel_btn').on('click', function(){
+      if($('#kftc_open_select').val() == 'select'){ window.alert('Select an open payment.'); return; }
+      postKftc('cancelKftc', { payment_id: $('#kftc_open_select').val() }, 'Cancelled');
+    });
+    $('#kftc_pause_btn').on('click', function(){
+      if($('#kftc_bene_select').val() == 'select'){ window.alert('Select a beneficiary.'); return; }
+      postKftc('pauseKftcBeneficiary', { beneficiary_id: $('#kftc_bene_select').val() }, 'Paused');
+    });
+    $('#kftc_resume_btn').on('click', function(){
+      if($('#kftc_bene_select').val() == 'select'){ window.alert('Select a beneficiary.'); return; }
+      postKftc('resumeKftcBeneficiary', { beneficiary_id: $('#kftc_bene_select').val() }, 'Resumed');
+    });
+    $('#kftc_archive_btn').on('click', function(){
+      if($('#kftc_bene_select').val() == 'select'){ window.alert('Select a beneficiary.'); return; }
+      postKftc('archiveKftcBeneficiary', { beneficiary_id: $('#kftc_bene_select').val() }, 'Archived');
     });
     $('#la_add_btn').on('click', function(){
       if($('#la_nickname').val() == '' || $('#la_default_account').val() == 'select'){
