@@ -1,9 +1,10 @@
 import os
 import tempfile
 import unittest
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 
+from utility.crypto_receipt import generate_receipt
 from utility.wire import (
     AmountError,
     MemoryWireStore,
@@ -79,6 +80,16 @@ class FoundationTests(unittest.TestCase):
         self.assertEqual(calendar.value_date(july4).isoformat(), '2024-07-05')
         saturday = ts(2024, 6, 15, 11, 0)
         self.assertEqual(calendar.value_date(saturday).isoformat(), '2024-06-17')
+
+    def test_weekday_holidays_shift_value_date(self):
+        # Unique vs weekend-observed cases: these 2024 holidays fall on weekdays.
+        calendar = WireCalendar(cutoff_hour=17, tz_offset_hours=-4)
+        self.assertIn(date(2024, 6, 19), us_fed_holidays(2024))
+        self.assertEqual(calendar.value_date(ts(2024, 6, 19, 10, 0)).isoformat(), '2024-06-20')
+        self.assertIn(date(2024, 11, 28), us_fed_holidays(2024))
+        self.assertEqual(calendar.value_date(ts(2024, 11, 28, 10, 0)).isoformat(), '2024-11-29')
+        self.assertIn(date(2024, 11, 11), us_fed_holidays(2024))
+        self.assertEqual(calendar.value_date(ts(2024, 11, 11, 10, 0)).isoformat(), '2024-11-12')
 
 
 class WireServiceTests(unittest.TestCase):
@@ -304,6 +315,179 @@ class WireServiceTests(unittest.TestCase):
         with self.assertRaises(WireError) as ctx:
             self.service.cancel_wire(wire_id=live.wire_id, actor='alice', actor_type='customer')
         self.assertEqual(ctx.exception.code, 'not_cancelable')
+
+    def test_waive_fee_then_run_due_debits_principal_only(self):
+        self.now[0] = ts(2024, 6, 14, 18, 0)
+        bene = self._add()
+        wire, _ = self.service.originate(
+            owner_userid='alice', actor='alice', actor_type='customer',
+            beneficiary_id=bene.beneficiary_id, amount='50.00', trace_id='waive-due',
+        )
+        self.assertEqual(wire.status, 'queued')
+        waived = self.service.waive_fee(
+            wire_id=wire.wire_id, actor='teller', actor_type='tier1',
+        )
+        self.assertEqual(waived.fee, '0.00')
+        self.assertEqual(waived.fee_status, 'waived')
+        self.assertEqual(self.debits, [])
+        self.now[0] = ts(2024, 6, 17, 10, 0)
+        due = self.service.run_due('alice')
+        self.assertEqual(due[0].status, 'sent')
+        self.assertEqual(due[0].fee_status, 'waived')
+        self.assertEqual(self.debits, [('1001', '50.00', 'wire to Chase Checking')])
+
+    def test_customer_waive_flag_is_ignored_staff_originate_skips_fee(self):
+        bene = self._add()
+        customer_wire, _ = self.service.originate(
+            owner_userid='alice', actor='alice', actor_type='customer',
+            beneficiary_id=bene.beneficiary_id, amount='40.00',
+            waive_fee=True, trace_id='cust-waive',
+        )
+        self.assertEqual(customer_wire.status, 'sent')
+        self.assertEqual(customer_wire.fee_status, 'collected')
+        self.assertEqual(self.debits[0][1], '40.00')
+        self.assertEqual(self.debits[1][1], '25.00')
+        self.debits.clear()
+        staff_wire, _ = self.service.originate(
+            owner_userid='alice', actor='teller', actor_type='tier1',
+            beneficiary_id=bene.beneficiary_id, amount='40.00',
+            waive_fee=True, trace_id='staff-waive',
+        )
+        self.assertEqual(staff_wire.fee_status, 'waived')
+        self.assertEqual(self.debits, [('1001', '40.00', 'wire to Chase Checking')])
+
+    def test_ofac_override_dual_control_stays_pending_cutoff_queues(self):
+        held, _ = self.service.originate(
+            owner_userid='alice', actor='alice', actor_type='customer',
+            beneficiary_id=self._add(nickname='Blocked HV', name='Blocked Person').beneficiary_id,
+            amount='10000.00', trace_id='ofac-dc',
+        )
+        self.assertEqual(held.status, 'held')
+        pending = self.service.override_ofac(
+            wire_id=held.wire_id, actor='teller', actor_type='tier1', note='cleared',
+        )
+        self.assertEqual(pending.status, 'pending_release')
+        self.assertEqual(self.debits, [])
+
+        self.now[0] = ts(2024, 6, 14, 18, 0)
+        late_held, _ = self.service.originate(
+            owner_userid='alice', actor='alice', actor_type='customer',
+            beneficiary_id=self._add(
+                nickname='Blocked Late', name='Blocked Person',
+                account_number='77889900',
+            ).beneficiary_id,
+            amount='80.00', trace_id='ofac-late',
+        )
+        self.assertEqual(late_held.status, 'held')
+        queued = self.service.override_ofac(
+            wire_id=late_held.wire_id, actor='teller', actor_type='tier1',
+        )
+        self.assertEqual(queued.status, 'queued')
+        self.assertEqual(queued.value_date, '20240617')
+        self.assertEqual(self.debits, [])
+
+    def test_release_queued_after_cutoff_does_not_debit(self):
+        self.now[0] = ts(2024, 6, 14, 18, 0)
+        bene = self._add()
+        wire, _ = self.service.originate(
+            owner_userid='alice', actor='alice', actor_type='customer',
+            beneficiary_id=bene.beneficiary_id, amount='50.00', trace_id='rel-cut',
+        )
+        self.assertEqual(wire.status, 'queued')
+        still_queued = self.service.release_wire(
+            wire_id=wire.wire_id, actor='teller', actor_type='tier1',
+        )
+        self.assertEqual(still_queued.status, 'queued')
+        self.assertEqual(still_queued.value_date, '20240617')
+        self.assertEqual(self.debits, [])
+        self.now[0] = ts(2024, 6, 17, 10, 0)
+        sent = self.service.release_wire(
+            wire_id=wire.wire_id, actor='teller', actor_type='tier1',
+        )
+        self.assertEqual(sent.status, 'sent')
+        self.assertEqual(self.debits[0][1], '50.00')
+
+    def test_recall_credits_principal_and_collected_fee(self):
+        bene = self._add()
+        wire, _ = self.service.originate(
+            owner_userid='alice', actor='alice', actor_type='customer',
+            beneficiary_id=bene.beneficiary_id, amount='60.00', trace_id='fee-recall',
+        )
+        self.assertEqual(wire.fee_status, 'collected')
+        recalled = self.service.recall_wire(
+            wire_id=wire.wire_id, actor='teller', actor_type='tier2',
+        )
+        self.assertEqual(recalled.status, 'recalled')
+        self.assertEqual(self.credits[0][0], '1001')
+        self.assertEqual(self.credits[0][1], '60.00')
+        self.assertEqual(self.credits[1][1], '25.00')
+        self.assertIn('wire fee recalled', self.credits[1][2])
+
+    def test_hmac_receipt_from_credit_fails_recall_after_principal_moved(self):
+        bene = self._add()
+        wire, _ = self.service.originate(
+            owner_userid='alice', actor='alice', actor_type='customer',
+            beneficiary_id=bene.beneficiary_id, amount='45.00', trace_id='rcpt-recall',
+        )
+
+        def credit_fn(account, amount, remark):
+            self.credits.append((account, amount, remark))
+            return generate_receipt({
+                'to_account': account, 'amount': amount, 'status': 'done',
+            })
+
+        self.service.credit_fn = credit_fn
+        with self.assertRaises(WireError) as ctx:
+            self.service.recall_wire(
+                wire_id=wire.wire_id, actor='teller', actor_type='tier2',
+            )
+        self.assertEqual(ctx.exception.code, 'recall_failed')
+        stored = self.service.get_wire(
+            wire_id=wire.wire_id, actor='teller', actor_type='tier2',
+        )
+        self.assertEqual(stored.status, 'sent')
+        self.assertEqual(self.credits[0][1], '45.00')
+
+    def test_resume_paused_beneficiary_then_send(self):
+        bene = self._add()
+        paused = self.service.set_beneficiary_status(
+            beneficiary_id=bene.beneficiary_id, actor='alice', actor_type='customer',
+            status='pause',
+        )
+        self.assertEqual(paused.status, 'paused')
+        with self.assertRaises(WireError) as ctx:
+            self.service.set_beneficiary_status(
+                beneficiary_id=bene.beneficiary_id, actor='alice', actor_type='customer',
+                status='pause',
+            )
+        self.assertEqual(ctx.exception.code, 'already_paused')
+        resumed = self.service.set_beneficiary_status(
+            beneficiary_id=bene.beneficiary_id, actor='alice', actor_type='customer',
+            status='resume',
+        )
+        self.assertEqual(resumed.status, 'active')
+        wire, created = self.service.originate(
+            owner_userid='alice', actor='alice', actor_type='customer',
+            beneficiary_id=bene.beneficiary_id, amount='20.00', trace_id='resumed',
+        )
+        self.assertTrue(created)
+        self.assertEqual(wire.status, 'sent')
+
+    def test_purpose_aliases_and_rejects_unknown(self):
+        bene = self._add()
+        wire, _ = self.service.originate(
+            owner_userid='alice', actor='alice', actor_type='customer',
+            beneficiary_id=bene.beneficiary_id, amount='20.00',
+            purpose='salary', trace_id='purpose-ok',
+        )
+        self.assertEqual(wire.purpose, 'payroll')
+        with self.assertRaises(WireError) as ctx:
+            self.service.originate(
+                owner_userid='alice', actor='alice', actor_type='customer',
+                beneficiary_id=bene.beneficiary_id, amount='20.00',
+                purpose='crypto',
+            )
+        self.assertEqual(ctx.exception.code, 'invalid_purpose')
 
     def test_sqlite_roundtrip_masks_account(self):
         handle, path = tempfile.mkstemp(suffix='.sqlite')
