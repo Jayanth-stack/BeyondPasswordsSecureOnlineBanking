@@ -231,6 +231,68 @@ class WireRouteTests(unittest.TestCase):
         self.assertEqual(rejected.status_code, 200)
         self.assertEqual(rejected.get_json()['wire']['status'], 'rejected')
 
+    def test_customer_list_ignores_foreign_customer_id(self):
+        self.login()
+        added = self.client.post('/addWireBeneficiary', json=self._bene_payload())
+        self.assertEqual(added.status_code, 201)
+        listed = self.client.post('/listWires', json={'userid': 'alice', 'customer_id': 'bob'})
+        self.assertEqual(listed.status_code, 200)
+        self.assertEqual(listed.get_json()['Wires']['beneficiaries'][0]['nickname'], 'Chase')
+        self.assertNotIn('account_number', listed.get_json()['Wires']['beneficiaries'][0])
+
+        self.login('bob')
+        bob_list = self.client.get('/listWires', json={'userid': 'bob', 'customer_id': 'alice'})
+        self.assertEqual(bob_list.status_code, 200)
+        self.assertEqual(bob_list.get_json()['Wires']['beneficiaries'], [])
+
+    def test_claimed_employee_list_is_staff_idor_hr_cannot_release(self):
+        self.login()
+        added = self.client.post('/addWireBeneficiary', json=self._bene_payload(nickname='Ally'))
+        self.assertEqual(added.status_code, 201)
+        self.now[0] = ts(2024, 6, 14, 18, 0)
+        queued = self.client.post('/sendWire', json={
+            'userid': 'alice',
+            'beneficiary_id': added.get_json()['beneficiary']['beneficiary_id'],
+            'amount': '33.00',
+        })
+        self.assertEqual(queued.status_code, 201)
+        self.assertEqual(queued.get_json()['wire']['status'], 'queued')
+        wire_id = queued.get_json()['wire']['wire_id']
+
+        self.login('hr1', 'hr')
+        listed = self.client.get('/listWires', json={'userid': 'hr1', 'customer_id': 'alice'})
+        self.assertEqual(listed.status_code, 200)
+        self.assertEqual(listed.get_json()['Wires']['beneficiaries'], [])
+        denied = self.client.get('/releaseWire', json={'userid': 'hr1', 'wire_id': wire_id})
+        self.assertEqual(denied.status_code, 403)
+        self.assertEqual(denied.get_json()['error'], 'wire_forbidden')
+
+        self.login('teller', 'employee')
+        staff_list = self.client.get('/listWires', json={'userid': 'teller', 'customer_id': 'alice'})
+        self.assertEqual(staff_list.status_code, 200)
+        self.assertEqual(staff_list.get_json()['Wires']['beneficiaries'][0]['nickname'], 'Ally')
+        released = self.client.get('/releaseWire', json={'userid': 'teller', 'wire_id': wire_id})
+        self.assertEqual(released.status_code, 200)
+        self.assertEqual(released.get_json()['wire']['status'], 'queued')
+        self.assertEqual(self.debits, [])
+
+    def test_get_preview_does_not_debit_and_customer_waive_still_shows_fee(self):
+        self.login()
+        added = self.client.post('/addWireBeneficiary', json=self._bene_payload(nickname='Wells'))
+        self.assertEqual(added.status_code, 201)
+        preview = self.client.get('/previewWire', json={
+            'userid': 'alice',
+            'beneficiary_id': added.get_json()['beneficiary']['beneficiary_id'],
+            'amount': '40.00',
+            'waive_fee': True,
+        })
+        self.assertEqual(preview.status_code, 200)
+        body = preview.get_json()['preview']
+        self.assertEqual(body['fee'], '25.00')
+        self.assertEqual(body['total'], '65.00')
+        self.assertNotIn('account_number', body['beneficiary'])
+        self.assertEqual(self.debits, [])
+
 
 if __name__ == '__main__':
     unittest.main()
