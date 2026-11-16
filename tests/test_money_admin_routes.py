@@ -200,7 +200,7 @@ class MoneyAdminRouteTests(unittest.TestCase):
                 json={"userid": "emp1", "customer_id": "cust1"},
             )
         self.assertEqual(response.status_code, 200)
-        emp_cls.return_value.deactivate_customer.assert_called_once_with("cust1")
+        emp_cls.return_value.deactivate_customer.assert_called_once_with("emp1", "cust1")
 
     def test_deactivate_employee_authorized_calls_helper(self):
         self._session("admin1", "admin", emp_tier=3)
@@ -222,7 +222,7 @@ class MoneyAdminRouteTests(unittest.TestCase):
                 json={"userid": "emp1", "update_req_no": 9},
             )
         self.assertEqual(response.status_code, 200)
-        emp_cls.return_value.approve_update_info.assert_called_once_with(9)
+        emp_cls.return_value.approve_update_info.assert_called_once_with("emp1", 9)
 
     def test_deny_update_info_authorized_employee(self):
         self._session("emp1", "employee", emp_tier=2)
@@ -392,6 +392,85 @@ class MoneyAdminRouteTests(unittest.TestCase):
         args, kwargs = send.call_args
         self.assertEqual(kwargs.get("filename") or (args[1] if len(args) > 1 else None), "bank.log")
         self.assertTrue(kwargs.get("as_attachment"))
+
+    def test_load_customer_includes_wires_without_account_number(self):
+        self._session("cust1", "customer")
+        with patch("app.Customers") as customers_cls:
+            customers_cls.return_value.get_all_account.return_value = {
+                "checkin": {"Account": 10, "Balance": 100}
+            }
+            customers_cls.return_value.get_customer_details.return_value = {
+                "first_name": "A"
+            }
+            customers_cls.return_value.get_funds_requests.return_value = "None"
+            response = self.client.post("/loadCustomer")
+        self.assertEqual(response.status_code, 200)
+        body = response.get_json()
+        self.assertIn("Wires", body)
+        self.assertIn("LinkedAccounts", body)
+        self.assertNotIn("account_number", str(body["Wires"]))
+        self.assertFalse(body["Wires"].get("beneficiaries"))
+
+    def test_get_modify_customer_still_mutates(self):
+        self._session("emp1", "employee", emp_tier=1)
+        with patch("app.Customers") as customers_cls:
+            customers_cls.return_value.update_account_info.return_value = "updated"
+            response = self.client.get(
+                "/modifyCustomer",
+                json={
+                    "userid": "emp1",
+                    "customer_id": "cust1",
+                    "last_name": "L",
+                    "middle_name": "",
+                    "first_name": "F",
+                    "contact_no": "1",
+                    "email_id": "a@b.com",
+                    "ssn": "1",
+                    "dob": "d",
+                    "address": "x",
+                },
+            )
+        self.assertEqual(response.status_code, 200)
+        customers_cls.return_value.update_account_info.assert_called_once()
+
+    def test_get_make_appointment_still_books(self):
+        self._session("cust1", "customer")
+        with patch("app.Customers") as customers_cls:
+            customers_cls.return_value.make_appointment.return_value = "Appointment fixed"
+            response = self.client.get(
+                "/makeAppointment",
+                json={"customer_id": "cust1", "time": "10:00"},
+            )
+        self.assertEqual(response.status_code, 200)
+        customers_cls.return_value.make_appointment.assert_called_once_with("cust1", "10:00")
+
+    def test_get_modify_employee_still_mutates_for_matching_userid(self):
+        self._session("emp1", "employee", emp_tier=1)
+        with patch("app.Employee") as emp_cls:
+            emp_cls.return_value.update_account_info.return_value = "updated"
+            response = self.client.get(
+                "/modifyEmployee",
+                json={
+                    "userid": "emp1",
+                    "emp_id": "emp9",
+                    "last_name": "L",
+                    "middle_name": "",
+                    "first_name": "F",
+                    "contact_no": "1",
+                    "email_id": "a@b.com",
+                    "ssn": "1",
+                    "dob": "d",
+                    "address": "x",
+                    "tier": 3,
+                },
+            )
+        self.assertEqual(response.status_code, 200)
+        emp_cls.return_value.update_account_info.assert_called_once()
+
+    def test_hr_usertype_cannot_load_employee_dashboard(self):
+        self._session("hr1", "hr", emp_tier=3)
+        response = self.client.post("/loadEmployee")
+        self.assertEqual(response.status_code, 401)
 
 
 if __name__ == "__main__":
