@@ -74,6 +74,25 @@ class FundTransfersTests(unittest.TestCase):
             "Insufficient Balance in Credit Card",
         )
 
+    def test_credit_overdraft_on_pending_txn_cancels_with_owner_filter(self):
+        customer = self.Customers()
+        self.cursor.fetchall.side_effect = self._regular_transfer_rows((0.0, 1, "credit"))
+        self.cursor.rowcount = 1
+
+        self.assertEqual(
+            customer.fund_transfers(10, 20, 5001.0, transaction_no=55),
+            "Insufficient Balance in Credit Card",
+        )
+        param_calls = [
+            call for call in self.cursor.execute.call_args_list if len(call.args) > 1
+        ]
+        self.assertTrue(param_calls)
+        sql, params = param_calls[-1].args
+        self.assertIn("Request Denied", sql)
+        self.assertIn("status = 1", sql)
+        self.assertEqual(params, (55,))
+        self.db.commit.assert_called()
+
     def test_credit_within_limit_succeeds(self):
         customer = self.Customers()
         self.cursor.fetchall.side_effect = self._regular_transfer_rows((0.0, 1, "credit"))
