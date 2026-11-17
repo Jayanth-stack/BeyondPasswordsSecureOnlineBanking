@@ -185,8 +185,8 @@ class RemainingRiskRouteTests(unittest.TestCase):
         self.assertIn(response.status_code, (301, 302))
         self.assertIn("/tier2", response.headers.get("Location", ""))
 
-    def test_deny_request_allows_userid_session_key(self):
-        # Gate is `values['userid'] in session` (session keys), not session['userid'].
+    def test_deny_request_rejects_session_key_spoof(self):
+        # Production requires session['userid'], not a spoofed session key.
         with self.client.session_transaction() as sess:
             sess["cust1"] = "cust1"
         with patch("app.Customers") as customers_cls:
@@ -195,8 +195,8 @@ class RemainingRiskRouteTests(unittest.TestCase):
                 "/denyRequest",
                 json={"userid": "cust1", "transaction_no": 9},
             )
-        self.assertEqual(response.status_code, 200)
-        customers_cls.return_value.deny_funds_requested.assert_called_once_with(9)
+        self.assertEqual(response.status_code, 302)
+        customers_cls.return_value.deny_funds_requested.assert_not_called()
 
     def test_get_customer_rejects_admin_usertype(self):
         self._session("admin1", "admin", emp_tier=3)
