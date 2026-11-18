@@ -200,7 +200,7 @@ class MoneyAdminRouteTests(unittest.TestCase):
                 json={"userid": "emp1", "customer_id": "cust1"},
             )
         self.assertEqual(response.status_code, 200)
-        emp_cls.return_value.deactivate_customer.assert_called_once_with("cust1")
+        emp_cls.return_value.deactivate_customer.assert_called_once_with("emp1", "cust1")
 
     def test_deactivate_employee_authorized_calls_helper(self):
         self._session("admin1", "admin", emp_tier=3)
@@ -222,7 +222,7 @@ class MoneyAdminRouteTests(unittest.TestCase):
                 json={"userid": "emp1", "update_req_no": 9},
             )
         self.assertEqual(response.status_code, 200)
-        emp_cls.return_value.approve_update_info.assert_called_once_with(9)
+        emp_cls.return_value.approve_update_info.assert_called_once_with("emp1", 9)
 
     def test_deny_update_info_authorized_employee(self):
         self._session("emp1", "employee", emp_tier=2)
@@ -378,6 +378,64 @@ class MoneyAdminRouteTests(unittest.TestCase):
             },
         )
         self.assertIn(response.status_code, (301, 302))
+
+    def test_get_approve_update_info_still_mutates(self):
+        self._session("emp1", "employee", emp_tier=2)
+        with patch("app.Employee") as emp_cls:
+            emp_cls.return_value.approve_update_info.return_value = "Customer Updated"
+            response = self.client.get(
+                "/approveUpdateInfo",
+                json={"userid": "emp1", "update_req_no": 9},
+            )
+        self.assertEqual(response.status_code, 200)
+        emp_cls.return_value.approve_update_info.assert_called_once_with("emp1", 9)
+
+    def test_get_deny_update_info_still_mutates(self):
+        self._session("emp1", "employee", emp_tier=2)
+        with patch("app.Employee") as emp_cls:
+            emp_cls.return_value.deny_update_info.return_value = "Done"
+            response = self.client.get(
+                "/denyUpdateInfo",
+                json={"userid": "emp1", "update_req_no": 9},
+            )
+        self.assertEqual(response.status_code, 200)
+        emp_cls.return_value.deny_update_info.assert_called_once_with("emp1", 9)
+
+    def test_get_reset_password_still_mutates_after_otp(self):
+        with patch("app.Customers") as customers_cls, patch("app.twilio_client") as twilio:
+            user = customers_cls.return_value
+            user.retrieve_phone_number.return_value = "+15551234567"
+            user.reset_fpassword.return_value = "Password Updated"
+            twilio.verify.v2.services.return_value.verification_checks.create.return_value.status = (
+                "approved"
+            )
+            response = self.client.get(
+                "/resetPassword",
+                json={
+                    "userid": "alice",
+                    "newPassword": "new-secret",
+                    "otp": "123456",
+                    "requester": "Customer",
+                },
+            )
+        self.assertEqual(response.status_code, 200)
+        user.reset_fpassword.assert_called_once_with("alice", "new-secret")
+
+    def test_get_send_otp_still_dispatches(self):
+        with patch("app.Customers") as customers_cls, patch("app.twilio_client") as twilio:
+            customers_cls.return_value.retrieve_phone_number.return_value = "+15551234567"
+            twilio.verify.v2.services.return_value.verifications.create.return_value.sid = (
+                "VE123"
+            )
+            response = self.client.get(
+                "/sendOTP",
+                json={"userid": "alice", "requester": "Customer"},
+            )
+        self.assertEqual(response.status_code, 200)
+        twilio.verify.v2.services.return_value.verifications.create.assert_called_once()
+        args, kwargs = twilio.verify.v2.services.return_value.verifications.create.call_args
+        self.assertEqual(kwargs.get("to") or args[0], "+15551234567")
+        self.assertEqual(kwargs.get("channel"), "sms")
 
     def test_get_system_logs_sends_file_when_present(self):
         self._session("admin1", "admin")
