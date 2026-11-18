@@ -128,6 +128,7 @@ function appendPrimaryData(data) {
   fillPendingTransTbl(data);
   fillLinkedAccounts(data);
   fillWires(data);
+  fillInstaPay(data);
 }
 
 function fillLinkedAccountSelect(selectId) {
@@ -252,6 +253,103 @@ function fillWires(data) {
     openOpt.innerHTML = wires[j].nickname + ' $' + wires[j].amount + ' (' + wires[j].status + ')';
     openSelect.options.add(openOpt);
   }
+}
+
+function fillInstaPay(data) {
+  var snapshot = data.InstaPay || {};
+  var summary = document.getElementById('instapay_summary');
+  if (summary) {
+    summary.innerHTML = 'Active: ' + (snapshot.active_count || 0) +
+      ' &middot; open: ' + (snapshot.open_count || 0) +
+      ' &middot; YTD sent: ₱' + (snapshot.ytd_sent || '0.00') +
+      ' &middot; FX ' + (snapshot.fx_rate || snapshot.php_fx_rate || '');
+  }
+  var clockEl = document.getElementById('instapay_clock');
+  if (clockEl && snapshot.clock) {
+    var peso = snapshot.pesonet_clock || {};
+    clockEl.innerHTML = 'InstaPay ' + (snapshot.clock.cutoff || '24/7') +
+      ' &middot; PESONet cutoff ' + (peso.cutoff || '15:30') +
+      ' &middot; value ' + (snapshot.clock.value_date || '--');
+  }
+  fillLinkedAccountSelect('instapay_default_account');
+  var table = document.getElementById('instapay_bene_tbl');
+  if (!table) {
+    return;
+  }
+  var body = table.getElementsByTagName('tbody')[0];
+  body.innerHTML = '';
+  var selection = document.getElementById('instapay_bene_select');
+  selection.options.length = 1;
+  var benes = snapshot.beneficiaries || [];
+  for (var i = 0; i < benes.length; i++) {
+    var row = body.insertRow(-1);
+    row.insertCell(0).innerHTML = benes[i].nickname;
+    row.insertCell(1).innerHTML = benes[i].filipino_mask || benes[i].legal_name;
+    row.insertCell(2).innerHTML = benes[i].bank_code;
+    row.insertCell(3).innerHTML = benes[i].account_last4;
+    row.insertCell(4).innerHTML = benes[i].status;
+    var option = document.createElement('OPTION');
+    option.value = benes[i].beneficiary_id;
+    option.innerHTML = benes[i].nickname + ' (' + benes[i].status + ')';
+    selection.options.add(option);
+  }
+  var hist = document.getElementById('instapay_history_tbl');
+  var histBody = hist.getElementsByTagName('tbody')[0];
+  histBody.innerHTML = '';
+  var openSelect = document.getElementById('instapay_open_select');
+  openSelect.options.length = 1;
+  var pays = snapshot.payments || [];
+  for (var j = 0; j < pays.length; j++) {
+    var prow = histBody.insertRow(-1);
+    prow.insertCell(0).innerHTML = pays[j].nickname;
+    prow.insertCell(1).innerHTML = '₱' + pays[j].amount;
+    prow.insertCell(2).innerHTML = '$' + pays[j].usd_amount;
+    prow.insertCell(3).innerHTML = pays[j].status;
+    prow.insertCell(4).innerHTML = pays[j].e2e_id || '';
+    if (!pays[j].cancelable) {
+      continue;
+    }
+    var openOpt = document.createElement('OPTION');
+    openOpt.value = pays[j].payment_id;
+    openOpt.innerHTML = pays[j].nickname + ' ₱' + pays[j].amount + ' (' + pays[j].status + ')';
+    openSelect.options.add(openOpt);
+  }
+}
+
+function postInstaPay(path, payload, okMsg) {
+  payload.userid = userid;
+  fetch(homeURL + path, {
+    method: 'post',
+    body: JSON.stringify(payload),
+    headers: { 'Content-type': 'application/json' }
+  }).then(function(response) {
+    return response.json().then(function(body) {
+      var result = document.getElementById('instapay_result');
+      if (!response.ok) {
+        if (result) { result.innerHTML = (body && (body.message || body.error)) || 'Failed'; }
+        window.alert((body && (body.message || body.error)) || 'Request failed');
+        if (body && body.InstaPay) {
+          fillInstaPay({ InstaPay: body.InstaPay });
+        }
+        return;
+      }
+      if (result) {
+        if (body && body.preview) {
+          result.innerHTML = 'USD $' + body.preview.usd_amount + ' &middot; FX ' + body.preview.fx_rate +
+            ' &middot; value ' + ((body.preview.clock && body.preview.clock.value_date) || '');
+        } else {
+          result.innerHTML = okMsg || body.message || 'Done';
+        }
+      }
+      if (body && body.InstaPay) {
+        fillInstaPay({ InstaPay: body.InstaPay });
+      } else {
+        getUser();
+      }
+    });
+  }).catch(function(error) {
+    console.error(error);
+  });
 }
 
 function postWire(path, payload, okMsg) {
@@ -1047,6 +1145,7 @@ $(document).ready(function() {
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#instapay_menu').css('background-color','maroon');
     });
     $('#service_requests_menu').on('click', function(){
       if($('#service_requests_pane').css('display')=='none'){
@@ -1057,6 +1156,7 @@ $(document).ready(function() {
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#instapay_menu').css('background-color','maroon');
     });
     $('#my_accounts_menu').on('click', function(){
       getUser();
@@ -1077,6 +1177,7 @@ $(document).ready(function() {
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#instapay_menu').css('background-color','maroon');
     });
     $('#pending_transaction_requests_menu').on('click', function(){
       if($('#pending_transaction_requests_pane').css('display')=='none'){
@@ -1087,6 +1188,7 @@ $(document).ready(function() {
       $('#service_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#instapay_menu').css('background-color','maroon');
     });
     $('#linked_accounts_menu').on('click', function(){
       if($('#linked_accounts_pane').css('display')=='none'){
@@ -1097,6 +1199,7 @@ $(document).ready(function() {
       $('#service_requests_menu').css('background-color','maroon');
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#instapay_menu').css('background-color','maroon');
     });
     $('#wires_menu').on('click', function(){
       if($('#wires_pane').css('display')=='none'){
@@ -1107,6 +1210,76 @@ $(document).ready(function() {
       $('#service_requests_menu').css('background-color','maroon');
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
+      $('#instapay_menu').css('background-color','maroon');
+    });
+    $('#instapay_menu').on('click', function(){
+      if($('#instapay_pane').css('display')=='none'){
+          $('#instapay_pane').show().siblings('div').hide();
+      }
+      $('#instapay_menu').css('background-color','#FF6600');
+      $('#my_accounts_menu').css('background-color','maroon');
+      $('#service_requests_menu').css('background-color','maroon');
+      $('#pending_transaction_requests_menu').css('background-color','maroon');
+      $('#linked_accounts_menu').css('background-color','maroon');
+      $('#wires_menu').css('background-color','maroon');
+    });
+    $('#instapay_add_btn').on('click', function(){
+      if($('#instapay_nickname').val() == '' || $('#instapay_legal_name').val() == '' || $('#instapay_default_account').val() == 'select'){
+        window.alert('Nickname, legal name, and internal account are required.');
+        return;
+      }
+      postInstaPay('addInstaPayBeneficiary', {
+        nickname: $('#instapay_nickname').val(),
+        legal_name: $('#instapay_legal_name').val(),
+        filipino_name: $('#instapay_filipino_name').val(),
+        bank_code: $('#instapay_bank').val(),
+        account_number: $('#instapay_account_number').val(),
+        proxy_type: $('#instapay_proxy_type').val(),
+        proxy: $('#instapay_proxy').val(),
+        default_account: $('#instapay_default_account').val()
+      }, 'Beneficiary added');
+    });
+    $('#instapay_preview_btn').on('click', function(){
+      if($('#instapay_bene_select').val() == 'select' || $('#instapay_amount').val() == ''){
+        window.alert('Select a beneficiary and amount.');
+        return;
+      }
+      postInstaPay('previewInstaPay', {
+        beneficiary_id: $('#instapay_bene_select').val(),
+        amount: $('#instapay_amount').val(),
+        rail: $('#instapay_rail').val(),
+        account: $('#instapay_default_account').val() == 'select' ? null : $('#instapay_default_account').val()
+      });
+    });
+    $('#instapay_send_btn').on('click', function(){
+      if($('#instapay_bene_select').val() == 'select' || $('#instapay_amount').val() == ''){
+        window.alert('Select a beneficiary and amount.');
+        return;
+      }
+      postInstaPay('sendInstaPay', {
+        beneficiary_id: $('#instapay_bene_select').val(),
+        amount: $('#instapay_amount').val(),
+        rail: $('#instapay_rail').val(),
+        purpose: $('#instapay_purpose').val(),
+        memo: $('#instapay_memo').val(),
+        account: $('#instapay_default_account').val() == 'select' ? null : $('#instapay_default_account').val()
+      }, 'Sent');
+    });
+    $('#instapay_cancel_btn').on('click', function(){
+      if($('#instapay_open_select').val() == 'select'){ window.alert('Select an open payment.'); return; }
+      postInstaPay('cancelInstaPay', { payment_id: $('#instapay_open_select').val() }, 'Cancelled');
+    });
+    $('#instapay_pause_btn').on('click', function(){
+      if($('#instapay_bene_select').val() == 'select'){ window.alert('Select a beneficiary.'); return; }
+      postInstaPay('pauseInstaPayBeneficiary', { beneficiary_id: $('#instapay_bene_select').val() }, 'Paused');
+    });
+    $('#instapay_resume_btn').on('click', function(){
+      if($('#instapay_bene_select').val() == 'select'){ window.alert('Select a beneficiary.'); return; }
+      postInstaPay('resumeInstaPayBeneficiary', { beneficiary_id: $('#instapay_bene_select').val() }, 'Resumed');
+    });
+    $('#instapay_archive_btn').on('click', function(){
+      if($('#instapay_bene_select').val() == 'select'){ window.alert('Select a beneficiary.'); return; }
+      postInstaPay('archiveInstaPayBeneficiary', { beneficiary_id: $('#instapay_bene_select').val() }, 'Archived');
     });
     $('#wire_add_btn').on('click', function(){
       if($('#wire_nickname').val() == '' || $('#wire_legal_name').val() == '' || $('#wire_default_account').val() == 'select'){

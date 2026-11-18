@@ -111,6 +111,15 @@
         </button>
 
         <button type="button" class="btn btn-primary btn-block"
+        id="instapay_menu">
+        <span class="glyphicon glyphicon-flash gi-3x"
+        style="color: white" aria-hidden="true">
+        </span>
+        <br />
+        InstaPay
+        </button>
+
+        <button type="button" class="btn btn-primary btn-block"
         id="service_requests_menu">
         <span class="glyphicon glyphicon-edit gi-3x"
         style="color: white" aria-hidden="true">
@@ -351,6 +360,86 @@
           </table>
           <select id="wire_open_select" style="height:30px;margin-right:5px;">
             <option value="select">Select open wire</option>
+          </select>
+        </div>
+        <div id="instapay_pane" style="display:none;">
+          <p id="instapay_summary" style="color:white;">Active: 0 &middot; open: 0 &middot; YTD sent: ₱0.00</p>
+          <p id="instapay_clock" style="color:white;">InstaPay 24/7 &middot; PESONet cutoff 15:30 PHT</p>
+          <table class="table table-hover table-bordered table-color fixed-header" id="instapay_bene_tbl">
+            <thead>
+              <tr>
+                <th>Nickname</th>
+                <th>Name</th>
+                <th>Bank</th>
+                <th>Last4</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+          <hr>
+          <h5 style="color:white;">Add an InstaPay beneficiary</h5>
+          <input type="text" id="instapay_nickname" placeholder="Nickname" style="height:30px;width:140px;margin-right:5px;">
+          <input type="text" id="instapay_legal_name" placeholder="Legal name" style="height:30px;width:160px;margin-right:5px;">
+          <input type="text" id="instapay_filipino_name" placeholder="Pangalan ng account" style="height:30px;width:180px;margin-right:5px;">
+          <input type="text" id="instapay_bank" placeholder="PCHC bank" maxlength="3" style="height:30px;width:90px;margin-right:5px;">
+          <input type="text" id="instapay_account_number" placeholder="Account no." style="height:30px;width:120px;margin-right:5px;">
+          <select id="instapay_default_account" style="height:30px;margin-right:5px;">
+            <option value="select">Internal account</option>
+          </select>
+          <br><br>
+          <select id="instapay_proxy_type" style="height:30px;margin-right:5px;">
+            <option value="">Bank + account</option>
+            <option value="phone">Mobile +63</option>
+            <option value="tin">TIN</option>
+            <option value="email">Email</option>
+          </select>
+          <input type="text" id="instapay_proxy" placeholder="Proxy" style="height:30px;width:160px;margin-right:5px;">
+          <button type="button" id="instapay_add_btn" class="btn btn-primary">Add beneficiary</button>
+          <br><br>
+          <h5 style="color:white;">Send PHP</h5>
+          <select id="instapay_bene_select" style="height:30px;margin-right:5px;">
+            <option value="select">Select beneficiary</option>
+          </select>
+          <input type="text" id="instapay_amount" placeholder="PHP amount" style="height:30px;width:110px;margin-right:5px;">
+          <select id="instapay_rail" style="height:30px;margin-right:5px;">
+            <option value="instapay">InstaPay 24/7</option>
+            <option value="pesonet">PESONet</option>
+            <option value="philpass">PhilPaSS</option>
+          </select>
+          <select id="instapay_purpose" style="height:30px;margin-right:5px;">
+            <option value="other">Other</option>
+            <option value="family">Family</option>
+            <option value="goods">Goods</option>
+            <option value="payroll">Payroll</option>
+            <option value="tax">Tax</option>
+            <option value="loan">Loan</option>
+            <option value="rent">Rent</option>
+          </select>
+          <input type="text" id="instapay_memo" placeholder="Memo" style="height:30px;width:140px;margin-right:5px;">
+          <button type="button" id="instapay_preview_btn" class="btn btn-primary">Preview</button>
+          <button type="button" id="instapay_send_btn" class="btn btn-primary">Send</button>
+          <button type="button" id="instapay_cancel_btn" class="btn btn-primary">Cancel open</button>
+          <button type="button" id="instapay_pause_btn" class="btn btn-primary">Pause</button>
+          <button type="button" id="instapay_resume_btn" class="btn btn-primary">Resume</button>
+          <button type="button" id="instapay_archive_btn" class="btn btn-primary">Archive</button>
+          <p id="instapay_result" style="color:yellow;margin-top:10px;"></p>
+          <hr>
+          <h5 style="color:white;">InstaPay history</h5>
+          <table class="table table-hover table-bordered table-color fixed-header" id="instapay_history_tbl">
+            <thead>
+              <tr>
+                <th>Nickname</th>
+                <th>PHP</th>
+                <th>USD</th>
+                <th>Status</th>
+                <th>E2E</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+          <select id="instapay_open_select" style="height:30px;margin-right:5px;">
+            <option value="select">Select open payment</option>
           </select>
         </div>
         <div id="account_details_pane" style="display:none;">
