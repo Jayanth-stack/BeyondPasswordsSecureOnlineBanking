@@ -321,6 +321,7 @@ function appendSecondaryData(customer_id, data) {
   fillCustomerAccTbl(data);
   fillStaffLinked(data);
   fillStaffWires(data);
+  fillStaffInstaPay(data);
   if($('#cust_details_card').css('display')=='none'){
     $('#cust_details_card').show();
   }
@@ -393,6 +394,73 @@ function postStaffLinked(path, payload) {
   }).then(function(response) {
     return response.json().then(function(body) {
       var result = document.getElementById('staff_la_result');
+      if (!response.ok) {
+        if (result) { result.innerHTML = (body && (body.message || body.error)) || 'Failed'; }
+        return;
+      }
+      if (result) { result.innerHTML = body.message || 'Done'; }
+      getCustomer($('#customer_id_input').val() || document.getElementById('customer_id').innerHTML);
+    });
+  }).catch(function(error) {
+    console.error(error);
+  });
+}
+
+function fillStaffInstaPay(data) {
+  var snapshot = data.InstaPay || {};
+  var card = document.getElementById('staff_instapay_card');
+  if (!card) {
+    return;
+  }
+  card.style.display = 'block';
+  var summary = document.getElementById('staff_instapay_summary');
+  if (summary) {
+    summary.innerHTML = 'YTD sent: ₱' + (snapshot.ytd_sent || '0.00') +
+      ' &middot; fees: ₱' + (snapshot.ytd_fees || '0.00') +
+      ' &middot; recalled: ₱' + (snapshot.recalled_ytd || '0.00');
+  }
+  var beneTable = document.getElementById('staff_instapay_bene_tbl');
+  var beneBody = beneTable.getElementsByTagName('tbody')[0];
+  beneBody.innerHTML = '';
+  var benes = snapshot.beneficiaries || [];
+  for (var i = 0; i < benes.length; i++) {
+    var row = beneBody.insertRow(-1);
+    row.insertCell(0).innerHTML = benes[i].nickname;
+    row.insertCell(1).innerHTML = benes[i].filipino_mask || benes[i].legal_name;
+    row.insertCell(2).innerHTML = benes[i].bank_code;
+    row.insertCell(3).innerHTML = benes[i].status;
+  }
+  var table = document.getElementById('staff_instapay_tbl');
+  var body = table.getElementsByTagName('tbody')[0];
+  body.innerHTML = '';
+  var selection = document.getElementById('staff_instapay_id');
+  selection.options.length = 1;
+  var pays = snapshot.payments || [];
+  for (var j = 0; j < pays.length; j++) {
+    var prow = body.insertRow(-1);
+    prow.insertCell(0).innerHTML = pays[j].nickname;
+    prow.insertCell(1).innerHTML = '₱' + pays[j].amount;
+    prow.insertCell(2).innerHTML = pays[j].status;
+    prow.insertCell(3).innerHTML = (pays[j].e2e_id || pays[j].payment_id).slice(0, 12);
+    if (['held', 'queued', 'pending_release', 'sent'].indexOf(pays[j].status) < 0) {
+      continue;
+    }
+    var option = document.createElement('OPTION');
+    option.value = pays[j].payment_id;
+    option.innerHTML = pays[j].nickname + ' ₱' + pays[j].amount + ' (' + pays[j].status + ')';
+    selection.options.add(option);
+  }
+}
+
+function postStaffInstaPay(path, payload) {
+  payload.userid = userid;
+  fetch(homeURL + path, {
+    method: 'post',
+    body: JSON.stringify(payload),
+    headers: { 'Content-type': 'application/json' }
+  }).then(function(response) {
+    return response.json().then(function(body) {
+      var result = document.getElementById('staff_instapay_result');
       if (!response.ok) {
         if (result) { result.innerHTML = (body && (body.message || body.error)) || 'Failed'; }
         return;
@@ -877,6 +945,7 @@ $(document).ready(function() {
       $('#cust_accounts_tbl').hide();
       $('#staff_linked_card').hide();
       $('#staff_wire_card').hide();
+      $('#staff_instapay_card').hide();
     });
     $('#staff_la_force_btn').on('click', function(){
       if($('#staff_la_link_id').val() == 'select'){ window.alert('Select a pending link.'); return; }
@@ -917,6 +986,30 @@ $(document).ready(function() {
     $('#staff_wire_recall_btn').on('click', function(){
       if($('#staff_wire_id').val() == 'select'){ window.alert('Select a wire.'); return; }
       postStaffWire('recallWire', { wire_id: $('#staff_wire_id').val() });
+    });
+    $('#staff_instapay_override_btn').on('click', function(){
+      if($('#staff_instapay_id').val() == 'select'){ window.alert('Select a payment.'); return; }
+      postStaffInstaPay('overrideInstaPayOfac', { payment_id: $('#staff_instapay_id').val() });
+    });
+    $('#staff_instapay_filipino_btn').on('click', function(){
+      if($('#staff_instapay_id').val() == 'select'){ window.alert('Select a payment.'); return; }
+      postStaffInstaPay('overrideInstaPayFilipino', { payment_id: $('#staff_instapay_id').val() });
+    });
+    $('#staff_instapay_release_btn').on('click', function(){
+      if($('#staff_instapay_id').val() == 'select'){ window.alert('Select a payment.'); return; }
+      postStaffInstaPay('releaseInstaPay', { payment_id: $('#staff_instapay_id').val() });
+    });
+    $('#staff_instapay_reject_btn').on('click', function(){
+      if($('#staff_instapay_id').val() == 'select'){ window.alert('Select a payment.'); return; }
+      postStaffInstaPay('rejectInstaPay', { payment_id: $('#staff_instapay_id').val() });
+    });
+    $('#staff_instapay_complete_btn').on('click', function(){
+      if($('#staff_instapay_id').val() == 'select'){ window.alert('Select a payment.'); return; }
+      postStaffInstaPay('completeInstaPay', { payment_id: $('#staff_instapay_id').val() });
+    });
+    $('#staff_instapay_recall_btn').on('click', function(){
+      if($('#staff_instapay_id').val() == 'select'){ window.alert('Select a payment.'); return; }
+      postStaffInstaPay('recallInstaPay', { payment_id: $('#staff_instapay_id').val() });
     });
     $('#approve_req_btn').on('click', function(){
       if($('#customer_req_id').val() == 'select'){
