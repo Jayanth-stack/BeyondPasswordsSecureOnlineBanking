@@ -2,6 +2,7 @@
 
 Routes close over the import-time service; loadCustomer/getCustomer read
 get_link_service(); session usertype is trusted as the ACH actor role.
+Dashboard GETs call snapshot → expire_due and can expire pending micros.
 """
 from decimal import Decimal
 import importlib
@@ -230,6 +231,84 @@ class LinkAppWiringTests(unittest.TestCase):
         )
         self.assertIn("ach to Chase", executed)
         customer_module.db.commit.side_effect = None
+
+    def _add_pending_micro(self, customers_cls, **overrides):
+        customers_cls.return_value.get_all_account.return_value = _accounts()
+        added = self.client.post("/addLinkedAccount", json=self._add_payload(**overrides))
+        self.assertEqual(added.status_code, 201)
+        link_id = added.get_json()["link"]["link_id"]
+        row = self.service.store.get_link(link_id)
+        row.expires_at = float(self.service.clock()) - 1
+        self.service.store.update_link(row)
+        return link_id
+
+    def _assert_expired(self, link_id):
+        stored = self.service.store.get_link(link_id)
+        self.assertEqual(stored.status, "expired")
+        denied = self.client.post(
+            "/confirmLinkedAccount",
+            json={
+                "userid": "alice",
+                "link_id": link_id,
+                "amount1": "0.12",
+                "amount2": "0.47",
+            },
+        )
+        self.assertEqual(denied.status_code, 403)
+        self.assertEqual(denied.get_json()["error"], "link_expired")
+
+    def test_get_load_customer_expires_due_pending_micro(self):
+        self._session()
+        with patch("app.Customers") as customers_cls:
+            link_id = self._add_pending_micro(customers_cls)
+            customers_cls.return_value.get_customer_details.return_value = {"first_name": "Ada"}
+            customers_cls.return_value.get_funds_requests.return_value = "None"
+            dash = self.client.get("/loadCustomer")
+        self.assertEqual(dash.status_code, 200)
+        self.assertEqual(dash.get_json()["LinkedAccounts"]["links"][0]["status"], "expired")
+        self._session()
+        self._assert_expired(link_id)
+
+    def test_get_list_links_expires_due_pending_micro(self):
+        self._session()
+        with patch("app.Customers") as customers_cls:
+            link_id = self._add_pending_micro(customers_cls)
+            listed = self.client.get("/listLinkedAccounts", json={"userid": "alice"})
+        self.assertEqual(listed.status_code, 200)
+        self.assertEqual(listed.get_json()["LinkedAccounts"]["links"][0]["status"], "expired")
+        ach = self.client.get("/listLinkedAch", json={"userid": "alice"})
+        self.assertEqual(ach.status_code, 200)
+        self.assertEqual(ach.get_json()["LinkedAccounts"]["links"][0]["status"], "expired")
+        self._assert_expired(link_id)
+
+    def test_set_service_none_does_not_stop_closed_over_list_expire(self):
+        self._session()
+        with patch("app.Customers") as customers_cls:
+            link_id = self._add_pending_micro(customers_cls)
+        set_service(None)
+        listed = self.client.get("/listLinkedAccounts", json={"userid": "alice"})
+        self.assertEqual(listed.status_code, 200)
+        self.assertEqual(listed.get_json()["LinkedAccounts"]["links"][0]["status"], "expired")
+        set_service(self.service)
+        self._assert_expired(link_id)
+
+    def test_claimed_employee_get_customer_expires_another_customers_micro(self):
+        self._session()
+        with patch("app.Customers") as customers_cls:
+            link_id = self._add_pending_micro(customers_cls)
+        self._session("teller", "employee")
+        with patch("app.Customers") as customers_cls:
+            customers_cls.return_value.get_all_account.return_value = _accounts()
+            customers_cls.return_value.get_customer_details.return_value = {"first_name": "Ada"}
+            response = self.client.get(
+                "/getCustomer",
+                json={"userid": "teller", "customer_id": "alice"},
+            )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json()["LinkedAccounts"]["links"][0]["status"], "expired")
+        self.assertNotIn("challenge_digest", response.get_json()["LinkedAccounts"]["links"][0])
+        self._session()
+        self._assert_expired(link_id)
 
 
 if __name__ == "__main__":
