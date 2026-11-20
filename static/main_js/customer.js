@@ -128,6 +128,7 @@ function appendPrimaryData(data) {
   fillPendingTransTbl(data);
   fillLinkedAccounts(data);
   fillWires(data);
+  fillSepa(data);
 }
 
 function fillLinkedAccountSelect(selectId) {
@@ -252,6 +253,113 @@ function fillWires(data) {
     openOpt.innerHTML = wires[j].nickname + ' $' + wires[j].amount + ' (' + wires[j].status + ')';
     openSelect.options.add(openOpt);
   }
+}
+
+function fillSepa(data) {
+  var snapshot = data.Sepa || {};
+  var summary = document.getElementById('sepa_summary');
+  if (summary) {
+    summary.innerHTML = 'Active: ' + (snapshot.active_count || 0) +
+      ' &middot; open: ' + (snapshot.open_count || 0) +
+      ' &middot; YTD sent: €' + (snapshot.ytd_sent || '0.00') +
+      ' &middot; fees: €' + (snapshot.ytd_fees || '0.00');
+  }
+  var clockEl = document.getElementById('sepa_clock');
+  if (clockEl) {
+    var inst = snapshot.clock || {};
+    var sct = snapshot.sct_clock || {};
+    var t2 = snapshot.t2_clock || {};
+    clockEl.innerHTML = 'Instant ' + (inst.cutoff || '24/7') +
+      ' &middot; SCT cutoff ' + (sct.cutoff || '16:00') +
+      ' value ' + (sct.value_date || '--') +
+      ' &middot; TARGET2 cutoff ' + (t2.cutoff || '17:00') +
+      ' value ' + (t2.value_date || '--');
+  }
+  fillLinkedAccountSelect('sepa_default_account');
+  var table = document.getElementById('sepa_bene_tbl');
+  if (!table) {
+    return;
+  }
+  var body = table.getElementsByTagName('tbody')[0];
+  body.innerHTML = '';
+  var selection = document.getElementById('sepa_bene_select');
+  selection.options.length = 1;
+  var benes = snapshot.beneficiaries || [];
+  for (var i = 0; i < benes.length; i++) {
+    var row = body.insertRow(-1);
+    row.insertCell(0).innerHTML = benes[i].nickname;
+    row.insertCell(1).innerHTML = benes[i].legal_name;
+    row.insertCell(2).innerHTML = benes[i].bank_code || '';
+    row.insertCell(3).innerHTML = benes[i].account_last4;
+    row.insertCell(4).innerHTML = benes[i].sepa_mask || '';
+    row.insertCell(5).innerHTML = benes[i].status;
+    var option = document.createElement('OPTION');
+    option.value = benes[i].beneficiary_id;
+    option.innerHTML = benes[i].nickname + ' (' + benes[i].status + ')';
+    selection.options.add(option);
+  }
+  var hist = document.getElementById('sepa_history_tbl');
+  var histBody = hist.getElementsByTagName('tbody')[0];
+  histBody.innerHTML = '';
+  var openSelect = document.getElementById('sepa_open_select');
+  openSelect.options.length = 1;
+  var pays = snapshot.payments || [];
+  for (var j = 0; j < pays.length; j++) {
+    var prow = histBody.insertRow(-1);
+    prow.insertCell(0).innerHTML = pays[j].nickname;
+    prow.insertCell(1).innerHTML = '€' + pays[j].amount;
+    prow.insertCell(2).innerHTML = '$' + pays[j].usd_amount;
+    prow.insertCell(3).innerHTML = pays[j].status;
+    prow.insertCell(4).innerHTML = pays[j].e2e_id || '';
+    if (!pays[j].cancelable) {
+      continue;
+    }
+    var openOpt = document.createElement('OPTION');
+    openOpt.value = pays[j].payment_id;
+    openOpt.innerHTML = pays[j].nickname + ' €' + pays[j].amount + ' (' + pays[j].status + ')';
+    openSelect.options.add(openOpt);
+  }
+}
+
+function postSepa(path, payload, okMsg) {
+  payload.userid = userid;
+  fetch(homeURL + path, {
+    method: 'post',
+    body: JSON.stringify(payload),
+    headers: { 'Content-type': 'application/json' }
+  }).then(function(response) {
+    return response.json().then(function(body) {
+      var result = document.getElementById('sepa_result');
+      if (!response.ok) {
+        if (result) { result.innerHTML = (body && (body.message || body.error)) || 'Failed'; }
+        window.alert((body && (body.message || body.error)) || 'Request failed');
+        if (body && body.Sepa) {
+          fillSepa({ Sepa: body.Sepa });
+        }
+        return;
+      }
+      if (result) {
+        if (body && body.quote) {
+          result.innerHTML = '€' + body.quote.instructed_amount + ' = $' + body.quote.usd_amount +
+            ' @ ' + body.quote.fx_rate;
+        } else if (body && body.preview) {
+          result.innerHTML = 'USD $' + body.preview.usd_amount + ' &middot; fee €' + body.preview.fee +
+            ' &middot; value ' + ((body.preview.clock && body.preview.clock.value_date) || '');
+        } else if (body && body.sepa) {
+          result.innerHTML = (body.sepa.outcome || okMsg || 'Lookup') + ' ' + (body.sepa.registered_mask || '');
+        } else {
+          result.innerHTML = okMsg || body.message || 'Done';
+        }
+      }
+      if (body && body.Sepa) {
+        fillSepa({ Sepa: body.Sepa });
+      } else {
+        getUser();
+      }
+    });
+  }).catch(function(error) {
+    console.error(error);
+  });
 }
 
 function postWire(path, payload, okMsg) {
@@ -1047,6 +1155,7 @@ $(document).ready(function() {
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#sepa_menu').css('background-color','maroon');
     });
     $('#service_requests_menu').on('click', function(){
       if($('#service_requests_pane').css('display')=='none'){
@@ -1057,6 +1166,7 @@ $(document).ready(function() {
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#sepa_menu').css('background-color','maroon');
     });
     $('#my_accounts_menu').on('click', function(){
       getUser();
@@ -1077,6 +1187,7 @@ $(document).ready(function() {
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#sepa_menu').css('background-color','maroon');
     });
     $('#pending_transaction_requests_menu').on('click', function(){
       if($('#pending_transaction_requests_pane').css('display')=='none'){
@@ -1087,6 +1198,7 @@ $(document).ready(function() {
       $('#service_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#sepa_menu').css('background-color','maroon');
     });
     $('#linked_accounts_menu').on('click', function(){
       if($('#linked_accounts_pane').css('display')=='none'){
@@ -1097,6 +1209,7 @@ $(document).ready(function() {
       $('#service_requests_menu').css('background-color','maroon');
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#sepa_menu').css('background-color','maroon');
     });
     $('#wires_menu').on('click', function(){
       if($('#wires_pane').css('display')=='none'){
@@ -1107,6 +1220,95 @@ $(document).ready(function() {
       $('#service_requests_menu').css('background-color','maroon');
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
+      $('#sepa_menu').css('background-color','maroon');
+    });
+    $('#sepa_menu').on('click', function(){
+      if($('#sepa_pane').css('display')=='none'){
+          $('#sepa_pane').show().siblings('div').hide();
+      }
+      $('#sepa_menu').css('background-color','#FF6600');
+      $('#my_accounts_menu').css('background-color','maroon');
+      $('#service_requests_menu').css('background-color','maroon');
+      $('#pending_transaction_requests_menu').css('background-color','maroon');
+      $('#linked_accounts_menu').css('background-color','maroon');
+      $('#wires_menu').css('background-color','maroon');
+    });
+    $('#sepa_add_btn').on('click', function(){
+      if($('#sepa_nickname').val() == '' || $('#sepa_legal_name').val() == '' || $('#sepa_default_account').val() == 'select'){
+        window.alert('Nickname, legal name, and internal account are required.');
+        return;
+      }
+      postSepa('addSepaBeneficiary', {
+        nickname: $('#sepa_nickname').val(),
+        legal_name: $('#sepa_legal_name').val(),
+        sepa_name: $('#sepa_sepa_name').val(),
+        bank_code: $('#sepa_bank_code').val(),
+        account_number: $('#sepa_account_number').val(),
+        default_account: $('#sepa_default_account').val(),
+        proxy_type: $('#sepa_proxy_type').val(),
+        proxy: $('#sepa_proxy').val()
+      }, 'Beneficiary added');
+    });
+    $('#sepa_lookup_btn').on('click', function(){
+      postSepa('lookupSepa', {
+        proxy_type: $('#sepa_proxy_type').val(),
+        proxy: $('#sepa_proxy').val(),
+        sepa_name: $('#sepa_sepa_name').val(),
+        bank_code: $('#sepa_bank_code').val(),
+        account_number: $('#sepa_account_number').val()
+      }, 'Lookup');
+    });
+    $('#sepa_quote_btn').on('click', function(){
+      if($('#sepa_amount').val() == ''){
+        window.alert('Enter a EUR amount.');
+        return;
+      }
+      postSepa('quoteSepaFx', {
+        amount: $('#sepa_amount').val(),
+        rail: $('#sepa_rail').val()
+      }, 'Quote');
+    });
+    $('#sepa_preview_btn').on('click', function(){
+      if($('#sepa_bene_select').val() == 'select' || $('#sepa_amount').val() == ''){
+        window.alert('Select a beneficiary and amount.');
+        return;
+      }
+      postSepa('previewSepa', {
+        beneficiary_id: $('#sepa_bene_select').val(),
+        amount: $('#sepa_amount').val(),
+        rail: $('#sepa_rail').val(),
+        account: $('#sepa_default_account').val() == 'select' ? null : $('#sepa_default_account').val()
+      }, 'Preview');
+    });
+    $('#sepa_send_btn').on('click', function(){
+      if($('#sepa_bene_select').val() == 'select' || $('#sepa_amount').val() == ''){
+        window.alert('Select a beneficiary and amount.');
+        return;
+      }
+      postSepa('sendSepa', {
+        beneficiary_id: $('#sepa_bene_select').val(),
+        amount: $('#sepa_amount').val(),
+        rail: $('#sepa_rail').val(),
+        purpose: $('#sepa_purpose').val(),
+        memo: $('#sepa_memo').val(),
+        account: $('#sepa_default_account').val() == 'select' ? null : $('#sepa_default_account').val()
+      }, 'SEPA originated');
+    });
+    $('#sepa_cancel_btn').on('click', function(){
+      if($('#sepa_open_select').val() == 'select'){ window.alert('Select an open payment.'); return; }
+      postSepa('cancelSepa', { payment_id: $('#sepa_open_select').val() }, 'Cancelled');
+    });
+    $('#sepa_pause_btn').on('click', function(){
+      if($('#sepa_bene_select').val() == 'select'){ window.alert('Select a beneficiary.'); return; }
+      postSepa('pauseSepaBeneficiary', { beneficiary_id: $('#sepa_bene_select').val() }, 'Paused');
+    });
+    $('#sepa_resume_btn').on('click', function(){
+      if($('#sepa_bene_select').val() == 'select'){ window.alert('Select a beneficiary.'); return; }
+      postSepa('resumeSepaBeneficiary', { beneficiary_id: $('#sepa_bene_select').val() }, 'Resumed');
+    });
+    $('#sepa_archive_btn').on('click', function(){
+      if($('#sepa_bene_select').val() == 'select'){ window.alert('Select a beneficiary.'); return; }
+      postSepa('archiveSepaBeneficiary', { beneficiary_id: $('#sepa_bene_select').val() }, 'Archived');
     });
     $('#wire_add_btn').on('click', function(){
       if($('#wire_nickname').val() == '' || $('#wire_legal_name').val() == '' || $('#wire_default_account').val() == 'select'){
