@@ -2,6 +2,7 @@
 
 Routes close over the import-time service; loadCustomer/getCustomer read
 get_link_service(); session usertype is trusted as the ACH actor role.
+GET /forceVerifyLinkedAccount still mutates and skips expiry/prenote wait.
 """
 from decimal import Decimal
 import importlib
@@ -231,6 +232,107 @@ class LinkAppWiringTests(unittest.TestCase):
         self.assertIn("ach to Chase", executed)
         customer_module.db.commit.side_effect = None
 
+    def _expire(self, link_id):
+        row = self.service.store.get_link(link_id)
+        row.expires_at = float(self.service.clock()) - 1
+        self.service.store.update_link(row)
+        return link_id
+
+    def test_claimed_employee_get_force_verify_resurrects_expired_micro(self):
+        # Unique vs #174 (pending GET force-verify) and #201 (GET list expire then confirm 403).
+        self._session()
+        with patch("app.Customers") as customers_cls:
+            customers_cls.return_value.get_all_account.return_value = _accounts()
+            added = self.client.post("/addLinkedAccount", json=self._add_payload())
+        self.assertEqual(added.status_code, 201)
+        link_id = self._expire(added.get_json()["link"]["link_id"])
+        denied = self.client.post(
+            "/confirmLinkedAccount",
+            json={
+                "userid": "alice",
+                "link_id": link_id,
+                "amount1": "0.12",
+                "amount2": "0.47",
+            },
+        )
+        self.assertEqual(denied.status_code, 403)
+        self.assertEqual(denied.get_json()["error"], "link_expired")
+        self._session("teller", "employee")
+        with patch("app.Customers") as customers_cls:
+            customers_cls.return_value.get_all_account.return_value = _accounts()
+            forced = self.client.get(
+                "/forceVerifyLinkedAccount",
+                json={"userid": "teller", "link_id": link_id},
+            )
+        self.assertEqual(forced.status_code, 200)
+        self.assertEqual(forced.get_json()["link"]["status"], "verified")
+        self.assertNotIn("challenge_digest", forced.get_json()["link"])
+
+    def test_claimed_employee_get_force_verify_skips_prenote_wait(self):
+        # Unique vs #189 GET acceptPrenote too_soon-then-wait and #174 pending force-verify.
+        self._session()
+        with patch("app.Customers") as customers_cls:
+            customers_cls.return_value.get_all_account.return_value = _accounts()
+            added = self.client.post(
+                "/addLinkedAccount",
+                json=self._add_payload(
+                    nickname="Prenote",
+                    routing_last4="1210",
+                    account_last4="9001",
+                    method="prenote",
+                ),
+            )
+        self.assertEqual(added.status_code, 201)
+        link_id = added.get_json()["link"]["link_id"]
+        self._session("teller", "employee")
+        too_soon = self.client.post(
+            "/acceptPrenote",
+            json={"userid": "teller", "link_id": link_id},
+        )
+        self.assertEqual(too_soon.status_code, 400)
+        self.assertEqual(too_soon.get_json()["error"], "too_soon")
+        forced = self.client.get(
+            "/forceVerifyLinkedAccount",
+            json={"userid": "teller", "link_id": link_id},
+        )
+        self.assertEqual(forced.status_code, 200)
+        self.assertEqual(forced.get_json()["link"]["status"], "verified")
+
+    def test_claimed_hr_get_force_verify_is_forbidden(self):
+        self._session()
+        with patch("app.Customers") as customers_cls:
+            customers_cls.return_value.get_all_account.return_value = _accounts()
+            added = self.client.post("/addLinkedAccount", json=self._add_payload())
+        self.assertEqual(added.status_code, 201)
+        link_id = added.get_json()["link"]["link_id"]
+        self._session("hr1", "hr")
+        forced = self.client.get(
+            "/forceVerifyLinkedAccount",
+            json={"userid": "hr1", "link_id": link_id},
+        )
+        self.assertEqual(forced.status_code, 403)
+        self.assertEqual(forced.get_json()["error"], "link_forbidden")
+        stored = self.service.store.get_link(link_id)
+        self.assertEqual(stored.status, "pending")
+
+    def test_set_service_none_does_not_stop_closed_over_get_force_verify(self):
+        self._session()
+        with patch("app.Customers") as customers_cls:
+            customers_cls.return_value.get_all_account.return_value = _accounts()
+            added = self.client.post("/addLinkedAccount", json=self._add_payload())
+        self.assertEqual(added.status_code, 201)
+        link_id = self._expire(added.get_json()["link"]["link_id"])
+        set_service(None)
+        self._session("teller", "employee")
+        forced = self.client.get(
+            "/forceVerifyLinkedAccount",
+            json={"userid": "teller", "link_id": link_id},
+        )
+        self.assertEqual(forced.status_code, 200)
+        self.assertEqual(forced.get_json()["link"]["status"], "verified")
+        set_service(self.service)
+
 
 if __name__ == "__main__":
     unittest.main()
+
