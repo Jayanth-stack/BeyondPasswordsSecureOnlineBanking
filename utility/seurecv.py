@@ -1,0 +1,2757 @@
+"""Inbound SEPA Instant / SCT / TARGET2 receive posting.
+
+Staff ingest incoming EUR credits. Recipients enroll SEPA proxies
+(IBAN ISO 7064 MOD 97-10, +49 mobile, German IdNr, email) at this
+bank's BIC. Matched Instant credits post instantly 24/7. SCT waits
+for 09:00-16:00 CET. TARGET2 waits for 08:30-17:00 CET. Unmatched
+proxies wait for a customer claim or staff assignment.
+Independent of outbound SEPA origination (PR #204), inbound CNAPS
+(PR #206), domestic Fedwire (PR #73), and ACH linking (PR #68).
+Existing `/fundTransfer`, `/withdrawAmount`, and `/sendWire` stay
+unchanged.
+
+Foundations (reusable beyond this screen):
+- IBAN (ISO 7064 MOD 97-10; DE89 3704 0044 0532 0130 00)
+- BIC 8 or 11 (COBADEFF / COBADEFFXXX)
+- Account type 1 ordinary / 2 current / 4 savings
+- Latin Kontoinhaber (NFC, mask José García → J***a)
+- ISO-style DE phone (+49 15/16/17 mobile), 11-digit IdNr, email proxy
+- SEPA name inquiry (`match` / `close_match` / `no_match` / `unavailable`)
+- SCTI / SCT1 / TARG End-to-End ID (`SCTI`/`SCT1`/`TARG` + YYYYMMDD + seq)
+- SE1 14-pipe file (XML/DOCTYPE and non-SEPA clearing rejected)
+- EuClock CET UTC+1: Instant 24/7; SCT 09:00–16:00;
+  TARGET2 08:30–17:00; TARGET2 holidays + one weekday after a weekend cluster
+  (New Year 2022-01-01 Sat → SCT value date 2022-01-04)
+- EURUSD quote book converting instructed amount to USD credit
+- SEPA claim (customer presents matching proxy; enroll rematches unmatched)
+- Return windows (Instant 24h customer / SCT+T2 next CET session / 90-day staff)
+- Dual-control at EUR 50,000; Instant cap 50k / SCT 1m / TARGET2 100m
+
+Reuses Fedwire OFAC screening, money parsing, and account directory
+from `utility.wire`. Stores are pluggable (memory for tests, sqlite WAL
+for restart-safe default). Full IBAN, sepa name, fingerprint, phone, email,
+IdNr, and E2E ID never appear in to_dict / snapshots.
+"""
+
+from __future__ import annotations
+
+import hashlib
+import os
+import re
+import sqlite3
+import threading
+import uuid
+from dataclasses import dataclass
+import unicodedata
+from datetime import date, datetime, timedelta, timezone
+from decimal import Decimal, ROUND_HALF_EVEN
+from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
+
+from flask import jsonify, request, session
+
+from utility.wire import (
+    DEFAULT_WATCHLIST,
+    EMPLOYEE_ROLES,
+    MONEY_QUANTUM,
+    AccountError,
+    AmountError,
+    ScreenResult,
+    account_types_from_customer_payload,
+    last4,
+    money_str,
+    normalize_account,
+    own_accounts_from_customer_payload,
+    parse_money,
+    screen_name,
+)
+
+KEY_ACTIVE = 'active'
+KEY_PAUSED = 'paused'
+KEY_CANCELLED = 'cancelled'
+KEY_STATUSES = frozenset({KEY_ACTIVE, KEY_PAUSED, KEY_CANCELLED})
+OPEN_KEY = frozenset({KEY_ACTIVE, KEY_PAUSED})
+IN_UNMATCHED = 'unmatched'
+IN_HELD = 'held'
+IN_QUEUED = 'queued'
+IN_PENDING = 'pending_release'
+IN_POSTED = 'posted'
+IN_REJECTED = 'rejected'
+IN_RETURNED = 'returned'
+IN_EXPIRED = 'expired'
+IN_FAILED = 'failed'
+IN_STATUSES = frozenset({
+    IN_UNMATCHED, IN_HELD, IN_QUEUED, IN_PENDING, IN_POSTED, IN_REJECTED,
+    IN_RETURNED, IN_EXPIRED, IN_FAILED,
+})
+OPEN_IN = frozenset({IN_UNMATCHED, IN_HELD, IN_QUEUED, IN_PENDING})
+PURPOSES = frozenset({'family', 'goods', 'payroll', 'tax', 'loan', 'rent', 'other'})
+PURPOSE_ALIASES = {
+    'personal': 'family', 'gift': 'family', 'support': 'family',
+    'invoice': 'goods', 'purchase': 'goods', 'vendor': 'goods',
+    'salary': 'payroll', 'wage': 'payroll',
+    'rd': 'tax', 'taxes': 'tax', 'revenue': 'tax',
+    'mortgage': 'loan', 'housing': 'rent',
+}
+RAILS = frozenset({'inst', 'sct', 't2'})
+RAIL_ALIASES = {
+    'inst': 'inst', 'instant': 'inst', 'sctinst': 'inst', 'sepa_instant': 'inst',
+    '24/7': 'inst', 'sepa': 'inst', 'fast': 'inst',
+    'sct': 'sct', 'credit': 'sct', 'transfer': 'sct', 'bulk': 'sct', 'batch': 'sct',
+    'ach': 'sct', 'sctinstplus': 'sct',
+    't2': 't2', 'target2': 't2', 'target': 't2', 'rtgs': 't2', 'hvps': 't2',
+    'ecb': 't2',
+}
+ACCOUNT_TYPES = frozenset({'1', '2', '4'})
+ACCOUNT_TYPE_ALIASES = {
+    'ordinary': '1', 'demand': '1', 'savings_ord': '1',
+    'current': '2', 'checking': '2',
+    'savings': '4',
+}
+PROXY_TYPES = frozenset({'iban', 'phone', 'nid', 'email'})
+PROXY_ALIASES = {
+    'account': 'iban', 'bank': 'iban', 'acct': 'iban', 'iban': 'iban',
+    'sepa': 'iban', 'bbanc': 'iban',
+    'mobile': 'phone', 'msisdn': 'phone', 'tel': 'phone', 'sms': 'phone',
+    'mail': 'email', 'e_mail': 'email',
+    'nid': 'nid', 'national_id': 'nid', 'id': 'nid', 'idcard': 'nid',
+    'idnr': 'nid', 'steuer': 'nid', 'tax': 'nid', 'citizen': 'nid',
+}
+SEPA_MATCH = 'match'
+SEPA_CLOSE = 'close_match'
+SEPA_NONE = 'no_match'
+SEPA_UNAVAILABLE = 'unavailable'
+SEPA_OUTCOMES = frozenset({SEPA_MATCH, SEPA_CLOSE, SEPA_NONE, SEPA_UNAVAILABLE})
+CLEARING_BY_RAIL = {'inst': 'SCTI', 'sct': 'SCT1', 't2': 'TARG'}
+REJECTED_CLEARING = frozenset({
+    'AUNPP', 'USRTPP', 'FEDNOW', 'FEDWIRE', 'ACH', 'UPI', 'CHIPS', 'SWIFT',
+    'PIX', 'SPEI', 'NPP', 'OSKO', 'FAST', 'PAYNOW', 'MEPS', 'GIRO', 'PNW',
+    'FPS', 'FPS1', 'CHATS', 'ECG', 'HKFPS', 'HKID', 'CHAPS', 'BACS',
+    'ZGN', 'KFT1', 'MTS', 'BOJ', 'BOJNET', 'ZENGIN', 'MORETIME',
+    'OPEN', 'EFTC', 'BOKW', 'KFTC', 'PPAY', 'SMRT', 'BAHT', 'PP1', 'SMART',
+    'DUIT', 'IBGX', 'RNTS', 'DN1', 'BAHTNET', 'PROMPTPAY', 'IBG', 'RENTAS',
+    'INST', 'INSTAPAY', 'PESO', 'PASS', 'IP1', 'PESONET', 'PHILPASS',
+    'IBPS', 'BEPS', 'CIPS', 'CNAPS', 'CN1',
+})
+DEFAULT_BANKS = {
+    'COBA': 'Commerzbank',
+    'DEUT': 'Deutsche Bank',
+    'BNPA': 'BNP Paribas',
+    'SOGE': 'Société Générale',
+    'ABNA': 'ABN AMRO',
+    'CAIX': 'CaixaBank',
+    'UNCR': 'UniCredit',
+    'INGB': 'ING',
+}
+SEPA_PASS = frozenset({
+    ('COBADEFFXXX', 'DE89370400440532013000'),
+    ('BNPAFRPPXXX', 'FR1420041010050500013M02606'),
+    ('ABNANL2AXXX', 'NL91ABNA0417164300'),
+})
+DEFAULT_SEPA_DIRECTORY = {
+    'iban:DE89370400440532013000': 'José García',
+    'phone:+4915112345678': 'José García',
+    'nid:12345678903': 'José García',
+    'email:jose@example.de': 'José García',
+    'iban:FR1420041010050500013M02606': 'Marie Dupont',
+}
+SE1_VERSION = '1'
+SE1_FIELDS = 14
+DEFAULT_STORE_PATH = 'SystemLogs/seurecv.sqlite'
+DEFAULT_RECEIVER_BANK = 'COBADEFFXXX'
+DEFAULT_SENDER_BANK = 'BNPAFRPPXXX'
+CUSTOMER_RETURN_SECONDS = 24 * 60 * 60
+STAFF_COMPLAINT_DAYS = 90
+CLAIM_SECONDS = 24 * 60 * 60
+CET_OFFSET_MINUTES = 60
+DEFAULT_EURUSD = Decimal('1.085000')
+BLOCKED_E2E_PREFIXES = (
+    'IMAD', 'UETR', 'NPP', 'AUNPP', 'RRN', 'STAN', 'ARN', 'RFI', 'RFR', 'RTR',
+    'PNW', 'FAST', 'MEPS', 'GIRO', 'PIX', 'SPEI', 'UPI', 'FPS1', 'CHATS', 'ECG',
+    'HKFPS', 'HKID', 'PAYNOW', 'FPS', 'CHAPS', 'BACS', 'FEDWIRE', 'FEDNOW',
+    'INST', 'PESO', 'PASS', 'IP1', 'ZGN', 'MTS', 'BOJ', 'KFTC', 'KFT1',
+    'PPAY', 'PP1', 'DUIT', 'DN1', 'IBPS', 'BEPS', 'CIPS', 'CNAPS', 'CN1',
+)
+E2E_PREFIX = {'inst': 'SCTI', 'sct': 'SCT1', 't2': 'TARG'}
+FX_QUANTUM = Decimal('0.000001')
+CREDIT_OK = frozenset({'success', 'done', 'ok', 'amount debited', 'amount credited'})
+CREDIT_NSF = ('insufficient',)
+
+
+class SeurecvError(ValueError):
+    def __init__(self, code: str, message: str, **extra: Any):
+        super().__init__(message)
+        self.code = code
+        self.message = message
+        self.extra = extra
+
+
+def normalize_note(value: Any, *, limit: int = 500) -> str:
+    return str(value or '').strip()[:limit]
+
+
+def normalize_id(value: Any) -> str:
+    text = str(value or '').strip()
+    if not text:
+        return uuid.uuid4().hex
+    return text[:120]
+
+
+def normalize_nickname(value: Any) -> str:
+    text = ' '.join(str(value or '').strip().split())
+    if not (2 <= len(text) <= 40):
+        raise SeurecvError('invalid_nickname', 'Nickname must be 2-40 characters.')
+    return text
+
+
+def normalize_legal_name(value: Any) -> str:
+    text = ' '.join(str(value or '').strip().split())
+    if not (2 <= len(text) <= 80):
+        raise SeurecvError('invalid_name', 'Sender legal name must be 2-80 characters.')
+    return text
+
+
+def normalize_purpose(value: Any, *, default: str = 'other') -> str:
+    text = str(value or default).strip().lower().replace('-', '_').replace(' ', '_')
+    text = PURPOSE_ALIASES.get(text, text)
+    if text not in PURPOSES:
+        raise SeurecvError('invalid_purpose', 'Unknown SEPA purpose.')
+    return text
+
+
+def normalize_rail(value: Any, *, default: str = 'inst') -> str:
+    text = str(value or default).strip().lower().replace('-', '_').replace(' ', '_')
+    text = RAIL_ALIASES.get(text, text)
+    if text not in RAILS:
+        raise SeurecvError('invalid_rail', 'Rail must be inst, sct, or t2.')
+    return text
+
+
+def normalize_currency(value: Any, *, default: str = 'EUR', rail: str = 'inst') -> str:
+    _ = rail
+    text = str(value or default or 'EUR').strip().upper()
+    if text in {'EURO', 'EU', '€'}:
+        text = 'EUR'
+    if text != 'EUR':
+        raise SeurecvError('invalid_currency', 'SEPA Instant / SCT / TARGET2 is EUR only.')
+    return text
+
+
+def normalize_proxy_type(value: Any, *, default: str = '') -> str:
+    text = str(value or default).strip().lower().replace('-', '_')
+    text = PROXY_ALIASES.get(text, text)
+    if not text:
+        return ''
+    if text not in PROXY_TYPES:
+        raise SeurecvError('invalid_proxy', 'Proxy must be iban, phone, nid, or email.')
+    return text
+
+
+def normalize_account_type(value: Any, *, default: str = '1') -> str:
+    text = str(value or '').strip().lower()
+    text = ACCOUNT_TYPE_ALIASES.get(text, text)
+    if not text:
+        text = default
+    if text not in ACCOUNT_TYPES:
+        raise SeurecvError('invalid_account_type', 'Account type must be 1, 2, or 4.')
+    return text
+
+
+def iban_compact(value: Any) -> str:
+    return ''.join(ch for ch in str(value or '').upper() if ch.isalnum())
+
+
+def iban_check_ok(iban: str) -> bool:
+    """ISO 7064 MOD 97-10: rearrange country+check to the end, A=10..Z=35, % 97 == 1."""
+    compact = iban_compact(iban)
+    if not (15 <= len(compact) <= 34 and compact[:2].isalpha() and compact[2:4].isdigit()):
+        return False
+    rearr = compact[4:] + compact[:4]
+    digits = []
+    for ch in rearr:
+        if ch.isdigit():
+            digits.append(ch)
+        elif ch.isalpha():
+            digits.append(str(ord(ch) - 55))
+        else:
+            return False
+    total = 0
+    for ch in ''.join(digits):
+        total = (total * 10 + int(ch)) % 97
+    return total == 1
+
+
+def normalize_iban(value: Any, *, required: bool = True) -> str:
+    compact = iban_compact(value)
+    if not compact:
+        if required:
+            raise SeurecvError('invalid_iban', 'IBAN is required.')
+        return ''
+    if not iban_check_ok(compact):
+        raise SeurecvError('invalid_iban', 'IBAN failed checksum.')
+    return compact
+
+
+def normalize_bank_code(value: Any, *, required: bool = True) -> str:
+    """BIC: 8 or 11 alphanumeric (COBADEFF / COBADEFFXXX)."""
+    text = ''.join(ch for ch in str(value or '').upper() if ch.isalnum())
+    if not text:
+        if required:
+            raise SeurecvError('invalid_bank', 'BIC is required.')
+        return ''
+    if len(text) == 8:
+        text = text + 'XXX'
+    if len(text) != 11 or not text[:4].isalpha() or not text[4:6].isalpha():
+        raise SeurecvError('invalid_bank', 'BIC must be 8 or 11 characters.')
+    if text[:6] == 'XXXXXX' or not text[6:8].isalnum() or not text[8:].isalnum():
+        raise SeurecvError('invalid_bank', 'BIC failed format check.')
+    return text
+
+
+def normalize_branch_code(value: Any, *, required: bool = False) -> str:
+    text = ''.join(ch for ch in str(value or '').upper() if ch.isalnum())
+    if not text:
+        if required:
+            raise SeurecvError('invalid_branch', 'BIC branch must be 3 characters.')
+        return ''
+    if len(text) > 3:
+        raise SeurecvError('invalid_branch', 'BIC branch must be 3 characters.')
+    return text.ljust(3, 'X')
+
+
+def sepa_ok(bank: str, account: str, branch: str = '') -> bool:
+    _ = branch
+    bic = ''.join(ch for ch in str(bank or '').upper() if ch.isalnum())
+    if len(bic) == 8:
+        bic = bic + 'XXX'
+    iban = iban_compact(account)
+    if (bic, iban) in SEPA_PASS:
+        return True
+    if bic and len(bic) == 11 and not (bic[:4].isalpha() and bic[4:6].isalpha()):
+        return False
+    if not iban_check_ok(iban):
+        return False
+    return True
+
+
+def mask_bank(value: Any) -> str:
+    text = ''.join(ch for ch in str(value or '').upper() if ch.isalnum())
+    if len(text) < 4:
+        return '***'
+    return text[:4] + '***'
+
+
+def bank_name(value: Any, *, directory: Optional[Dict[str, str]] = None) -> str:
+    code = ''.join(ch for ch in str(value or '').upper() if ch.isalnum())
+    table = directory or DEFAULT_BANKS
+    return table.get(code[:4], '')
+
+
+def format_iban(bank: str, account: str, branch: str = '') -> str:
+    _ = branch
+    _ = bank
+    iban = iban_compact(account)
+    if not iban:
+        return ''
+    return '%s****%s' % (iban[:4], iban[-4:])
+
+
+def idnr_ok(digits: str) -> bool:
+    """German 11-digit tax ID: 10-digit body, 11th is product/sum check, first != 0."""
+    text = ''.join(ch for ch in str(digits or '') if ch.isdigit())
+    if len(text) != 11 or text[0] == '0':
+        return False
+    product = 10
+    for ch in text[:10]:
+        remainder = (int(ch) + product) % 10
+        if remainder == 0:
+            remainder = 10
+        product = (2 * remainder) % 11
+    check = 11 - product
+    if check == 10:
+        check = 0
+    return check == int(text[10])
+
+
+def normalize_idnr(value: Any, *, required: bool = False) -> str:
+    digits = ''.join(ch for ch in str(value or '') if ch.isdigit())
+    if not digits:
+        if required:
+            raise SeurecvError('invalid_idnr', 'German tax ID is required.')
+        return ''
+    if not idnr_ok(digits):
+        raise SeurecvError('invalid_idnr', 'German tax ID failed checksum.')
+    return digits
+
+
+def _letter_chars(text: str) -> List[str]:
+    return [ch for ch in text if ch.isalpha()]
+
+
+def normalize_sepa_name(value: Any, *, required: bool = True) -> str:
+    text = unicodedata.normalize('NFC', str(value or ''))
+    text = ' '.join(text.replace('\u00a0', ' ').split())
+    if not text:
+        if required:
+            raise SeurecvError('invalid_sepa_name', 'SEPA beneficiary name is required.')
+        return ''
+    letters = _letter_chars(text)
+    if required and len(letters) < 2:
+        raise SeurecvError('invalid_sepa_name', 'SEPA name must contain at least two letters.')
+    if len(text) > 80:
+        raise SeurecvError('invalid_sepa_name', 'SEPA name must be 2-80 characters.')
+    return text
+
+
+def mask_sepa_name(value: Any) -> str:
+    """Mask using first and last letter so José García → J***a, not a trailing accent mark."""
+    text = unicodedata.normalize('NFC', str(value or ''))
+    letters = _letter_chars(text)
+    if letters:
+        if len(letters) == 1:
+            return letters[0] + '***'
+        return letters[0] + '***' + letters[-1]
+    if len(text) <= 2:
+        return text[:1] + '***' if text else ''
+    return text[0] + '***' + text[-1]
+
+
+def normalize_external_account(value: Any, *, required: bool = True) -> str:
+    compact = iban_compact(value)
+    if compact and compact[:2].isalpha():
+        if required and not iban_check_ok(compact):
+            raise SeurecvError('invalid_account', 'IBAN failed checksum.')
+        if compact:
+            return compact
+    digits = ''.join(ch for ch in str(value or '') if ch.isdigit())
+    if not digits:
+        if required:
+            raise SeurecvError('invalid_account', 'Account is required.')
+        return ''
+    if not (4 <= len(digits) <= 34):
+        raise SeurecvError('invalid_account', 'Account must be 4-34 characters.')
+    return digits
+
+
+def mask_account(value: Any) -> str:
+    compact = iban_compact(value)
+    if compact and compact[:2].isalpha():
+        if len(compact) < 8:
+            return '*' * len(compact)
+        return compact[:4] + '****' + compact[-4:]
+    digits = ''.join(ch for ch in str(value or '') if ch.isdigit())
+    if len(digits) < 4:
+        return '*' * len(digits)
+    return ('*' * (len(digits) - 4)) + digits[-4:]
+
+
+def normalize_phone(value: Any, *, required: bool = False) -> str:
+    digits = ''.join(ch for ch in str(value or '') if ch.isdigit())
+    if not digits:
+        if required:
+            raise SeurecvError('invalid_phone', 'Mobile number is required.')
+        return ''
+    if digits.startswith('49') and len(digits) >= 12:
+        national = digits[2:]
+    elif digits.startswith('0'):
+        national = digits[1:]
+    else:
+        national = digits
+    if not (10 <= len(national) <= 12 and national[:2] in {'15', '16', '17'}):
+        raise SeurecvError('invalid_phone', 'German mobile must be +49 15/16/17.')
+    return '+49' + national
+
+
+def mask_phone(value: Any) -> str:
+    text = str(value or '')
+    if len(text) < 4:
+        return text
+    return '+49****' + text[-4:]
+
+
+def normalize_email(value: Any, *, required: bool = False) -> str:
+    text = str(value or '').strip().lower()
+    if not text:
+        if required:
+            raise SeurecvError('invalid_email', 'Email is required.')
+        return ''
+    if not re.match(r'^[^@\s]+@[^@\s]+\.[^@\s]+$', text):
+        raise SeurecvError('invalid_email', 'Email is not valid.')
+    return text
+
+
+def mask_email(value: Any) -> str:
+    text = str(value or '')
+    if '@' not in text:
+        return text
+    local, _, domain = text.partition('@')
+    head = local[:1] if local else '*'
+    return '%s***@%s' % (head, domain)
+
+
+def infer_proxy_type(value: Any) -> str:
+    text = str(value or '').strip()
+    if '@' in text:
+        return 'email'
+    compact = iban_compact(text)
+    if compact and compact[:2].isalpha() and iban_check_ok(compact):
+        return 'iban'
+    digits = ''.join(ch for ch in text if ch.isdigit())
+    if digits.startswith('49') and len(digits) >= 12:
+        return 'phone'
+    if digits.startswith('0') and len(digits) >= 11:
+        national = digits[1:]
+        if national[:2] in {'15', '16', '17'}:
+            return 'phone'
+    if 10 <= len(digits) <= 12 and digits[:2] in {'15', '16', '17'}:
+        return 'phone'
+    if idnr_ok(digits):
+        return 'nid'
+    return ''
+
+
+def normalize_proxy(proxy_type: Any, value: Any, *, required: bool = False) -> Tuple[str, str]:
+    kind = normalize_proxy_type(proxy_type, default='')
+    if not kind:
+        kind = infer_proxy_type(value)
+    if not kind:
+        if required:
+            raise SeurecvError('invalid_proxy', 'Proxy type is required.')
+        return '', ''
+    if kind == 'phone':
+        return kind, normalize_phone(value, required=True)
+    if kind == 'email':
+        return kind, normalize_email(value, required=True)
+    if kind == 'nid':
+        return kind, normalize_idnr(value, required=True)
+    iban = normalize_iban(value, required=True)
+    if not sepa_ok('', iban):
+        raise SeurecvError('invalid_iban', 'IBAN is not valid.')
+    return kind, iban
+
+
+def mask_proxy(proxy_type: str, value: str) -> str:
+    if proxy_type == 'phone':
+        return mask_phone(value)
+    if proxy_type == 'email':
+        return mask_email(value)
+    if proxy_type == 'nid':
+        return mask_account(value)
+    if proxy_type == 'iban':
+        return format_iban('', value)
+    return mask_account(value)
+
+
+def proxy_fingerprint(proxy_type: Any, value: Any) -> str:
+    kind, proxy = normalize_proxy(proxy_type, value, required=True)
+    material = '%s:%s' % (kind, proxy)
+    return hashlib.sha256(material.encode('utf-8')).hexdigest()
+
+
+def proxy_key(proxy_type: str, value: str) -> str:
+    return '%s:%s' % (proxy_type, value)
+
+
+def mask_e2e(value: Any) -> str:
+    text = str(value or '').strip().upper()
+    if len(text) < 8:
+        return '****'
+    prefix = re.match(r'[A-Z]+', text)
+    head = prefix.group(0) if prefix else text[:4]
+    return head + '****' + text[-4:]
+
+
+def compose_e2e(rail: str, cycle_date: str, sequence: int) -> str:
+    kind = normalize_rail(rail)
+    if not re.fullmatch(r'\d{8}', str(cycle_date or '')):
+        raise SeurecvError('invalid_reference', 'Cycle date must be YYYYMMDD.')
+    seq = int(sequence)
+    if seq < 1 or seq > 999999:
+        raise SeurecvError('invalid_reference', 'E2E sequence out of range.')
+    return '%s%s%06d' % (E2E_PREFIX[kind], cycle_date, seq)
+
+
+def normalize_e2e(value: Any) -> str:
+    text = re.sub(r'[^A-Z0-9]', '', str(value or '').upper())
+    if not text:
+        raise SeurecvError('invalid_reference', 'SEPA End-to-End ID is required.')
+    if any(text.startswith(prefix) for prefix in BLOCKED_E2E_PREFIXES):
+        raise SeurecvError('invalid_reference', 'End-to-End ID must not use another rail prefix.')
+    if len(text) == 22 and text[:8].isdigit():
+        raise SeurecvError('invalid_reference', 'Fedwire IMAD is not a SEPA End-to-End ID.')
+    if not re.fullmatch(r'(SCTI|SCT1|TARG)\d{14}', text):
+        raise SeurecvError('invalid_reference', 'E2E ID must be SCTI/SCT1/TARG + date + seq.')
+    return text
+
+
+def compose_amount_field(amount: Decimal) -> str:
+    quantized = amount.quantize(MONEY_QUANTUM, rounding=ROUND_HALF_EVEN)
+    if quantized < 0 or quantized > Decimal('999999999.99'):
+        raise SeurecvError('invalid_amount', 'Amount cannot be encoded in SE1.')
+    return money_str(quantized)
+
+
+def parse_amount_field(value: Any) -> Decimal:
+    try:
+        return parse_money(value)
+    except AmountError as exc:
+        raise SeurecvError('invalid_amount', 'SE1 amount field is invalid.') from exc
+
+
+def parse_fx_rate(value: Any) -> Decimal:
+    text = str(value or '').strip()
+    try:
+        rate = Decimal(text)
+    except Exception as exc:
+        raise AmountError('FX rate is not a number.') from exc
+    if rate <= 0:
+        raise AmountError('FX rate must be positive.')
+    return rate.quantize(FX_QUANTUM, rounding=ROUND_HALF_EVEN)
+
+
+def rate_str(value: Decimal) -> str:
+    quantized = Decimal(value).quantize(FX_QUANTUM, rounding=ROUND_HALF_EVEN)
+    return format(quantized, 'f')
+
+
+def convert_instructed_to_usd(amount: Decimal, rate: Decimal) -> Decimal:
+    if rate <= 0:
+        raise SeurecvError('invalid_fx', 'FX rate must be positive.')
+    return (amount * rate).quantize(MONEY_QUANTUM, rounding=ROUND_HALF_EVEN)
+
+
+def sepa_name_outcome(registered: str, presented: str) -> str:
+    left = normalize_sepa_name(registered, required=False)
+    right = normalize_sepa_name(presented, required=False)
+    if not left or not right:
+        return SEPA_UNAVAILABLE
+    if left == right:
+        return SEPA_MATCH
+    if left.startswith(right) or right.startswith(left):
+        return SEPA_CLOSE
+    left_letters = ''.join(_letter_chars(left)).casefold()
+    right_letters = ''.join(_letter_chars(right)).casefold()
+    if len(left_letters) >= 1 and len(right_letters) >= 1 and left_letters[0] == right_letters[0]:
+        return SEPA_CLOSE
+    return SEPA_NONE
+
+
+def _reject_markup(text: str) -> None:
+    lowered = text.lower()
+    if (
+        '<xml' in lowered or '<!doctype' in lowered or '<?xml' in lowered
+        or '<se1' in lowered or '<sct' in lowered or '<targ' in lowered
+        or '<sepa' in lowered or '<ibps' in lowered or '<cn1' in lowered
+    ):
+        raise SeurecvError('invalid_file', 'XML/DOCTYPE SE1 files are rejected.')
+
+
+def compose_se1(
+    *,
+    e2e: str,
+    rail: str,
+    proxy_type: str,
+    proxy: str,
+    bank: str,
+    account_number: str,
+    extra: str,
+    amount: Decimal,
+    purpose: str,
+    status: str,
+    currency: str = 'EUR',
+    mask: bool = True,
+) -> str:
+    kind = normalize_rail(rail)
+    clearing = CLEARING_BY_RAIL[kind]
+    money = normalize_currency(currency, rail=kind)
+    name_field = extra or ''
+    if mask and name_field:
+        name_field = mask_sepa_name(name_field)
+    return '|'.join((
+        'SE1',
+        SE1_VERSION,
+        mask_e2e(e2e) if mask else normalize_e2e(e2e),
+        kind,
+        proxy_type or '',
+        mask_proxy(proxy_type, proxy) if mask and proxy else (proxy or ''),
+        mask_bank(bank) if mask and bank else (normalize_bank_code(bank, required=False) if bank else ''),
+        mask_account(account_number) if mask and account_number else (account_number or ''),
+        name_field,
+        compose_amount_field(amount),
+        normalize_purpose(purpose),
+        str(status or IN_POSTED),
+        money,
+        clearing,
+    ))
+
+
+def parse_se1(text: Any) -> Dict[str, Any]:
+    raw = str(text or '').strip()
+    if not raw:
+        raise SeurecvError('invalid_file', 'SE1 record is empty.')
+    _reject_markup(raw)
+    parts = raw.split('|')
+    if len(parts) != SE1_FIELDS or parts[0] != 'SE1' or parts[1] != SE1_VERSION:
+        raise SeurecvError('invalid_file', 'SE1 record is malformed.')
+    clearing = parts[13].strip().upper()
+    if clearing in REJECTED_CLEARING or clearing not in {'SCTI', 'SCT1', 'TARG'}:
+        raise SeurecvError('invalid_file', 'SE1 clearing must be SCTI/SCT1/TARG.')
+    rail = normalize_rail(parts[3])
+    if CLEARING_BY_RAIL[rail] != clearing:
+        raise SeurecvError('invalid_file', 'SE1 rail and clearing do not match.')
+    joined = '|'.join(parts[2:9])
+    if '*' in joined or '…' in joined or '***' in joined:
+        raise SeurecvError('invalid_file', 'Masked SE1 record cannot be re-ingested.')
+    proxy_type = normalize_proxy_type(parts[4]) if parts[4] else ''
+    proxy = ''
+    if parts[5]:
+        proxy_type, proxy = normalize_proxy(proxy_type, parts[5], required=True)
+    return {
+        'e2e': normalize_e2e(parts[2]),
+        'rail': rail,
+        'proxy_type': proxy_type,
+        'proxy': proxy,
+        'bank': normalize_bank_code(parts[6], required=bool(parts[6])),
+        'recv_bank': normalize_bank_code(parts[6], required=bool(parts[6])),
+        'account_number': normalize_external_account(parts[7], required=bool(parts[7])),
+        'sepa_name': normalize_sepa_name(parts[8], required=False) if parts[8] else '',
+        'amount': parse_amount_field(parts[9]),
+        'purpose': normalize_purpose(parts[10]),
+        'status': parts[11],
+        'currency': normalize_currency(parts[12], rail=rail),
+        'clearing': clearing,
+        'name': '',
+        'send_bank': DEFAULT_SENDER_BANK,
+    }
+
+
+def split_se1_file(text: Any) -> List[str]:
+    raw = str(text or '')
+    _reject_markup(raw)
+    records = [line.strip() for line in raw.replace('\r\n', '\n').split('\n') if line.strip()]
+    if not records:
+        raise SeurecvError('invalid_file', 'SE1 file is empty.')
+    return records
+
+
+def message_from_values(values: Dict[str, Any]) -> Dict[str, Any]:
+    recv = normalize_bank_code(
+        values.get('recv_bank') or values.get('receiver') or values.get('bank') or DEFAULT_RECEIVER_BANK,
+    )
+    send = normalize_bank_code(
+        values.get('send_bank') or values.get('sender_bank') or DEFAULT_SENDER_BANK,
+        required=False,
+    ) or DEFAULT_SENDER_BANK
+    proxy_raw = (
+        values.get('proxy') or values.get('iban') or values.get('key')
+        or values.get('phone') or values.get('email') or values.get('nid')
+    )
+    proxy_type = values.get('proxy_type') or values.get('key_type') or values.get('kind') or ''
+    proxy = ''
+    kind = ''
+    if proxy_raw:
+        kind, proxy = normalize_proxy(proxy_type, proxy_raw, required=True)
+    amount = values.get('amount')
+    if not isinstance(amount, Decimal):
+        try:
+            amount = parse_money(amount)
+        except AmountError as exc:
+            raise SeurecvError('invalid_amount', 'Amount is invalid.') from exc
+    e2e = str(values.get('end_to_end_id') or values.get('e2e') or '').strip()
+    rail = normalize_rail(values.get('rail') or 'inst')
+    if e2e:
+        e2e = normalize_e2e(e2e)
+    else:
+        cycle = str(values.get('value_date') or values.get('cycle_date') or '').strip()
+        if '-' in cycle:
+            cycle = cycle.replace('-', '')[:8]
+        seq = values.get('sequence') or values.get('seq') or 1
+        e2e = compose_e2e(rail, cycle, int(seq))
+    name = str(values.get('name') or values.get('sender_name') or values.get('payer') or '').strip()
+    if name:
+        name = normalize_legal_name(name)
+    dest_acct = normalize_external_account(
+        values.get('account_number') or values.get('external_account') or '',
+        required=False,
+    )
+    currency = normalize_currency(values.get('currency') or 'EUR', rail=rail)
+    sepa_name = normalize_sepa_name(
+        values.get('sepa_name') or values.get('chinese') or values.get('kana') or values.get('beneficiary_sepa') or '',
+        required=False,
+    )
+    return {
+        'e2e': e2e,
+        'rail': rail,
+        'proxy_type': kind,
+        'proxy': proxy,
+        'bank': recv,
+        'account_number': dest_acct,
+        'sepa_name': sepa_name,
+        'amount': amount,
+        'purpose': normalize_purpose(values.get('purpose')),
+        'name': name or 'SEPA PAYER',
+        'currency': currency,
+        'send_bank': send,
+        'recv_bank': recv,
+    }
+
+
+def easter_date(year: int) -> date:
+    """Anonymous Gregorian Easter (Western)."""
+    a = year % 19
+    b = year // 100
+    c = year % 100
+    d = b // 4
+    e = b % 4
+    f = (b + 8) // 25
+    g = (b - f + 1) // 3
+    h = (19 * a + b - d - g + 15) % 30
+    i = c // 4
+    k = c % 4
+    ll = (32 + 2 * e + 2 * i - h - k) % 7
+    m = (a + 11 * h + 22 * ll) // 451
+    month = (h + ll - 7 * m + 114) // 31
+    day = ((h + ll - 7 * m + 114) % 31) + 1
+    return date(year, month, day)
+
+
+def target2_holidays(year: int) -> set:
+    """TARGET2 closing days plus the weekday after a weekend-touching cluster."""
+    easter = easter_date(year)
+    raw = {
+        date(year, 1, 1),
+        easter - timedelta(days=2),
+        easter + timedelta(days=1),
+        date(year, 5, 1),
+        date(year, 12, 25),
+        date(year, 12, 26),
+    }
+    observed = set(raw)
+    for day in sorted(raw):
+        if day.weekday() < 5:
+            continue
+        prev = day - timedelta(days=1)
+        if prev in observed:
+            continue
+        cursor = day + timedelta(days=1)
+        while cursor.weekday() >= 5 or cursor in observed:
+            cursor += timedelta(days=1)
+        observed.add(cursor)
+    return observed
+
+
+class EuClock:
+    """CET Instant 24/7 vs SCT / TARGET2 banking-day clock."""
+
+    def __init__(
+        self,
+        *,
+        sct_open_hour: int = 9,
+        sct_open_minute: int = 0,
+        sct_cutoff_hour: int = 16,
+        sct_cutoff_minute: int = 0,
+        t2_open_hour: int = 8,
+        t2_open_minute: int = 30,
+        t2_cutoff_hour: int = 17,
+        t2_cutoff_minute: int = 0,
+        tz_offset_minutes: int = CET_OFFSET_MINUTES,
+        extra_holidays: Sequence[str] = (),
+    ) -> None:
+        self.sct_open_hour = int(sct_open_hour)
+        self.sct_open_minute = int(sct_open_minute)
+        self.sct_cutoff_hour = int(sct_cutoff_hour)
+        self.sct_cutoff_minute = int(sct_cutoff_minute)
+        self.t2_open_hour = int(t2_open_hour)
+        self.t2_open_minute = int(t2_open_minute)
+        self.t2_cutoff_hour = int(t2_cutoff_hour)
+        self.t2_cutoff_minute = int(t2_cutoff_minute)
+        self.tz_offset_minutes = int(tz_offset_minutes)
+        self.tz = timezone(timedelta(minutes=self.tz_offset_minutes))
+        extra = set()
+        for item in extra_holidays:
+            text = str(item).strip()
+            if not text:
+                continue
+            extra.add(date.fromisoformat(text[:10]) if '-' in text else datetime.strptime(text[:8], '%Y%m%d').date())
+        self.extra_holidays = extra
+
+    def local_dt(self, ts: float) -> datetime:
+        return datetime.fromtimestamp(float(ts), tz=timezone.utc).astimezone(self.tz)
+
+    def holidays(self, year: int) -> set:
+        return target2_holidays(year) | {day for day in self.extra_holidays if day.year == year}
+
+    def is_weekend(self, day: date) -> bool:
+        return day.weekday() >= 5
+
+    def is_holiday(self, day: date) -> bool:
+        return day in self.holidays(day.year)
+
+    def is_business_day(self, day: date) -> bool:
+        return not self.is_weekend(day) and not self.is_holiday(day)
+
+    def _window(self, rail: str) -> Tuple[int, int, int, int]:
+        if rail == 't2':
+            return (
+                self.t2_open_hour, self.t2_open_minute,
+                self.t2_cutoff_hour, self.t2_cutoff_minute,
+            )
+        return (
+            self.sct_open_hour, self.sct_open_minute,
+            self.sct_cutoff_hour, self.sct_cutoff_minute,
+        )
+
+    def is_after_cutoff(self, ts: float, *, rail: str = 'inst') -> bool:
+        kind = normalize_rail(rail)
+        if kind == 'inst':
+            return False
+        local = self.local_dt(ts)
+        day = local.date()
+        if not self.is_business_day(day):
+            return True
+        open_h, open_m, cut_h, cut_m = self._window(kind)
+        minutes = local.hour * 60 + local.minute
+        return minutes < open_h * 60 + open_m or minutes >= cut_h * 60 + cut_m
+
+    def is_session(self, ts: float, *, rail: str = 'sct') -> bool:
+        kind = normalize_rail(rail)
+        if kind == 'inst':
+            return True
+        return not self.is_after_cutoff(ts, rail=kind)
+
+    def next_business_day(self, day: date) -> date:
+        cursor = day + timedelta(days=1)
+        while not self.is_business_day(cursor):
+            cursor += timedelta(days=1)
+        return cursor
+
+    def value_date(self, ts: float, *, rail: str = 'inst') -> date:
+        kind = normalize_rail(rail)
+        local = self.local_dt(ts)
+        day = local.date()
+        if kind == 'inst':
+            return day
+        if not self.is_business_day(day) or self.is_after_cutoff(ts, rail=kind):
+            return self.next_business_day(day)
+        return day
+
+    def cycle_date(self, ts: float, *, rail: str = 'inst') -> str:
+        return self.value_date(ts, rail=rail).strftime('%Y%m%d')
+
+    def session_close_ts(self, day: date, *, rail: str = 'sct') -> float:
+        kind = normalize_rail(rail)
+        if kind == 't2':
+            hour, minute = self.t2_cutoff_hour, self.t2_cutoff_minute
+        else:
+            hour, minute = self.sct_cutoff_hour, self.sct_cutoff_minute
+        local = datetime(day.year, day.month, day.day, hour, minute, tzinfo=self.tz)
+        return local.timestamp()
+
+    def snapshot(self, ts: float, *, rail: str = 'inst') -> Dict[str, Any]:
+        kind = normalize_rail(rail)
+        local = self.local_dt(ts)
+        day = local.date()
+        after = self.is_after_cutoff(ts, rail=kind)
+        if kind == 't2':
+            cutoff = '%02d:%02d' % (self.t2_cutoff_hour, self.t2_cutoff_minute)
+            open_at = '%02d:%02d' % (self.t2_open_hour, self.t2_open_minute)
+        elif kind == 'sct':
+            cutoff = '%02d:%02d' % (self.sct_cutoff_hour, self.sct_cutoff_minute)
+            open_at = '%02d:%02d' % (self.sct_open_hour, self.sct_open_minute)
+        else:
+            cutoff = '24/7'
+            open_at = '00:00'
+        return {
+            'rail': kind,
+            'local_date': day.isoformat(),
+            'local_time': local.strftime('%H:%M'),
+            'timezone': 'CET',
+            'open': open_at,
+            'cutoff': cutoff,
+            'session': self.is_session(ts, rail=kind),
+            'after_cutoff': after,
+            'always_on': kind == 'inst',
+            'weekend': self.is_weekend(day),
+            'holiday': self.is_holiday(day),
+            'business_day': self.is_business_day(day),
+            'value_date': self.value_date(ts, rail=kind).isoformat(),
+            'cycle_date': self.cycle_date(ts, rail=kind),
+            'clearing': CLEARING_BY_RAIL[kind],
+        }
+
+
+def _env_bool(name: str, default: bool) -> bool:
+    raw = os.environ.get(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() in {'1', 'true', 'yes', 'on'}
+
+
+def _env_int(name: str, default: int) -> int:
+    raw = os.environ.get(name)
+    if raw is None or not str(raw).strip():
+        return default
+    try:
+        return int(str(raw).strip())
+    except ValueError:
+        return default
+
+
+def _env_money(name: str, default: str) -> Decimal:
+    raw = os.environ.get(name)
+    try:
+        return parse_money(raw if raw not in (None, '') else default, allow_zero=True)
+    except AmountError:
+        return parse_money(default, allow_zero=True)
+
+
+def _env_rate(name: str, default: str) -> Decimal:
+    raw = os.environ.get(name, default)
+    try:
+        return parse_fx_rate(raw)
+    except AmountError:
+        return parse_fx_rate(default)
+
+
+def _env_list(name: str) -> Tuple[str, ...]:
+    raw = os.environ.get(name) or ''
+    return tuple(item.strip() for item in raw.split(',') if item.strip())
+
+
+def _classify_money_result(result: Any) -> str:
+    if result in (None, True, 1):
+        return 'ok'
+    text = str(result or '').strip().lower()
+    if any(token in text for token in CREDIT_NSF):
+        return 'nsf'
+    if text in CREDIT_OK or 'debit' in text or 'credit' in text or 'success' in text:
+        return 'ok'
+    return 'failed'
+
+
+@dataclass
+class SeurecvPolicy:
+    enabled: bool = True
+    customer_manage: bool = True
+    customer_claim: bool = True
+    customer_return: bool = True
+    allow_credit: bool = False
+    max_keys: int = 12
+    max_inbounds: int = 120
+    min_amount: Decimal = Decimal('0.01')
+    inst_cap: Decimal = Decimal('50000.00')
+    sct_cap: Decimal = Decimal('1000000.00')
+    t2_cap: Decimal = Decimal('100000000.00')
+    dual_control_threshold: Decimal = Decimal('50000.00')
+    eurusd: Decimal = DEFAULT_EURUSD
+    require_sepa_match: bool = True
+    sepa_directory: Dict[str, str] = None  # type: ignore[assignment]
+    tz_offset_minutes: int = CET_OFFSET_MINUTES
+    sct_open_hour: int = 9
+    sct_open_minute: int = 0
+    sct_cutoff_hour: int = 16
+    sct_cutoff_minute: int = 0
+    t2_open_hour: int = 8
+    t2_open_minute: int = 30
+    t2_cutoff_hour: int = 17
+    t2_cutoff_minute: int = 0
+    receiver_bank: str = DEFAULT_RECEIVER_BANK
+    customer_return_seconds: int = CUSTOMER_RETURN_SECONDS
+    staff_complaint_days: int = STAFF_COMPLAINT_DAYS
+    claim_seconds: int = CLAIM_SECONDS
+    watchlist: Tuple[str, ...] = DEFAULT_WATCHLIST
+    extra_holidays: Tuple[str, ...] = ()
+    banks: Dict[str, str] = None  # type: ignore[assignment]
+
+    def __post_init__(self) -> None:
+        if self.banks is None:
+            self.banks = dict(DEFAULT_BANKS)
+        if self.sepa_directory is None:
+            self.sepa_directory = dict(DEFAULT_SEPA_DIRECTORY)
+
+    def cap_for(self, rail: str) -> Decimal:
+        if rail == 'sct':
+            return self.sct_cap
+        if rail == 't2':
+            return self.t2_cap
+        return self.inst_cap
+
+    def rate_for(self, currency: str) -> Decimal:
+        _ = currency
+        return self.eurusd
+
+    @classmethod
+    def from_env(cls) -> 'SeurecvPolicy':
+        extra = _env_list('SEURECV_OFAC_LIST')
+        watch = tuple(dict.fromkeys(DEFAULT_WATCHLIST + extra))
+        source = os.environ.get('SEURECV_RECEIVER') or DEFAULT_RECEIVER_BANK
+        try:
+            receiver = normalize_bank_code(source)
+        except SeurecvError:
+            receiver = DEFAULT_RECEIVER_BANK
+        return cls(
+            enabled=_env_bool('SEURECV_ENABLED', True),
+            customer_manage=_env_bool('SEURECV_CUSTOMER_MANAGE', True),
+            customer_claim=_env_bool('SEURECV_CUSTOMER_CLAIM', True),
+            customer_return=_env_bool('SEURECV_CUSTOMER_RETURN', True),
+            allow_credit=_env_bool('SEURECV_ALLOW_CREDIT', False),
+            max_keys=max(1, _env_int('SEURECV_MAX_KEYS', 12)),
+            max_inbounds=max(1, _env_int('SEURECV_MAX_INBOUNDS', 120)),
+            min_amount=_env_money('SEURECV_MIN_AMOUNT', '0.01'),
+            inst_cap=_env_money('SEURECV_INST_CAP', '50000.00'),
+            sct_cap=_env_money('SEURECV_SCT_CAP', '1000000.00'),
+            t2_cap=_env_money('SEURECV_T2_CAP', '100000000.00'),
+            dual_control_threshold=_env_money('SEURECV_DUAL_CONTROL', '50000.00'),
+            eurusd=_env_rate('SEURECV_FX_EURUSD', '1.085000'),
+            require_sepa_match=_env_bool('SEURECV_REQUIRE_SEPA', True),
+            tz_offset_minutes=_env_int('SEURECV_TZ_OFFSET', CET_OFFSET_MINUTES),
+            sct_open_hour=max(0, min(23, _env_int('SEURECV_OPEN_HOUR', 9))),
+            sct_open_minute=max(0, min(59, _env_int('SEURECV_OPEN_MINUTE', 0))),
+            sct_cutoff_hour=max(0, min(23, _env_int('SEURECV_CUTOFF_HOUR', 16))),
+            sct_cutoff_minute=max(0, min(59, _env_int('SEURECV_CUTOFF_MINUTE', 0))),
+            t2_open_hour=max(0, min(23, _env_int('SEURECV_T2_OPEN_HOUR', 8))),
+            t2_open_minute=max(0, min(59, _env_int('SEURECV_T2_OPEN_MINUTE', 30))),
+            t2_cutoff_hour=max(0, min(23, _env_int('SEURECV_T2_CUTOFF_HOUR', 17))),
+            t2_cutoff_minute=max(0, min(59, _env_int('SEURECV_T2_CUTOFF_MINUTE', 0))),
+            receiver_bank=receiver,
+            customer_return_seconds=max(60, _env_int('SEURECV_RETURN_SECONDS', CUSTOMER_RETURN_SECONDS)),
+            staff_complaint_days=max(1, _env_int('SEURECV_COMPLAINT_DAYS', STAFF_COMPLAINT_DAYS)),
+            claim_seconds=max(60, _env_int('SEURECV_CLAIM_SECONDS', CLAIM_SECONDS)),
+            watchlist=watch,
+            extra_holidays=_env_list('SEURECV_HOLIDAYS'),
+        )
+
+
+@dataclass
+class SeurecvKey:
+    key_id: str
+    userid: str
+    nickname: str
+    proxy_type: str
+    proxy: str
+    fingerprint: str
+    destination_account: str
+    status: str
+    actor: str
+    created_at: float
+    updated_at: float
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            'key_id': self.key_id,
+            'userid': self.userid,
+            'nickname': self.nickname,
+            'proxy_type': self.proxy_type,
+            'proxy_masked': mask_proxy(self.proxy_type, self.proxy),
+            'account_last4': last4(self.destination_account),
+            'status': self.status,
+            'created_at': self.created_at,
+            'updated_at': self.updated_at,
+            'active': self.status == KEY_ACTIVE,
+            'paused': self.status == KEY_PAUSED,
+            'cancelled': self.status == KEY_CANCELLED,
+        }
+
+
+@dataclass
+class SeurecvInbound:
+    inbound_id: str
+    e2e: str
+    userid: str
+    destination_account: str
+    amount_instructed: str
+    amount_usd: str
+    currency: str
+    sender_name: str
+    send_bank: str
+    recv_bank: str
+    rail: str
+    proxy_type: str
+    proxy: str
+    fingerprint: str
+    account_number: str
+    purpose: str
+    status: str
+    reason: str
+    actor: str
+    releaser: str
+    ofac_hit: bool
+    ofac_match: str
+    ofac_overridden: bool
+    created_at: float
+    updated_at: float
+    posted_at: float = 0.0
+    returned_at: float = 0.0
+    expiry_at: float = 0.0
+    note: str = ''
+    sepa_name: str = ''
+    sepa_outcome: str = ''
+    sepa_overridden: bool = False
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            'inbound_id': self.inbound_id,
+            'e2e_masked': mask_e2e(self.e2e),
+            'userid': self.userid,
+            'account_last4': last4(self.destination_account) if self.destination_account else '',
+            'amount_instructed': self.amount_instructed,
+            'amount_usd': self.amount_usd,
+            'amount_eur': self.amount_instructed if self.currency == 'EUR' else '',
+            'currency': self.currency,
+            'sender_name': self.sender_name,
+            'send_bank_masked': mask_bank(self.send_bank) if self.send_bank else '',
+            'send_name': bank_name(self.send_bank) if self.send_bank else '',
+            'recv_bank_masked': mask_bank(self.recv_bank) if self.recv_bank else '',
+            'rail': self.rail,
+            'proxy_type': self.proxy_type,
+            'proxy_masked': mask_proxy(self.proxy_type, self.proxy) if self.proxy else '****',
+            'sepa_masked': mask_sepa_name(self.sepa_name) if self.sepa_name else '',
+            'sepa_outcome': self.sepa_outcome,
+            'purpose': self.purpose,
+            'status': self.status,
+            'reason': self.reason,
+            'ofac_hit': self.ofac_hit,
+            'returnable': self.status in OPEN_IN or self.status == IN_POSTED,
+            'claimable': self.status == IN_UNMATCHED,
+            'created_at': self.created_at,
+            'updated_at': self.updated_at,
+            'posted_at': self.posted_at,
+            'expiry_at': self.expiry_at,
+        }
+
+
+def _key_from_row(row: Any) -> SeurecvKey:
+    data = dict(row)
+    return SeurecvKey(
+        key_id=data['key_id'], userid=data['userid'], nickname=data['nickname'],
+        proxy_type=data['proxy_type'], proxy=data['proxy'], fingerprint=data['fingerprint'],
+        destination_account=data['destination_account'], status=data['status'], actor=data['actor'],
+        created_at=float(data['created_at']), updated_at=float(data['updated_at']),
+    )
+
+
+def _inbound_from_row(row: Any) -> SeurecvInbound:
+    data = dict(row)
+    return SeurecvInbound(
+        inbound_id=data['inbound_id'], e2e=data['e2e'], userid=data['userid'],
+        destination_account=data['destination_account'], amount_instructed=data['amount_instructed'],
+        amount_usd=data['amount_usd'], currency=data.get('currency') or 'EUR',
+        sender_name=data['sender_name'],
+        send_bank=data['send_bank'], recv_bank=data['recv_bank'], rail=data['rail'],
+        proxy_type=data['proxy_type'], proxy=data['proxy'], fingerprint=data['fingerprint'],
+        account_number=data.get('account_number') or '', purpose=data['purpose'],
+        status=data['status'], reason=data['reason'], actor=data['actor'], releaser=data['releaser'],
+        ofac_hit=bool(int(data['ofac_hit'])), ofac_match=data['ofac_match'],
+        ofac_overridden=bool(int(data['ofac_overridden'])),
+        created_at=float(data['created_at']), updated_at=float(data['updated_at']),
+        posted_at=float(data.get('posted_at') or 0), returned_at=float(data.get('returned_at') or 0),
+        expiry_at=float(data.get('expiry_at') or 0), note=data.get('note') or '',
+        sepa_name=data.get('sepa_name') or data.get('chinese') or data.get('kana') or '', sepa_outcome=data.get('sepa_outcome') or '',
+        sepa_overridden=bool(int(data.get('sepa_overridden') or 0)),
+    )
+
+
+class MemorySeurecvStore:
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self.keys: Dict[str, SeurecvKey] = {}
+        self.inbounds: Dict[str, SeurecvInbound] = {}
+        self._by_e2e: Dict[str, str] = {}
+
+    def put_key(self, row: SeurecvKey) -> None:
+        with self._lock:
+            self.keys[row.key_id] = row
+
+    def get_key(self, key_id: str) -> Optional[SeurecvKey]:
+        return self.keys.get(key_id)
+
+    def get_key_by_fingerprint(self, fingerprint: str) -> Optional[SeurecvKey]:
+        matches = [
+            row for row in self.keys.values()
+            if row.fingerprint == fingerprint and row.status in OPEN_KEY
+        ]
+        if not matches:
+            return None
+        return sorted(matches, key=lambda row: row.created_at, reverse=True)[0]
+
+    def update_key(self, row: SeurecvKey) -> None:
+        self.put_key(row)
+
+    def list_keys(self, userid: Optional[str] = None) -> List[SeurecvKey]:
+        rows = list(self.keys.values())
+        if userid is not None:
+            rows = [row for row in rows if row.userid == userid]
+        return sorted(rows, key=lambda row: row.created_at)
+
+    def put_inbound(self, row: SeurecvInbound) -> None:
+        with self._lock:
+            self.inbounds[row.inbound_id] = row
+            self._by_e2e[row.e2e] = row.inbound_id
+
+    def get_inbound(self, inbound_id: str) -> Optional[SeurecvInbound]:
+        return self.inbounds.get(inbound_id)
+
+    def get_by_e2e(self, e2e: str) -> Optional[SeurecvInbound]:
+        inbound_id = self._by_e2e.get(e2e)
+        return self.inbounds.get(inbound_id) if inbound_id else None
+
+    def update_inbound(self, row: SeurecvInbound) -> None:
+        self.put_inbound(row)
+
+    def list_inbounds(self, userid: Optional[str] = None, status: Optional[str] = None) -> List[SeurecvInbound]:
+        rows = list(self.inbounds.values())
+        if userid is not None:
+            rows = [row for row in rows if row.userid == userid]
+        if status is not None:
+            rows = [row for row in rows if row.status == status]
+        return sorted(rows, key=lambda row: row.created_at, reverse=True)
+
+
+class SqliteSeurecvStore:
+    def __init__(self, path: str = DEFAULT_STORE_PATH) -> None:
+        self.path = path
+        directory = os.path.dirname(path)
+        if directory:
+            os.makedirs(directory, exist_ok=True)
+        self._lock = threading.Lock()
+        self._init()
+
+    def _connect(self) -> sqlite3.Connection:
+        conn = sqlite3.connect(self.path, timeout=30)
+        conn.row_factory = sqlite3.Row
+        conn.execute('PRAGMA journal_mode=WAL')
+        return conn
+
+    def _init(self) -> None:
+        with self._lock, self._connect() as conn:
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS keys (
+                    key_id TEXT PRIMARY KEY,
+                    userid TEXT NOT NULL,
+                    nickname TEXT NOT NULL,
+                    proxy_type TEXT NOT NULL,
+                    proxy TEXT NOT NULL,
+                    fingerprint TEXT NOT NULL,
+                    destination_account TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    actor TEXT NOT NULL,
+                    created_at REAL NOT NULL,
+                    updated_at REAL NOT NULL
+                )
+                """
+            )
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS inbounds (
+                    inbound_id TEXT PRIMARY KEY,
+                    e2e TEXT NOT NULL UNIQUE,
+                    userid TEXT NOT NULL DEFAULT '',
+                    destination_account TEXT NOT NULL DEFAULT '',
+                    amount_instructed TEXT NOT NULL,
+                    amount_usd TEXT NOT NULL,
+                    currency TEXT NOT NULL DEFAULT 'EUR',
+                    sender_name TEXT NOT NULL,
+                    send_bank TEXT NOT NULL,
+                    recv_bank TEXT NOT NULL,
+                    rail TEXT NOT NULL,
+                    proxy_type TEXT NOT NULL DEFAULT '',
+                    proxy TEXT NOT NULL DEFAULT '',
+                    fingerprint TEXT NOT NULL DEFAULT '',
+                    account_number TEXT NOT NULL DEFAULT '',
+                    purpose TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    reason TEXT NOT NULL DEFAULT '',
+                    actor TEXT NOT NULL,
+                    releaser TEXT NOT NULL DEFAULT '',
+                    ofac_hit INTEGER NOT NULL DEFAULT 0,
+                    ofac_match TEXT NOT NULL DEFAULT '',
+                    ofac_overridden INTEGER NOT NULL DEFAULT 0,
+                    created_at REAL NOT NULL,
+                    updated_at REAL NOT NULL,
+                    posted_at REAL NOT NULL DEFAULT 0,
+                    returned_at REAL NOT NULL DEFAULT 0,
+                    expiry_at REAL NOT NULL DEFAULT 0,
+                    note TEXT NOT NULL DEFAULT '',
+                    sepa_name TEXT NOT NULL DEFAULT '',
+                    sepa_outcome TEXT NOT NULL DEFAULT '',
+                    sepa_overridden INTEGER NOT NULL DEFAULT 0
+                )
+                """
+            )
+            conn.commit()
+
+    def put_key(self, row: SeurecvKey) -> None:
+        with self._lock, self._connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO keys (
+                    key_id, userid, nickname, proxy_type, proxy, fingerprint,
+                    destination_account, status, actor, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    row.key_id, row.userid, row.nickname, row.proxy_type, row.proxy,
+                    row.fingerprint, row.destination_account, row.status, row.actor,
+                    row.created_at, row.updated_at,
+                ),
+            )
+            conn.commit()
+
+    def get_key(self, key_id: str) -> Optional[SeurecvKey]:
+        with self._lock, self._connect() as conn:
+            row = conn.execute('SELECT * FROM keys WHERE key_id = ?', (key_id,)).fetchone()
+        return _key_from_row(row) if row else None
+
+    def get_key_by_fingerprint(self, fingerprint: str) -> Optional[SeurecvKey]:
+        with self._lock, self._connect() as conn:
+            row = conn.execute(
+                """
+                SELECT * FROM keys WHERE fingerprint = ? AND status IN ('active', 'paused')
+                ORDER BY created_at DESC LIMIT 1
+                """,
+                (fingerprint,),
+            ).fetchone()
+        return _key_from_row(row) if row else None
+
+    def update_key(self, row: SeurecvKey) -> None:
+        with self._lock, self._connect() as conn:
+            conn.execute(
+                """
+                UPDATE keys SET nickname=?, proxy_type=?, proxy=?, fingerprint=?,
+                    destination_account=?, status=?, actor=?, updated_at=?
+                WHERE key_id=?
+                """,
+                (
+                    row.nickname, row.proxy_type, row.proxy, row.fingerprint,
+                    row.destination_account, row.status, row.actor, row.updated_at, row.key_id,
+                ),
+            )
+            conn.commit()
+
+    def list_keys(self, userid: Optional[str] = None) -> List[SeurecvKey]:
+        sql = 'SELECT * FROM keys'
+        args: Tuple[Any, ...] = ()
+        if userid is not None:
+            sql += ' WHERE userid = ?'
+            args = (userid,)
+        sql += ' ORDER BY created_at'
+        with self._lock, self._connect() as conn:
+            rows = conn.execute(sql, args).fetchall()
+        return [_key_from_row(row) for row in rows]
+
+    def put_inbound(self, row: SeurecvInbound) -> None:
+        with self._lock, self._connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO inbounds (
+                    inbound_id, e2e, userid, destination_account, amount_instructed, amount_usd,
+                    currency, sender_name, send_bank, recv_bank, rail, proxy_type, proxy, fingerprint,
+                    account_number, purpose, status, reason, actor, releaser, ofac_hit,
+                    ofac_match, ofac_overridden, created_at, updated_at, posted_at,
+                    returned_at, expiry_at, note, sepa_name, sepa_outcome, sepa_overridden
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    row.inbound_id, row.e2e, row.userid, row.destination_account, row.amount_instructed,
+                    row.amount_usd, row.currency, row.sender_name, row.send_bank, row.recv_bank, row.rail,
+                    row.proxy_type, row.proxy, row.fingerprint, row.account_number, row.purpose,
+                    row.status, row.reason, row.actor, row.releaser, int(row.ofac_hit),
+                    row.ofac_match, int(row.ofac_overridden), row.created_at, row.updated_at,
+                    row.posted_at, row.returned_at, row.expiry_at, row.note,
+                    row.sepa_name, row.sepa_outcome, int(row.sepa_overridden),
+                ),
+            )
+            conn.commit()
+
+    def get_inbound(self, inbound_id: str) -> Optional[SeurecvInbound]:
+        with self._lock, self._connect() as conn:
+            row = conn.execute('SELECT * FROM inbounds WHERE inbound_id = ?', (inbound_id,)).fetchone()
+        return _inbound_from_row(row) if row else None
+
+    def get_by_e2e(self, e2e: str) -> Optional[SeurecvInbound]:
+        with self._lock, self._connect() as conn:
+            row = conn.execute('SELECT * FROM inbounds WHERE e2e = ?', (e2e,)).fetchone()
+        return _inbound_from_row(row) if row else None
+
+    def update_inbound(self, row: SeurecvInbound) -> None:
+        with self._lock, self._connect() as conn:
+            conn.execute(
+                """
+                UPDATE inbounds SET userid=?, destination_account=?, amount_instructed=?, amount_usd=?,
+                    currency=?, sender_name=?, send_bank=?, recv_bank=?, rail=?, proxy_type=?, proxy=?,
+                    fingerprint=?, account_number=?, purpose=?, status=?, reason=?, actor=?,
+                    releaser=?, ofac_hit=?, ofac_match=?, ofac_overridden=?, updated_at=?,
+                    posted_at=?, returned_at=?, expiry_at=?, note=?, sepa_name=?, sepa_outcome=?,
+                    sepa_overridden=?
+                WHERE inbound_id=?
+                """,
+                (
+                    row.userid, row.destination_account, row.amount_instructed, row.amount_usd,
+                    row.currency, row.sender_name, row.send_bank, row.recv_bank, row.rail, row.proxy_type,
+                    row.proxy, row.fingerprint, row.account_number, row.purpose, row.status,
+                    row.reason, row.actor, row.releaser, int(row.ofac_hit), row.ofac_match,
+                    int(row.ofac_overridden), row.updated_at, row.posted_at, row.returned_at,
+                    row.expiry_at, row.note, row.sepa_name, row.sepa_outcome,
+                    int(row.sepa_overridden), row.inbound_id,
+                ),
+            )
+            conn.commit()
+
+    def list_inbounds(self, userid: Optional[str] = None, status: Optional[str] = None) -> List[SeurecvInbound]:
+        clauses = []
+        args: List[Any] = []
+        if userid is not None:
+            clauses.append('userid = ?')
+            args.append(userid)
+        if status is not None:
+            clauses.append('status = ?')
+            args.append(status)
+        sql = 'SELECT * FROM inbounds'
+        if clauses:
+            sql += ' WHERE ' + ' AND '.join(clauses)
+        sql += ' ORDER BY created_at DESC'
+        with self._lock, self._connect() as conn:
+            rows = conn.execute(sql, tuple(args)).fetchall()
+        return [_inbound_from_row(row) for row in rows]
+
+
+class SeurecvService:
+    def __init__(
+        self,
+        policy: SeurecvPolicy,
+        store: Any,
+        *,
+        clock: Optional[Callable[[], float]] = None,
+        debit_fn: Optional[Callable[..., Any]] = None,
+        credit_fn: Optional[Callable[..., Any]] = None,
+        accounts_fn: Optional[Callable[[str], Any]] = None,
+        screen_fn: Optional[Callable[..., ScreenResult]] = None,
+        calendar: Optional[EuClock] = None,
+    ) -> None:
+        self.policy = policy
+        self.store = store
+        self.clock = clock or (lambda: datetime.now(tz=timezone.utc).timestamp())
+        self.debit_fn = debit_fn
+        self.credit_fn = credit_fn
+        self.accounts_fn = accounts_fn
+        self.screen_fn = screen_fn or screen_name
+        self.calendar = calendar or EuClock(
+            sct_open_hour=policy.sct_open_hour,
+            sct_open_minute=policy.sct_open_minute,
+            sct_cutoff_hour=policy.sct_cutoff_hour,
+            sct_cutoff_minute=policy.sct_cutoff_minute,
+            t2_open_hour=policy.t2_open_hour,
+            t2_open_minute=policy.t2_open_minute,
+            t2_cutoff_hour=policy.t2_cutoff_hour,
+            t2_cutoff_minute=policy.t2_cutoff_minute,
+            tz_offset_minutes=policy.tz_offset_minutes,
+            extra_holidays=policy.extra_holidays,
+        )
+
+    def _now(self) -> float:
+        return float(self.clock())
+
+    def _require_enabled(self) -> None:
+        if not self.policy.enabled:
+            raise SeurecvError('seurecv_disabled', 'SEPA receive is disabled.')
+
+    def _require_staff(self, actor_type: str) -> None:
+        if actor_type not in EMPLOYEE_ROLES:
+            raise SeurecvError('seurecv_forbidden', 'Staff only.')
+
+    def _require_customer_manage(self, actor_type: str) -> None:
+        if actor_type in EMPLOYEE_ROLES:
+            return
+        if not self.policy.customer_manage:
+            raise SeurecvError('seurecv_forbidden', 'Customers cannot manage SEPA proxies.')
+
+    def _accounts(self, userid: str) -> Any:
+        if not self.accounts_fn:
+            return {}
+        return self.accounts_fn(userid) or {}
+
+    def _owned(self, userid: str, account: str) -> None:
+        owned = own_accounts_from_customer_payload(self._accounts(userid))
+        if account not in owned:
+            raise SeurecvError('invalid_account', 'Destination is not an account of this customer.')
+
+    def _account_type(self, userid: str, account: str) -> str:
+        return account_types_from_customer_payload(self._accounts(userid)).get(account, '')
+
+    def _credit_allowed(self, userid: str, account: str) -> bool:
+        kind = self._account_type(userid, account)
+        if kind == 'credit' and not self.policy.allow_credit:
+            return False
+        return True
+
+    def add_key(
+        self,
+        *,
+        owner_userid: str,
+        actor: str,
+        actor_type: str,
+        nickname: str,
+        proxy_type: Any,
+        proxy: Any,
+        destination_account: Any,
+    ) -> SeurecvKey:
+        self._require_enabled()
+        self._require_customer_manage(actor_type)
+        if actor_type not in EMPLOYEE_ROLES and actor != owner_userid:
+            raise SeurecvError('seurecv_forbidden', 'Cannot enroll a SEPA proxy for another customer.')
+        kind, value = normalize_proxy(proxy_type, proxy, required=True)
+        account = normalize_account(destination_account)
+        self._owned(owner_userid, account)
+        if not self._credit_allowed(owner_userid, account):
+            raise SeurecvError('credit_not_allowed', 'Credit accounts cannot receive SEPA credits.')
+        fingerprint = proxy_fingerprint(kind, value)
+        existing = self.store.get_key_by_fingerprint(fingerprint)
+        if existing and existing.status in OPEN_KEY:
+            raise SeurecvError('key_duplicate', 'That SEPA proxy is already enrolled.')
+        open_rows = [row for row in self.store.list_keys(owner_userid) if row.status in OPEN_KEY]
+        if any(row.nickname.lower() == normalize_nickname(nickname).lower() for row in open_rows):
+            raise SeurecvError('key_duplicate', 'That nickname is already in use.')
+        if len(open_rows) >= self.policy.max_keys:
+            raise SeurecvError('key_limit', 'SEPA enrollment limit reached.')
+        now = self._now()
+        row = SeurecvKey(
+            key_id=uuid.uuid4().hex,
+            userid=owner_userid,
+            nickname=normalize_nickname(nickname),
+            proxy_type=kind,
+            proxy=value,
+            fingerprint=fingerprint,
+            destination_account=account,
+            status=KEY_ACTIVE,
+            actor=actor,
+            created_at=now,
+            updated_at=now,
+        )
+        self.store.put_key(row)
+        self._rematch_unmatched(row)
+        return row
+
+    def set_key_status(
+        self,
+        *,
+        key_id: str,
+        actor: str,
+        actor_type: str,
+        status: str,
+    ) -> SeurecvKey:
+        self._require_enabled()
+        row = self.store.get_key(key_id)
+        if row is None:
+            raise SeurecvError('key_not_found', 'SEPA enrollment not found.')
+        if actor_type not in EMPLOYEE_ROLES and actor != row.userid:
+            raise SeurecvError('seurecv_forbidden', 'Cannot change another customer SEPA proxy.')
+        self._require_customer_manage(actor_type)
+        if status not in KEY_STATUSES:
+            raise SeurecvError('invalid_status', 'Unknown SEPA status.')
+        if row.status == KEY_CANCELLED:
+            raise SeurecvError('already_cancelled', 'Cancelled SEPA proxies cannot change.')
+        if status == KEY_PAUSED and row.status != KEY_ACTIVE:
+            raise SeurecvError('already_paused' if row.status == KEY_PAUSED else 'invalid_status', 'SEPA proxy is not active.')
+        if status == KEY_ACTIVE and row.status != KEY_PAUSED:
+            raise SeurecvError('already_active', 'SEPA proxy is already active.')
+        if status == row.status:
+            code = 'already_paused' if status == KEY_PAUSED else 'already_active'
+            raise SeurecvError(code, 'SEPA proxy already in that status.')
+        row.status = status
+        row.actor = actor
+        row.updated_at = self._now()
+        self.store.update_key(row)
+        if status == KEY_ACTIVE:
+            self._rematch_unmatched(row)
+        return row
+
+    def _rematch_unmatched(self, enrollment: SeurecvKey) -> None:
+        if enrollment.status != KEY_ACTIVE:
+            return
+        for inbound in self.store.list_inbounds(status=IN_UNMATCHED):
+            if inbound.fingerprint != enrollment.fingerprint:
+                continue
+            inbound.userid = enrollment.userid
+            inbound.destination_account = enrollment.destination_account
+            inbound.updated_at = self._now()
+            self.store.update_inbound(inbound)
+            self._evaluate(inbound, rescreen=True)
+
+    def ingest(
+        self,
+        *,
+        actor: str,
+        actor_type: str,
+        values: Dict[str, Any],
+    ) -> Tuple[SeurecvInbound, bool]:
+        self._require_enabled()
+        self._require_staff(actor_type)
+        payload = dict(values or {})
+        if not payload.get('end_to_end_id') and not payload.get('e2e') and not payload.get('cycle_date') and not payload.get('value_date'):
+            payload['cycle_date'] = self.calendar.cycle_date(
+                self._now(), rail=normalize_rail(payload.get('rail') or 'inst'),
+            )
+        parsed = message_from_values(payload)
+        return self._ingest_parsed(actor=actor, parsed=parsed)
+
+    def ingest_file(
+        self,
+        *,
+        actor: str,
+        actor_type: str,
+        payload: str,
+        sender_name: str = '',
+        send_bank: str = '',
+    ) -> Tuple[List[SeurecvInbound], int]:
+        self._require_enabled()
+        self._require_staff(actor_type)
+        created = 0
+        rows = []
+        fallback = ''
+        if sender_name:
+            fallback = normalize_legal_name(sender_name)
+        sender = ''
+        if send_bank:
+            sender = normalize_bank_code(send_bank, required=False)
+        for record in split_se1_file(payload):
+            parsed = parse_se1(record)
+            parsed['recv_bank'] = parsed.get('recv_bank') or parsed.get('bank') or self.policy.receiver_bank
+            parsed['send_bank'] = sender or parsed.get('send_bank') or DEFAULT_SENDER_BANK
+            if fallback:
+                parsed['name'] = fallback
+            elif not parsed.get('name'):
+                parsed['name'] = 'SEPA PAYER'
+            row, is_new = self._ingest_parsed(actor=actor, parsed=parsed)
+            rows.append(row)
+            if is_new:
+                created += 1
+        return rows, created
+
+    def _ingest_parsed(self, *, actor: str, parsed: Dict[str, Any]) -> Tuple[SeurecvInbound, bool]:
+        recv = parsed.get('recv_bank') or parsed.get('bank') or self.policy.receiver_bank
+        if recv != self.policy.receiver_bank:
+            raise SeurecvError('wrong_receiver', 'Credit is not for this BIC.')
+        existing = self.store.get_by_e2e(parsed['e2e'])
+        if existing is not None:
+            return existing, False
+        total = len(self.store.list_inbounds())
+        if total >= self.policy.max_inbounds:
+            raise SeurecvError('inbound_limit', 'Inbound SEPA limit reached.')
+        amount = parsed['amount'] if isinstance(parsed['amount'], Decimal) else parse_money(parsed['amount'])
+        rail = normalize_rail(parsed.get('rail') or 'inst')
+        cap = self.policy.cap_for(rail)
+        if amount < self.policy.min_amount or amount > cap:
+            code = '%s_amount_exceeded' % rail if amount > cap else 'amount_out_of_range'
+            raise SeurecvError(code, 'Amount is outside the %s range.' % rail)
+        now = self._now()
+        currency = normalize_currency(parsed.get('currency') or 'EUR', rail=rail)
+        proxy = parsed.get('proxy') or ''
+        kind = parsed.get('proxy_type') or ''
+        fingerprint = proxy_fingerprint(kind, proxy) if proxy else ''
+        usd = convert_instructed_to_usd(amount, self.policy.rate_for(currency))
+        row = SeurecvInbound(
+            inbound_id=uuid.uuid4().hex,
+            e2e=parsed['e2e'],
+            userid='',
+            destination_account='',
+            amount_instructed=money_str(amount),
+            amount_usd=money_str(usd),
+            currency=currency,
+            sender_name=parsed.get('name') or 'SEPA PAYER',
+            send_bank=parsed.get('send_bank') or '',
+            recv_bank=recv,
+            rail=rail,
+            proxy_type=kind,
+            proxy=proxy,
+            fingerprint=fingerprint,
+            account_number=parsed.get('account_number') or '',
+            purpose=parsed.get('purpose') or 'other',
+            status=IN_UNMATCHED,
+            reason='',
+            actor=actor,
+            releaser='',
+            ofac_hit=False,
+            ofac_match='',
+            ofac_overridden=False,
+            created_at=now,
+            updated_at=now,
+            expiry_at=now + self.policy.claim_seconds,
+            sepa_name=parsed.get('sepa_name') or '',
+        )
+        enrollment = None
+        if fingerprint:
+            enrollment = self.store.get_key_by_fingerprint(fingerprint)
+        if enrollment is not None and enrollment.status == KEY_ACTIVE:
+            row.userid = enrollment.userid
+            row.destination_account = enrollment.destination_account
+        self.store.put_inbound(row)
+        self._evaluate(row, rescreen=True)
+        return row, True
+
+    def _evaluate(self, row: SeurecvInbound, *, rescreen: bool) -> SeurecvInbound:
+        now = self._now()
+        if row.status in {IN_POSTED, IN_REJECTED, IN_RETURNED, IN_EXPIRED, IN_FAILED}:
+            return row
+        if row.status == IN_UNMATCHED and row.expiry_at and now > row.expiry_at:
+            row.status = IN_EXPIRED
+            row.reason = 'expired'
+            row.updated_at = now
+            self.store.update_inbound(row)
+            return row
+        if not row.userid or not row.destination_account:
+            row.status = IN_UNMATCHED
+            row.reason = 'unmatched'
+            row.updated_at = now
+            self.store.update_inbound(row)
+            return row
+        try:
+            self._owned(row.userid, row.destination_account)
+        except SeurecvError:
+            row.status = IN_UNMATCHED
+            row.reason = 'unmatched'
+            row.userid = ''
+            row.destination_account = ''
+            row.updated_at = now
+            self.store.update_inbound(row)
+            return row
+        if not self._credit_allowed(row.userid, row.destination_account):
+            row.status = IN_UNMATCHED
+            row.reason = 'credit_not_allowed'
+            row.updated_at = now
+            self.store.update_inbound(row)
+            return row
+        if rescreen and not row.ofac_overridden:
+            hit = self.screen_fn(row.sender_name, watchlist=self.policy.watchlist)
+            row.ofac_hit = bool(hit.hit)
+            row.ofac_match = hit.matched
+            if row.ofac_hit:
+                row.status = IN_HELD
+                row.reason = 'ofac'
+                row.updated_at = now
+                self.store.update_inbound(row)
+                return row
+        elif row.ofac_hit and not row.ofac_overridden:
+            row.status = IN_HELD
+            row.reason = 'ofac'
+            row.updated_at = now
+            self.store.update_inbound(row)
+            return row
+        if self.policy.require_sepa_match and not row.sepa_overridden:
+            registered = ''
+            if row.proxy:
+                registered = (self.policy.sepa_directory or {}).get(proxy_key(row.proxy_type, row.proxy), '')
+            outcome = sepa_name_outcome(registered, row.sepa_name) if (registered or row.sepa_name) else SEPA_UNAVAILABLE
+            row.sepa_outcome = outcome
+            if outcome == SEPA_NONE:
+                row.status = IN_HELD
+                row.reason = 'sepa'
+                row.updated_at = now
+                self.store.update_inbound(row)
+                return row
+        instructed = parse_money(row.amount_instructed)
+        if instructed >= self.policy.dual_control_threshold and not row.releaser:
+            row.status = IN_PENDING
+            row.reason = 'dual_control'
+            row.updated_at = now
+            self.store.update_inbound(row)
+            return row
+        if row.rail in {'sct', 't2'} and self.calendar.is_after_cutoff(now, rail=row.rail):
+            row.status = IN_QUEUED
+            row.reason = 'sct_session' if row.rail == 'sct' else 't2_session'
+            row.updated_at = now
+            self.store.update_inbound(row)
+            return row
+        return self._post(row)
+
+    def _post(self, row: SeurecvInbound) -> SeurecvInbound:
+        if self.credit_fn is None:
+            raise SeurecvError('failed', 'Credit function is not configured.')
+        remark = '%s from %s' % (row.rail, row.sender_name[:40])
+        result = self.credit_fn(row.destination_account, row.amount_usd, remark)
+        classified = _classify_money_result(result)
+        now = self._now()
+        if classified == 'nsf':
+            row.status = IN_FAILED
+            row.reason = 'nsf'
+            row.updated_at = now
+            self.store.update_inbound(row)
+            raise SeurecvError('nsf', 'Credit failed for insufficient funds.', inbound=row)
+        if classified != 'ok':
+            row.status = IN_FAILED
+            row.reason = 'failed'
+            row.updated_at = now
+            self.store.update_inbound(row)
+            raise SeurecvError('failed', 'Credit failed.', inbound=row)
+        row.status = IN_POSTED
+        row.reason = ''
+        row.posted_at = now
+        row.updated_at = now
+        self.store.update_inbound(row)
+        return row
+
+    def preview(self, *, inbound_id: str = '', e2e: str = '', actor: str = '', actor_type: str = '') -> Dict[str, Any]:
+        row = self._get(inbound_id=inbound_id, e2e=e2e)
+        self._assert_visible(row, actor, actor_type)
+        return {
+            'inbound': row.to_dict(),
+            'clock': self.calendar.snapshot(self._now(), rail=row.rail),
+            'receiver': mask_bank(self.policy.receiver_bank),
+        }
+
+    def _get(self, *, inbound_id: str = '', e2e: str = '') -> SeurecvInbound:
+        row = None
+        if inbound_id:
+            row = self.store.get_inbound(str(inbound_id).strip())
+        if row is None and e2e:
+            row = self.store.get_by_e2e(normalize_e2e(e2e))
+        if row is None:
+            raise SeurecvError('inbound_not_found', 'Inbound SEPA credit not found.')
+        return row
+
+    def _assert_visible(self, row: SeurecvInbound, actor: str, actor_type: str) -> None:
+        if actor_type in EMPLOYEE_ROLES:
+            return
+        if row.userid and row.userid != actor:
+            raise SeurecvError('seurecv_forbidden', 'Cannot view another customer SEPA credit.')
+
+    def assign(
+        self,
+        *,
+        inbound_id: str,
+        actor: str,
+        actor_type: str,
+        customer_id: str,
+        account: Any,
+        nickname: str = '',
+    ) -> SeurecvInbound:
+        self._require_enabled()
+        self._require_staff(actor_type)
+        row = self._get(inbound_id=inbound_id)
+        if row.status != IN_UNMATCHED:
+            raise SeurecvError('not_assignable', 'Only unmatched SEPA credits can be assigned.')
+        owner = str(customer_id or '').strip()
+        if not owner:
+            raise SeurecvError('missing_customer_id', 'Customer id is required to assign.')
+        dest = normalize_account(account)
+        self._owned(owner, dest)
+        if not self._credit_allowed(owner, dest):
+            raise SeurecvError('credit_not_allowed', 'Credit accounts cannot receive SEPA credits.')
+        if row.proxy:
+            existing = self.store.get_key_by_fingerprint(row.fingerprint)
+            if existing is None or existing.status == KEY_CANCELLED:
+                self.add_key(
+                    owner_userid=owner, actor=actor, actor_type=actor_type,
+                    nickname=nickname or ('SEPA %s' % (row.proxy_type or 'proxy')),
+                    proxy_type=row.proxy_type, proxy=row.proxy, destination_account=dest,
+                )
+                fresh = self.store.get_inbound(row.inbound_id)
+                if fresh is not None and fresh.status != IN_UNMATCHED:
+                    return fresh
+            elif existing.userid != owner:
+                raise SeurecvError('key_duplicate', 'SEPA proxy belongs to another customer.')
+        row.userid = owner
+        row.destination_account = dest
+        row.updated_at = self._now()
+        self.store.update_inbound(row)
+        return self._evaluate(row, rescreen=True)
+
+    def claim(
+        self,
+        *,
+        actor: str,
+        actor_type: str,
+        inbound_id: str = '',
+        proxy_type: Any = '',
+        proxy: Any = '',
+        destination_account: Any = '',
+        nickname: str = '',
+        owner_userid: str = '',
+    ) -> SeurecvInbound:
+        """SEPA claim: customer presents the matching proxy for an unmatched credit."""
+        self._require_enabled()
+        if actor_type not in EMPLOYEE_ROLES:
+            if not self.policy.customer_claim:
+                raise SeurecvError('seurecv_forbidden', 'Customers cannot claim SEPA credits.')
+            owner = actor
+        else:
+            owner = str(owner_userid or '').strip()
+            if not owner:
+                raise SeurecvError('missing_customer_id', 'Customer id is required to claim.')
+        if not proxy:
+            raise SeurecvError('missing_key', 'SEPA proxy is required to claim.')
+        kind, value = normalize_proxy(proxy_type, proxy, required=True)
+        fingerprint = proxy_fingerprint(kind, value)
+        dest = normalize_account(destination_account)
+        self._owned(owner, dest)
+        if not self._credit_allowed(owner, dest):
+            raise SeurecvError('credit_not_allowed', 'Credit accounts cannot receive SEPA credits.')
+        row = None
+        if inbound_id:
+            row = self._get(inbound_id=inbound_id)
+            if row.fingerprint != fingerprint:
+                raise SeurecvError('not_claimable', 'Presented proxy does not match this credit.')
+        else:
+            for candidate in self.store.list_inbounds(status=IN_UNMATCHED):
+                if candidate.fingerprint == fingerprint:
+                    row = candidate
+                    break
+        if row is None:
+            raise SeurecvError('inbound_not_found', 'No unmatched SEPA credit for that proxy.')
+        if row.status != IN_UNMATCHED:
+            raise SeurecvError('not_claimable', 'This SEPA credit is not waiting for a claim.')
+        if row.expiry_at and self._now() > row.expiry_at:
+            row.status = IN_EXPIRED
+            row.reason = 'expired'
+            row.updated_at = self._now()
+            self.store.update_inbound(row)
+            raise SeurecvError('return_window_closed', 'SEPA claim window has closed.')
+        existing = self.store.get_key_by_fingerprint(fingerprint)
+        if existing is None or existing.status == KEY_CANCELLED:
+            self.add_key(
+                owner_userid=owner, actor=actor, actor_type=actor_type,
+                nickname=nickname or ('SEPA %s' % kind),
+                proxy_type=kind, proxy=value, destination_account=dest,
+            )
+        elif existing.userid != owner:
+            raise SeurecvError('key_duplicate', 'SEPA proxy belongs to another customer.')
+        elif existing.status == KEY_PAUSED:
+            self.set_key_status(key_id=existing.key_id, actor=actor, actor_type=actor_type, status=KEY_ACTIVE)
+        fresh = self.store.get_inbound(row.inbound_id)
+        if fresh is not None and fresh.status != IN_UNMATCHED:
+            return fresh
+        row.userid = owner
+        row.destination_account = dest
+        row.updated_at = self._now()
+        self.store.update_inbound(row)
+        return self._evaluate(row, rescreen=True)
+
+    def override_ofac(self, *, inbound_id: str, actor: str, actor_type: str, note: str = '') -> SeurecvInbound:
+        self._require_enabled()
+        self._require_staff(actor_type)
+        row = self._get(inbound_id=inbound_id)
+        if row.status != IN_HELD or row.reason != 'ofac':
+            raise SeurecvError('not_overridable', 'Only OFAC-held SEPA credits can be overridden.')
+        row.ofac_overridden = True
+        row.ofac_hit = False
+        row.note = normalize_note(note)
+        row.updated_at = self._now()
+        self.store.update_inbound(row)
+        return self._evaluate(row, rescreen=False)
+
+    def override_sepa(self, *, inbound_id: str, actor: str, actor_type: str, note: str = '') -> SeurecvInbound:
+        self._require_enabled()
+        self._require_staff(actor_type)
+        row = self._get(inbound_id=inbound_id)
+        if row.status != IN_HELD or row.reason != 'sepa':
+            raise SeurecvError('not_overridable', 'Only SEPA-name-held credits can be overridden.')
+        row.sepa_overridden = True
+        row.note = normalize_note(note)
+        row.updated_at = self._now()
+        self.store.update_inbound(row)
+        return self._evaluate(row, rescreen=False)
+
+    def release(self, *, inbound_id: str, actor: str, actor_type: str) -> SeurecvInbound:
+        self._require_enabled()
+        self._require_staff(actor_type)
+        row = self._get(inbound_id=inbound_id)
+        if row.status != IN_PENDING:
+            raise SeurecvError('not_releasable', 'Only dual-control SEPA credits can be released.')
+        if actor == row.actor:
+            raise SeurecvError('same_approver', 'A different employee must release this credit.')
+        row.releaser = actor
+        row.updated_at = self._now()
+        self.store.update_inbound(row)
+        return self._evaluate(row, rescreen=False)
+
+    def reject(self, *, inbound_id: str, actor: str, actor_type: str, note: str = '') -> SeurecvInbound:
+        self._require_enabled()
+        self._require_staff(actor_type)
+        row = self._get(inbound_id=inbound_id)
+        if row.status not in OPEN_IN:
+            raise SeurecvError('not_rejectable', 'This SEPA credit cannot be rejected.')
+        row.status = IN_REJECTED
+        row.reason = 'rejected'
+        row.note = normalize_note(note)
+        row.updated_at = self._now()
+        self.store.update_inbound(row)
+        return row
+
+    def export(self, *, inbound_id: str, actor: str, actor_type: str) -> Dict[str, Any]:
+        self._require_enabled()
+        self._require_staff(actor_type)
+        row = self._get(inbound_id=inbound_id)
+        if not row.e2e:
+            raise SeurecvError('not_exportable', 'SEPA credit has no End-to-End ID to export.')
+        _ = actor
+        record = compose_se1(
+            e2e=row.e2e,
+            rail=row.rail,
+            proxy_type=row.proxy_type,
+            proxy=row.proxy,
+            bank=row.recv_bank,
+            account_number=row.account_number,
+            extra=row.sepa_name,
+            amount=parse_money(row.amount_instructed, allow_zero=True),
+            purpose=row.purpose,
+            status=row.status,
+            currency=row.currency,
+            mask=True,
+        )
+        return {'file': record, 'inbound': row.to_dict()}
+
+    def return_inbound(
+        self,
+        *,
+        inbound_id: str,
+        actor: str,
+        actor_type: str,
+        reason: str = 'cust',
+    ) -> SeurecvInbound:
+        self._require_enabled()
+        self._require_staff(actor_type)
+        row = self._get(inbound_id=inbound_id)
+        return self._return(row, actor=actor, actor_type=actor_type, reason=reason, honor_window=False)
+
+    def request_return(
+        self,
+        *,
+        inbound_id: str,
+        actor: str,
+        actor_type: str,
+        reason: str = 'cust',
+    ) -> SeurecvInbound:
+        self._require_enabled()
+        row = self._get(inbound_id=inbound_id)
+        self._assert_visible(row, actor, actor_type)
+        if actor_type not in EMPLOYEE_ROLES:
+            if not self.policy.customer_return:
+                raise SeurecvError('seurecv_forbidden', 'Customers cannot return SEPA credits.')
+            if actor != row.userid:
+                raise SeurecvError('seurecv_forbidden', 'Cannot return another customer SEPA credit.')
+        return self._return(row, actor=actor, actor_type=actor_type, reason=reason, honor_window=True)
+
+    def _customer_deadline(self, row: SeurecvInbound) -> float:
+        posted = row.posted_at or row.created_at
+        if row.rail in {'sct', 't2'}:
+            day = self.calendar.local_dt(posted).date()
+            return self.calendar.session_close_ts(self.calendar.next_business_day(day), rail=row.rail)
+        return posted + self.policy.customer_return_seconds
+
+    def _return(
+        self,
+        row: SeurecvInbound,
+        *,
+        actor: str,
+        actor_type: str,
+        reason: str,
+        honor_window: bool,
+    ) -> SeurecvInbound:
+        now = self._now()
+        _ = actor
+        if row.status == IN_RETURNED or row.returned_at:
+            raise SeurecvError('already_returned', 'SEPA credit already returned.')
+        if row.status in OPEN_IN:
+            row.status = IN_RETURNED
+            row.reason = reason or 'cust'
+            row.returned_at = now
+            row.updated_at = now
+            self.store.update_inbound(row)
+            return row
+        if row.status != IN_POSTED:
+            raise SeurecvError('not_returnable', 'This SEPA credit cannot be returned.')
+        if honor_window and actor_type not in EMPLOYEE_ROLES:
+            if now > self._customer_deadline(row):
+                raise SeurecvError('return_window_closed', 'Customer SEPA return window has closed.')
+        if actor_type in EMPLOYEE_ROLES:
+            elapsed = now - (row.posted_at or row.created_at)
+            if elapsed > self.policy.staff_complaint_days * 86400:
+                raise SeurecvError('med_window_closed', 'Staff complaint window is 90 days.')
+        if self.debit_fn is None:
+            raise SeurecvError('return_failed', 'Debit function is not configured.')
+        remark = '%s return %s' % (row.rail, row.e2e[-12:])
+        result = self.debit_fn(row.destination_account, row.amount_usd, remark)
+        classified = _classify_money_result(result)
+        if classified == 'nsf':
+            raise SeurecvError('nsf', 'Return debit failed for insufficient funds.', inbound=row)
+        if classified != 'ok':
+            raise SeurecvError('return_failed', 'Return debit failed.', inbound=row)
+        row.status = IN_RETURNED
+        row.reason = reason or 'cust'
+        row.returned_at = now
+        row.updated_at = now
+        self.store.update_inbound(row)
+        return row
+
+    def run_due(self, userid: Optional[str] = None) -> List[SeurecvInbound]:
+        now = self._now()
+        changed = []
+        rows = self.store.list_inbounds(userid) if userid else self.store.list_inbounds()
+        for row in rows:
+            if row.status == IN_UNMATCHED and row.expiry_at and now > row.expiry_at:
+                row.status = IN_EXPIRED
+                row.reason = 'expired'
+                row.updated_at = now
+                self.store.update_inbound(row)
+                changed.append(row)
+            elif row.status == IN_QUEUED:
+                updated = self._evaluate(row, rescreen=False)
+                if updated.status != IN_QUEUED:
+                    changed.append(updated)
+        return changed
+
+    def snapshot(self, userid: str, actor: Optional[str] = None, actor_type: str = 'customer') -> Dict[str, Any]:
+        _ = actor
+        _ = actor_type
+        now = self._now()
+        if userid:
+            self.run_due(userid)
+        keys = self.store.list_keys(userid) if userid else []
+        inbounds = self.store.list_inbounds(userid) if userid else []
+        received = [row for row in inbounds if row.status == IN_POSTED]
+        ytd = sum((parse_money(row.amount_usd, allow_zero=True) for row in received), Decimal('0.00'))
+        return {
+            'enabled': self.policy.enabled,
+            'clock': self.calendar.snapshot(now),
+            'receiver': mask_bank(self.policy.receiver_bank),
+            'keys': [row.to_dict() for row in keys[:40]],
+            'inbounds': [row.to_dict() for row in inbounds[:40]],
+            'ytd_received': money_str(ytd),
+            'open_count': sum(1 for row in inbounds if row.status in OPEN_IN),
+            'active_keys': sum(1 for row in keys if row.status == KEY_ACTIVE),
+            'min_amount': money_str(self.policy.min_amount),
+            'inst_cap': money_str(self.policy.inst_cap),
+            'sct_cap': money_str(self.policy.sct_cap),
+            't2_cap': money_str(self.policy.t2_cap),
+            'dual_control': money_str(self.policy.dual_control_threshold),
+            'clearing': 'se1',
+            'currency': 'EUR',
+            'fx_eurusd': rate_str(self.policy.eurusd),
+        }
+
+    def unmatched_snapshot(self) -> Dict[str, Any]:
+        rows = self.store.list_inbounds(status=IN_UNMATCHED)
+        return {
+            'enabled': self.policy.enabled,
+            'unmatched': [row.to_dict() for row in rows[:40]],
+            'count': len(rows),
+        }
+
+
+_SERVICE: Optional[SeurecvService] = None
+
+
+def set_service(service: Optional[SeurecvService]) -> None:
+    global _SERVICE
+    _SERVICE = service
+
+
+def get_service() -> Optional[SeurecvService]:
+    return _SERVICE
+
+
+def default_store() -> Any:
+    kind = os.environ.get('SEURECV_STORE', 'sqlite').strip().lower()
+    if kind in {'memory', 'mem'}:
+        return MemorySeurecvStore()
+    path = os.environ.get('SEURECV_DB', DEFAULT_STORE_PATH)
+    return SqliteSeurecvStore(path)
+
+
+def build_service(
+    *,
+    clock: Optional[Callable[[], float]] = None,
+    store: Any = None,
+    debit_fn: Optional[Callable[..., Any]] = None,
+    credit_fn: Optional[Callable[..., Any]] = None,
+    accounts_fn: Optional[Callable[[str], Any]] = None,
+    screen_fn: Optional[Callable[..., ScreenResult]] = None,
+    calendar: Optional[EuClock] = None,
+) -> SeurecvService:
+    if store is None:
+        store = default_store()
+    return SeurecvService(
+        SeurecvPolicy.from_env(),
+        store,
+        clock=clock,
+        debit_fn=debit_fn,
+        credit_fn=credit_fn,
+        accounts_fn=accounts_fn,
+        screen_fn=screen_fn,
+        calendar=calendar,
+    )
+
+
+def _session_userid() -> Optional[str]:
+    return session.get('userid')
+
+
+def _require_session_user() -> Tuple[Optional[str], Optional[Tuple[Any, int]]]:
+    userid = _session_userid()
+    if not userid:
+        return None, (jsonify({'message': 'Unauthorized access or session expired'}), 401)
+    values = request.get_json(silent=True) or {}
+    claimed = values.get('userid')
+    if claimed is not None and str(claimed) != str(userid):
+        return None, (jsonify({'message': 'User ID mismatch', 'error': 'userid_mismatch'}), 403)
+    return str(userid), None
+
+
+def _owner_from(actor: str, actor_type: str, values: Dict[str, Any]) -> str:
+    if actor_type in EMPLOYEE_ROLES:
+        return str(values.get('customer_id') or values.get('owner') or '').strip()
+    return actor
+
+
+def _error_status(code: str) -> int:
+    return {
+        'key_duplicate': 409,
+        'key_limit': 409,
+        'inbound_limit': 409,
+        'already_cancelled': 409,
+        'already_paused': 409,
+        'already_active': 409,
+        'already_returned': 409,
+        'nsf': 409,
+        'failed': 409,
+        'return_failed': 409,
+        'seurecv_forbidden': 403,
+        'seurecv_disabled': 403,
+        'credit_not_allowed': 403,
+        'same_approver': 403,
+        'not_assignable': 403,
+        'not_overridable': 403,
+        'not_releasable': 403,
+        'not_rejectable': 403,
+        'not_returnable': 403,
+        'not_claimable': 403,
+        'not_exportable': 403,
+        'return_window_closed': 403,
+        'med_window_closed': 403,
+        'key_not_found': 404,
+        'inbound_not_found': 404,
+        'invalid_amount': 400,
+        'invalid_account': 400,
+        'invalid_nickname': 400,
+        'invalid_name': 400,
+        'invalid_bank': 400,
+        'invalid_proxy': 400,
+        'invalid_phone': 400,
+        'invalid_sepa_name': 400,
+        'invalid_iban': 400,
+        'invalid_iban': 400,
+        'invalid_idnr': 400,
+        'invalid_account_type': 400,
+        'invalid_branch': 400,
+        'invalid_email': 400,
+        'amount_out_of_range': 400,
+        'invalid_rail': 400,
+        'invalid_purpose': 400,
+        'invalid_status': 400,
+        'invalid_reference': 400,
+        'invalid_file': 400,
+        'invalid_currency': 400,
+        'invalid_fx': 400,
+        'wrong_receiver': 400,
+        'inst_amount_exceeded': 400,
+        'sct_amount_exceeded': 400,
+        't2_amount_exceeded': 400,
+        'amount_out_of_range': 400,
+        'missing_customer_id': 400,
+        'missing_inbound': 400,
+        'missing_key': 400,
+        'missing_file': 400,
+    }.get(code, 400)
+
+
+def _error_body(exc: SeurecvError) -> Dict[str, Any]:
+    body = {'message': exc.message, 'error': exc.code}
+    if exc.extra.get('inbound') is not None:
+        body['inbound'] = exc.extra['inbound'].to_dict()
+    return body
+
+
+def _handle_errors(fn):
+    try:
+        return fn()
+    except AccountError:
+        return jsonify({'message': 'Invalid account', 'error': 'invalid_account'}), 400
+    except AmountError:
+        return jsonify({'message': 'Invalid amount', 'error': 'invalid_amount'}), 400
+    except SeurecvError as exc:
+        return jsonify(_error_body(exc)), _error_status(exc.code)
+
+
+def _snapshot_for(service: SeurecvService, userid: str, actor: str, actor_type: str) -> Dict[str, Any]:
+    return service.snapshot(userid, actor=actor, actor_type=actor_type)
+
+
+def handle_list(service: SeurecvService):
+    userid, error = _require_session_user()
+    if error:
+        return error
+    values = request.get_json(silent=True) or {}
+    actor_type = session.get('usertype') or 'customer'
+    owner = userid
+    if actor_type in EMPLOYEE_ROLES:
+        owner = _owner_from(userid, actor_type, values)
+        if not owner:
+            return jsonify({'message': 'Customer id required', 'error': 'missing_customer_id'}), 400
+    return jsonify({'SepaIn': _snapshot_for(service, owner, userid, actor_type)}), 200
+
+
+def handle_unmatched(service: SeurecvService):
+    userid, error = _require_session_user()
+    if error:
+        return error
+    actor_type = session.get('usertype') or 'customer'
+    if actor_type not in EMPLOYEE_ROLES:
+        return jsonify({'message': 'Staff only', 'error': 'seurecv_forbidden'}), 403
+    snap = service.unmatched_snapshot()
+    return jsonify({'UnmatchedSepaIns': snap, 'SepaIn': snap}), 200
+
+
+def handle_add_key(service: SeurecvService):
+    userid, error = _require_session_user()
+    if error:
+        return error
+
+    def _run():
+        values = request.get_json(silent=True) or {}
+        actor_type = session.get('usertype') or 'customer'
+        owner = userid
+        if actor_type in EMPLOYEE_ROLES:
+            owner = _owner_from(userid, actor_type, values)
+            if not owner:
+                raise SeurecvError('missing_customer_id', 'Customer id is required.')
+        row = service.add_key(
+            owner_userid=owner,
+            actor=userid,
+            actor_type=actor_type,
+            nickname=values.get('nickname') or '',
+            proxy_type=values.get('proxy_type') or values.get('key_type') or values.get('kind'),
+            proxy=values.get('proxy') or values.get('iban') or values.get('key') or values.get('phone') or values.get('email') or values.get('nid'),
+            destination_account=values.get('destination_account') or values.get('account') or values.get('default_account'),
+        )
+        return jsonify({
+            'message': 'SEPA proxy enrolled',
+            'key': row.to_dict(),
+            'SepaIn': _snapshot_for(service, row.userid, userid, actor_type),
+        }), 201
+
+    return _handle_errors(_run)
+
+
+def _key_status_route(service: SeurecvService, status: str, message: str):
+    userid, error = _require_session_user()
+    if error:
+        return error
+
+    def _run():
+        values = request.get_json(silent=True) or {}
+        key_id = str(values.get('key_id') or '').strip()
+        if not key_id:
+            raise SeurecvError('missing_key', 'key_id is required.')
+        actor_type = session.get('usertype') or 'customer'
+        row = service.set_key_status(key_id=key_id, actor=userid, actor_type=actor_type, status=status)
+        return jsonify({
+            'message': message,
+            'key': row.to_dict(),
+            'SepaIn': _snapshot_for(service, row.userid, userid, actor_type),
+        }), 200
+
+    return _handle_errors(_run)
+
+
+def handle_preview(service: SeurecvService):
+    userid, error = _require_session_user()
+    if error:
+        return error
+
+    def _run():
+        values = request.get_json(silent=True) or {}
+        actor_type = session.get('usertype') or 'customer'
+        preview = service.preview(
+            inbound_id=str(values.get('inbound_id') or ''),
+            e2e=str(values.get('end_to_end_id') or values.get('e2e') or ''),
+            actor=userid,
+            actor_type=actor_type,
+        )
+        owner = preview['inbound'].get('userid') or userid
+        return jsonify({'preview': preview, 'SepaIn': _snapshot_for(service, owner, userid, actor_type)}), 200
+
+    return _handle_errors(_run)
+
+
+def handle_ingest(service: SeurecvService):
+    userid, error = _require_session_user()
+    if error:
+        return error
+
+    def _run():
+        values = request.get_json(silent=True) or {}
+        actor_type = session.get('usertype') or 'customer'
+        row, created = service.ingest(actor=userid, actor_type=actor_type, values=values)
+        owner = row.userid or userid
+        return jsonify({
+            'message': 'SEPA ingested' if created else 'SEPA already ingested',
+            'inbound': row.to_dict(),
+            'SepaIn': _snapshot_for(service, owner, userid, actor_type),
+        }), (201 if created else 200)
+
+    return _handle_errors(_run)
+
+
+def handle_ingest_file(service: SeurecvService):
+    userid, error = _require_session_user()
+    if error:
+        return error
+
+    def _run():
+        values = request.get_json(silent=True) or {}
+        payload = values.get('file') or values.get('body') or values.get('payload')
+        if not payload:
+            raise SeurecvError('missing_file', 'SE1 file body is required.')
+        actor_type = session.get('usertype') or 'customer'
+        rows, created = service.ingest_file(
+            actor=userid, actor_type=actor_type, payload=str(payload),
+            sender_name=str(values.get('name') or values.get('sender_name') or ''),
+            send_bank=str(values.get('send_bank') or values.get('sender_bank') or ''),
+        )
+        owner = rows[-1].userid if rows and rows[-1].userid else userid
+        return jsonify({
+            'message': 'SE1 file ingested',
+            'created': created,
+            'inbounds': [row.to_dict() for row in rows],
+            'SepaIn': _snapshot_for(service, owner, userid, actor_type),
+        }), (201 if created else 200)
+
+    return _handle_errors(_run)
+
+
+def handle_assign(service: SeurecvService):
+    userid, error = _require_session_user()
+    if error:
+        return error
+
+    def _run():
+        values = request.get_json(silent=True) or {}
+        inbound_id = str(values.get('inbound_id') or '').strip()
+        if not inbound_id:
+            raise SeurecvError('missing_inbound', 'inbound_id is required.')
+        actor_type = session.get('usertype') or 'customer'
+        row = service.assign(
+            inbound_id=inbound_id,
+            actor=userid,
+            actor_type=actor_type,
+            customer_id=str(values.get('customer_id') or ''),
+            account=values.get('account') or values.get('destination_account'),
+            nickname=str(values.get('nickname') or ''),
+        )
+        return jsonify({
+            'message': 'SEPA assigned',
+            'inbound': row.to_dict(),
+            'SepaIn': _snapshot_for(service, row.userid, userid, actor_type),
+        }), 200
+
+    return _handle_errors(_run)
+
+
+def handle_claim(service: SeurecvService):
+    userid, error = _require_session_user()
+    if error:
+        return error
+
+    def _run():
+        values = request.get_json(silent=True) or {}
+        actor_type = session.get('usertype') or 'customer'
+        row = service.claim(
+            actor=userid,
+            actor_type=actor_type,
+            inbound_id=str(values.get('inbound_id') or ''),
+            proxy_type=values.get('proxy_type') or values.get('key_type') or values.get('kind'),
+            proxy=values.get('proxy') or values.get('iban') or values.get('key') or values.get('phone') or values.get('email') or values.get('nid'),
+            destination_account=values.get('destination_account') or values.get('account'),
+            nickname=str(values.get('nickname') or ''),
+            owner_userid=str(values.get('customer_id') or ''),
+        )
+        return jsonify({
+            'message': 'SEPA claimed',
+            'inbound': row.to_dict(),
+            'SepaIn': _snapshot_for(service, row.userid or userid, userid, actor_type),
+        }), 200
+
+    return _handle_errors(_run)
+
+
+def _staff_inbound_route(service: SeurecvService, action: str):
+    userid, error = _require_session_user()
+    if error:
+        return error
+
+    def _run():
+        values = request.get_json(silent=True) or {}
+        inbound_id = str(values.get('inbound_id') or '').strip()
+        if not inbound_id:
+            raise SeurecvError('missing_inbound', 'inbound_id is required.')
+        actor_type = session.get('usertype') or 'customer'
+        if action == 'override':
+            row = service.override_ofac(
+                inbound_id=inbound_id, actor=userid, actor_type=actor_type, note=values.get('note') or '',
+            )
+            message = 'OFAC hold overridden'
+        elif action == 'sepa':
+            row = service.override_sepa(
+                inbound_id=inbound_id, actor=userid, actor_type=actor_type, note=values.get('note') or '',
+            )
+            message = 'SEPA-name hold overridden'
+        elif action == 'release':
+            row = service.release(inbound_id=inbound_id, actor=userid, actor_type=actor_type)
+            message = 'SEPA released'
+        elif action == 'reject':
+            row = service.reject(
+                inbound_id=inbound_id, actor=userid, actor_type=actor_type, note=values.get('note') or '',
+            )
+            message = 'SEPA rejected'
+        elif action == 'return':
+            row = service.return_inbound(
+                inbound_id=inbound_id, actor=userid, actor_type=actor_type,
+                reason=str(values.get('reason') or 'cust'),
+            )
+            message = 'SEPA returned'
+        elif action == 'export':
+            exported = service.export(inbound_id=inbound_id, actor=userid, actor_type=actor_type)
+            owner = exported['inbound'].get('userid') or userid
+            return jsonify({
+                'message': 'SE1 exported',
+                'file': exported['file'],
+                'inbound': exported['inbound'],
+                'SepaIn': _snapshot_for(service, owner, userid, actor_type),
+            }), 200
+        else:
+            raise SeurecvError('invalid_status', 'Unknown SEPA action.')
+        return jsonify({
+            'message': message,
+            'inbound': row.to_dict(),
+            'SepaIn': _snapshot_for(service, row.userid or userid, userid, actor_type),
+        }), 200
+
+    return _handle_errors(_run)
+
+
+def handle_request_return(service: SeurecvService):
+    userid, error = _require_session_user()
+    if error:
+        return error
+
+    def _run():
+        values = request.get_json(silent=True) or {}
+        inbound_id = str(values.get('inbound_id') or '').strip()
+        if not inbound_id:
+            raise SeurecvError('missing_inbound', 'inbound_id is required.')
+        actor_type = session.get('usertype') or 'customer'
+        row = service.request_return(
+            inbound_id=inbound_id, actor=userid, actor_type=actor_type,
+            reason=str(values.get('reason') or 'cust'),
+        )
+        return jsonify({
+            'message': 'SEPA return requested',
+            'inbound': row.to_dict(),
+            'SepaIn': _snapshot_for(service, row.userid or userid, userid, actor_type),
+        }), 200
+
+    return _handle_errors(_run)
+
+
+def handle_run_due(service: SeurecvService):
+    userid, error = _require_session_user()
+    if error:
+        return error
+    values = request.get_json(silent=True) or {}
+    actor_type = session.get('usertype') or 'customer'
+    owner = userid
+    if actor_type in EMPLOYEE_ROLES:
+        owner = str(values.get('customer_id') or userid).strip() or userid
+    service.run_due(owner)
+    return jsonify({'SepaIn': _snapshot_for(service, owner, userid, actor_type)}), 200
+
+
+def attach_seurecv_routes(app, service: SeurecvService) -> None:
+    @app.route('/listSepaIns', methods=['POST', 'GET'])
+    def list_sepa_ins_route():
+        return handle_list(service)
+
+    @app.route('/listSepaRecvKeys', methods=['POST', 'GET'])
+    def list_sepa_recv_keys_route():
+        return handle_list(service)
+
+    @app.route('/listUnmatchedSepaIns', methods=['POST', 'GET'])
+    def list_unmatched_sepa_ins_route():
+        return handle_unmatched(service)
+
+    @app.route('/addSepaRecvKey', methods=['POST', 'GET'])
+    def add_sepa_recv_key_route():
+        return handle_add_key(service)
+
+    @app.route('/pauseSepaRecvKey', methods=['POST', 'GET'])
+    def pause_sepa_recv_key_route():
+        return _key_status_route(service, KEY_PAUSED, 'SEPA proxy paused')
+
+    @app.route('/resumeSepaRecvKey', methods=['POST', 'GET'])
+    def resume_sepa_recv_key_route():
+        return _key_status_route(service, KEY_ACTIVE, 'SEPA proxy resumed')
+
+    @app.route('/cancelSepaRecvKey', methods=['POST', 'GET'])
+    def cancel_sepa_recv_key_route():
+        return _key_status_route(service, KEY_CANCELLED, 'SEPA proxy cancelled')
+
+    @app.route('/previewSepaIn', methods=['POST', 'GET'])
+    def preview_sepa_in_route():
+        return handle_preview(service)
+
+    @app.route('/ingestSepaIn', methods=['POST', 'GET'])
+    def ingest_sepa_in_route():
+        return handle_ingest(service)
+
+    @app.route('/ingestSepaInFile', methods=['POST', 'GET'])
+    def ingest_sepa_in_file_route():
+        return handle_ingest_file(service)
+
+    @app.route('/claimSepaIn', methods=['POST', 'GET'])
+    def claim_sepa_in_route():
+        return handle_claim(service)
+
+    @app.route('/assignSepaIn', methods=['POST', 'GET'])
+    def assign_sepa_in_route():
+        return handle_assign(service)
+
+    @app.route('/overrideSepaInOfac', methods=['POST', 'GET'])
+    def override_sepa_in_ofac_route():
+        return _staff_inbound_route(service, 'override')
+
+    @app.route('/overrideSepaInName', methods=['POST', 'GET'])
+    def override_sepa_in_sepa_route():
+        return _staff_inbound_route(service, 'sepa')
+
+    @app.route('/releaseSepaIn', methods=['POST', 'GET'])
+    def release_sepa_in_route():
+        return _staff_inbound_route(service, 'release')
+
+    @app.route('/rejectSepaIn', methods=['POST', 'GET'])
+    def reject_sepa_in_route():
+        return _staff_inbound_route(service, 'reject')
+
+    @app.route('/returnSepaIn', methods=['POST', 'GET'])
+    def return_sepa_in_route():
+        return _staff_inbound_route(service, 'return')
+
+    @app.route('/exportSepaIn', methods=['POST', 'GET'])
+    def export_sepa_in_route():
+        return _staff_inbound_route(service, 'export')
+
+    @app.route('/requestSepaInReturn', methods=['POST', 'GET'])
+    def request_sepa_in_return_route():
+        return handle_request_return(service)
+
+    @app.route('/runDueSepaIns', methods=['POST', 'GET'])
+    def run_due_sepa_ins_route():
+        return handle_run_due(service)
