@@ -244,6 +244,7 @@ function appendSecondaryData(customer_id, data) {
   fillCustomerAccTbl(data);
   fillStaffLinked(data);
   fillStaffWires(data);
+  fillStaffUkFpsIn(data);
   if($('#cust_details_card').css('display')=='none'){
     $('#cust_details_card').show();
   }
@@ -372,6 +373,76 @@ function fillStaffWires(data) {
     option.innerHTML = wires[j].nickname + ' $' + wires[j].amount + ' (' + wires[j].status + ')';
     selection.options.add(option);
   }
+}
+
+function fillStaffUkFpsIn(data) {
+  var snapshot = data.UkFpsIn || {};
+  var card = document.getElementById('staff_ukfps_card');
+  if (!card) {
+    return;
+  }
+  card.style.display = 'block';
+  var summary = document.getElementById('staff_ukfps_summary');
+  if (summary) {
+    summary.innerHTML = 'YTD received: $' + (snapshot.ytd_received || '0.00') +
+      ' &middot; open: ' + (snapshot.open_count || 0);
+  }
+  var clockEl = document.getElementById('staff_ukfps_clock');
+  if (clockEl && snapshot.clock) {
+    clockEl.innerHTML = (snapshot.clock.clearing || 'FPS') + ' ' + (snapshot.clock.cutoff || '24/7') +
+      ' GMT &middot; value ' + (snapshot.clock.value_date || '--');
+  }
+  var keyTable = document.getElementById('staff_ukfps_key_tbl');
+  var keyBody = keyTable.getElementsByTagName('tbody')[0];
+  keyBody.innerHTML = '';
+  var keys = snapshot.keys || [];
+  for (var i = 0; i < keys.length; i++) {
+    var krow = keyBody.insertRow(-1);
+    krow.insertCell(0).innerHTML = keys[i].nickname;
+    krow.insertCell(1).innerHTML = keys[i].proxy_masked;
+    krow.insertCell(2).innerHTML = keys[i].status;
+  }
+  var table = document.getElementById('staff_ukfps_tbl');
+  var body = table.getElementsByTagName('tbody')[0];
+  body.innerHTML = '';
+  var selection = document.getElementById('staff_ukfps_id');
+  selection.options.length = 1;
+  var ins = snapshot.inbounds || [];
+  for (var j = 0; j < ins.length; j++) {
+    var wrow = body.insertRow(-1);
+    wrow.insertCell(0).innerHTML = ins[j].sender_name;
+    wrow.insertCell(1).innerHTML = '£' + (ins[j].amount_gbp || ins[j].amount_instructed);
+    wrow.insertCell(2).innerHTML = ins[j].status;
+    wrow.insertCell(3).innerHTML = (ins[j].e2e_masked || '').slice(0, 16);
+    var option = document.createElement('OPTION');
+    option.value = ins[j].inbound_id;
+    option.innerHTML = ins[j].sender_name + ' £' + (ins[j].amount_gbp || ins[j].amount_instructed) + ' (' + ins[j].status + ')';
+    selection.options.add(option);
+  }
+}
+
+function postStaffUkFps(path, payload) {
+  payload.userid = userid;
+  fetch(homeURL + path, {
+    method: 'post',
+    body: JSON.stringify(payload),
+    headers: { 'Content-type': 'application/json' }
+  }).then(function(response) {
+    return response.json().then(function(body) {
+      var result = document.getElementById('staff_ukfps_result');
+      if (!response.ok) {
+        if (result) { result.innerHTML = (body && (body.message || body.error)) || 'Failed'; }
+        return;
+      }
+      if (result) { result.innerHTML = body.message || 'Done'; }
+      if (body && body.file && result) {
+        result.innerHTML = (body.message || 'Exported') + ': ' + body.file;
+      }
+      getCustomer($('#customer_id_input').val() || document.getElementById('customer_id').innerHTML);
+    });
+  }).catch(function(error) {
+    console.error(error);
+  });
 }
 
 function postStaffWire(path, payload) {
@@ -803,6 +874,7 @@ $(document).ready(function() {
       $('#cust_accounts_tbl').hide();
       $('#staff_linked_card').hide();
       $('#staff_wire_card').hide();
+      $('#staff_ukfps_card').hide();
     });
     $('#staff_la_force_btn').on('click', function(){
       if($('#staff_la_link_id').val() == 'select'){ window.alert('Select a pending link.'); return; }
@@ -843,6 +915,51 @@ $(document).ready(function() {
     $('#staff_wire_recall_btn').on('click', function(){
       if($('#staff_wire_id').val() == 'select'){ window.alert('Select a wire.'); return; }
       postStaffWire('recallWire', { wire_id: $('#staff_wire_id').val() });
+    });
+    $('#staff_ukfps_ofac_btn').on('click', function(){
+      if($('#staff_ukfps_id').val() == 'select'){ window.alert('Select an inbound.'); return; }
+      postStaffUkFps('overrideUkFpsInOfac', { inbound_id: $('#staff_ukfps_id').val() });
+    });
+    $('#staff_ukfps_cop_btn').on('click', function(){
+      if($('#staff_ukfps_id').val() == 'select'){ window.alert('Select an inbound.'); return; }
+      postStaffUkFps('overrideUkFpsInCop', { inbound_id: $('#staff_ukfps_id').val() });
+    });
+    $('#staff_ukfps_release_btn').on('click', function(){
+      if($('#staff_ukfps_id').val() == 'select'){ window.alert('Select an inbound.'); return; }
+      postStaffUkFps('releaseUkFpsIn', { inbound_id: $('#staff_ukfps_id').val() });
+    });
+    $('#staff_ukfps_reject_btn').on('click', function(){
+      if($('#staff_ukfps_id').val() == 'select'){ window.alert('Select an inbound.'); return; }
+      postStaffUkFps('rejectUkFpsIn', { inbound_id: $('#staff_ukfps_id').val() });
+    });
+    $('#staff_ukfps_return_btn').on('click', function(){
+      if($('#staff_ukfps_id').val() == 'select'){ window.alert('Select an inbound.'); return; }
+      postStaffUkFps('returnUkFpsIn', { inbound_id: $('#staff_ukfps_id').val() });
+    });
+    $('#staff_ukfps_export_btn').on('click', function(){
+      if($('#staff_ukfps_id').val() == 'select'){ window.alert('Select an inbound.'); return; }
+      postStaffUkFps('exportUkFpsIn', { inbound_id: $('#staff_ukfps_id').val() });
+    });
+    $('#staff_ukfps_ingest_btn').on('click', function(){
+      if($('#staff_ukfps_amount').val() == '' || $('#staff_ukfps_proxy').val() == ''){
+        window.alert('Amount and proxy are required.');
+        return;
+      }
+      postStaffUkFps('ingestUkFpsIn', {
+        amount: $('#staff_ukfps_amount').val(),
+        name: $('#staff_ukfps_name').val() || 'UK PAYER',
+        proxy_type: $('#staff_ukfps_proxy_type').val(),
+        proxy: $('#staff_ukfps_proxy').val(),
+        rail: $('#staff_ukfps_rail').val(),
+        recv_bank: '040075'
+      });
+    });
+    $('#staff_ukfps_file_btn').on('click', function(){
+      if($('#staff_ukfps_file').val() == ''){ window.alert('UK1 file is required.'); return; }
+      postStaffUkFps('ingestUkFpsInFile', {
+        file: $('#staff_ukfps_file').val(),
+        name: $('#staff_ukfps_name').val() || 'UK PAYER'
+      });
     });
     $('#approve_trans_btn').on('click', function(){
       if($('#customer_trans_no').val() == 'select'){

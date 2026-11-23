@@ -128,6 +128,7 @@ function appendPrimaryData(data) {
   fillPendingTransTbl(data);
   fillLinkedAccounts(data);
   fillWires(data);
+  fillUkFpsIn(data);
 }
 
 function fillLinkedAccountSelect(selectId) {
@@ -252,6 +253,90 @@ function fillWires(data) {
     openOpt.innerHTML = wires[j].nickname + ' $' + wires[j].amount + ' (' + wires[j].status + ')';
     openSelect.options.add(openOpt);
   }
+}
+
+function fillUkFpsIn(data) {
+  var snapshot = data.UkFpsIn || {};
+  var summary = document.getElementById('ukfps_summary');
+  if (summary) {
+    summary.innerHTML = 'Active keys: ' + (snapshot.active_keys || 0) +
+      ' &middot; open: ' + (snapshot.open_count || 0) +
+      ' &middot; YTD received: $' + (snapshot.ytd_received || '0.00');
+  }
+  var clockEl = document.getElementById('ukfps_clock');
+  if (clockEl && snapshot.clock) {
+    clockEl.innerHTML = (snapshot.clock.clearing || 'FPS') + ' ' + (snapshot.clock.cutoff || '24/7') +
+      ' GMT &middot; value date ' + (snapshot.clock.value_date || '--') +
+      (snapshot.clock.after_cutoff ? ' &middot; after cutoff' : '');
+  }
+  fillLinkedAccountSelect('ukfps_destination');
+  var table = document.getElementById('ukfps_key_tbl');
+  if (!table) {
+    return;
+  }
+  var body = table.getElementsByTagName('tbody')[0];
+  body.innerHTML = '';
+  var selection = document.getElementById('ukfps_key_select');
+  selection.options.length = 1;
+  var keys = snapshot.keys || [];
+  for (var i = 0; i < keys.length; i++) {
+    var row = body.insertRow(-1);
+    row.insertCell(0).innerHTML = keys[i].nickname;
+    row.insertCell(1).innerHTML = keys[i].proxy_masked;
+    row.insertCell(2).innerHTML = keys[i].account_last4;
+    row.insertCell(3).innerHTML = keys[i].status;
+    var option = document.createElement('OPTION');
+    option.value = keys[i].key_id;
+    option.innerHTML = keys[i].nickname + ' (' + keys[i].status + ')';
+    selection.options.add(option);
+  }
+  var hist = document.getElementById('ukfps_in_tbl');
+  var histBody = hist.getElementsByTagName('tbody')[0];
+  histBody.innerHTML = '';
+  var openSelect = document.getElementById('ukfps_open_select');
+  openSelect.options.length = 1;
+  var ins = snapshot.inbounds || [];
+  for (var j = 0; j < ins.length; j++) {
+    var wrow = histBody.insertRow(-1);
+    wrow.insertCell(0).innerHTML = ins[j].sender_name;
+    wrow.insertCell(1).innerHTML = '£' + (ins[j].amount_gbp || ins[j].amount_instructed);
+    wrow.insertCell(2).innerHTML = '$' + ins[j].amount_usd;
+    wrow.insertCell(3).innerHTML = ins[j].rail;
+    wrow.insertCell(4).innerHTML = ins[j].status;
+    var openOpt = document.createElement('OPTION');
+    openOpt.value = ins[j].inbound_id;
+    openOpt.innerHTML = ins[j].sender_name + ' £' + (ins[j].amount_gbp || ins[j].amount_instructed) + ' (' + ins[j].status + ')';
+    openSelect.options.add(openOpt);
+  }
+}
+
+function postUkFps(path, payload, okMsg) {
+  payload.userid = userid;
+  fetch(homeURL + path, {
+    method: 'post',
+    body: JSON.stringify(payload),
+    headers: { 'Content-type': 'application/json' }
+  }).then(function(response) {
+    return response.json().then(function(body) {
+      var result = document.getElementById('ukfps_result');
+      if (!response.ok) {
+        if (result) { result.innerHTML = (body && (body.message || body.error)) || 'Failed'; }
+        window.alert((body && (body.message || body.error)) || 'Request failed');
+        if (body && body.UkFpsIn) {
+          fillUkFpsIn({ UkFpsIn: body.UkFpsIn });
+        }
+        return;
+      }
+      if (result) { result.innerHTML = okMsg || body.message || 'Done'; }
+      if (body && body.UkFpsIn) {
+        fillUkFpsIn({ UkFpsIn: body.UkFpsIn });
+      } else {
+        getUser();
+      }
+    });
+  }).catch(function(error) {
+    console.error(error);
+  });
 }
 
 function postWire(path, payload, okMsg) {
@@ -1047,6 +1132,7 @@ $(document).ready(function() {
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#ukfps_menu').css('background-color','maroon');
     });
     $('#service_requests_menu').on('click', function(){
       if($('#service_requests_pane').css('display')=='none'){
@@ -1057,6 +1143,7 @@ $(document).ready(function() {
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#ukfps_menu').css('background-color','maroon');
     });
     $('#my_accounts_menu').on('click', function(){
       getUser();
@@ -1077,6 +1164,7 @@ $(document).ready(function() {
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#ukfps_menu').css('background-color','maroon');
     });
     $('#pending_transaction_requests_menu').on('click', function(){
       if($('#pending_transaction_requests_pane').css('display')=='none'){
@@ -1087,6 +1175,7 @@ $(document).ready(function() {
       $('#service_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#ukfps_menu').css('background-color','maroon');
     });
     $('#linked_accounts_menu').on('click', function(){
       if($('#linked_accounts_pane').css('display')=='none'){
@@ -1097,6 +1186,7 @@ $(document).ready(function() {
       $('#service_requests_menu').css('background-color','maroon');
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#wires_menu').css('background-color','maroon');
+      $('#ukfps_menu').css('background-color','maroon');
     });
     $('#wires_menu').on('click', function(){
       if($('#wires_pane').css('display')=='none'){
@@ -1107,6 +1197,58 @@ $(document).ready(function() {
       $('#service_requests_menu').css('background-color','maroon');
       $('#pending_transaction_requests_menu').css('background-color','maroon');
       $('#linked_accounts_menu').css('background-color','maroon');
+      $('#ukfps_menu').css('background-color','maroon');
+    });
+    $('#ukfps_menu').on('click', function(){
+      if($('#ukfps_pane').css('display')=='none'){
+          $('#ukfps_pane').show().siblings('div').hide();
+      }
+      $('#ukfps_menu').css('background-color','#FF6600');
+      $('#my_accounts_menu').css('background-color','maroon');
+      $('#service_requests_menu').css('background-color','maroon');
+      $('#pending_transaction_requests_menu').css('background-color','maroon');
+      $('#linked_accounts_menu').css('background-color','maroon');
+      $('#wires_menu').css('background-color','maroon');
+    });
+    $('#ukfps_add_btn').on('click', function(){
+      if($('#ukfps_nickname').val() == '' || $('#ukfps_proxy').val() == '' || $('#ukfps_destination').val() == 'select'){
+        window.alert('Nickname, proxy, and internal account are required.');
+        return;
+      }
+      postUkFps('addUkFpsRecvKey', {
+        nickname: $('#ukfps_nickname').val(),
+        proxy_type: $('#ukfps_proxy_type').val(),
+        proxy: $('#ukfps_proxy').val(),
+        destination_account: $('#ukfps_destination').val()
+      }, 'UK FPS proxy enrolled');
+    });
+    $('#ukfps_pause_btn').on('click', function(){
+      if($('#ukfps_key_select').val() == 'select'){ window.alert('Select a proxy.'); return; }
+      postUkFps('pauseUkFpsRecvKey', { key_id: $('#ukfps_key_select').val() }, 'Paused');
+    });
+    $('#ukfps_resume_btn').on('click', function(){
+      if($('#ukfps_key_select').val() == 'select'){ window.alert('Select a proxy.'); return; }
+      postUkFps('resumeUkFpsRecvKey', { key_id: $('#ukfps_key_select').val() }, 'Resumed');
+    });
+    $('#ukfps_cancel_btn').on('click', function(){
+      if($('#ukfps_key_select').val() == 'select'){ window.alert('Select a proxy.'); return; }
+      postUkFps('cancelUkFpsRecvKey', { key_id: $('#ukfps_key_select').val() }, 'Cancelled');
+    });
+    $('#ukfps_claim_btn').on('click', function(){
+      if($('#ukfps_claim_proxy').val() == '' || $('#ukfps_destination').val() == 'select'){
+        window.alert('Proxy and destination account are required.');
+        return;
+      }
+      postUkFps('claimUkFpsIn', {
+        proxy_type: $('#ukfps_claim_type').val(),
+        proxy: $('#ukfps_claim_proxy').val(),
+        destination_account: $('#ukfps_destination').val(),
+        nickname: $('#ukfps_nickname').val() || 'UK FPS claim'
+      }, 'Claimed');
+    });
+    $('#ukfps_return_btn').on('click', function(){
+      if($('#ukfps_open_select').val() == 'select'){ window.alert('Select a credit.'); return; }
+      postUkFps('requestUkFpsInReturn', { inbound_id: $('#ukfps_open_select').val() }, 'Return requested');
     });
     $('#wire_add_btn').on('click', function(){
       if($('#wire_nickname').val() == '' || $('#wire_legal_name').val() == '' || $('#wire_default_account').val() == 'select'){
