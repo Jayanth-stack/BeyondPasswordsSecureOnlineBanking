@@ -563,13 +563,21 @@ def deny_request():
         logging.warning('Not logged In or Unauthorized Access - denyRequest')
         return redirect(url_for('get_login_page_ui', _external=True, _scheme='http'))
 
-    if session.get('usertype') != 'customer':
+    usertype = session.get('usertype')
+    if usertype == 'customer':
+        c = Customers()
+        result = c.deny_funds_requested(values['transaction_no'], session['userid'])
+    elif usertype in ['admin', 'employee', 'tier1', 'tier2']:
+        emp = Employee()
+        result = emp.deny_funds_requested(session['userid'], values['transaction_no'])
+    else:
         return jsonify({'message': 'Unauthorized access'}), 403
 
-    c = Customers()
-    result = c.deny_funds_requested(values['transaction_no'], session['userid'])
     if result != 'Request Cancelled':
-        status = 403 if result == 'Unauthorized or invalid transaction' else 500
+        status = 403 if result in (
+            'Unauthorized or invalid transaction',
+            'Not authorized to GET/Approve transactions',
+        ) else 500
         logging.warning(
             'DenyRequest rejected user=%s txn=%s result=%s',
             session['userid'], values['transaction_no'], result
@@ -825,8 +833,8 @@ def approve_update_info():
     try:
         emp = Employee()
         # Check if the employee has the right to approve updates
-        if session.get('usertype') in ['admin', 'employee'] and session.get('emp_tier',
-                                                                            1) >= 2:  # Assuming tier 2 and above can approve
+        if session.get('usertype') in ['admin', 'employee', 'tier1', 'tier2'] and session.get(
+                'emp_tier', 1) >= 2:
             result = emp.approve_update_info(values['userid'], values['update_req_no'])
             return jsonify({'message': result}), 200
         else:
@@ -856,7 +864,8 @@ def deny_update_info():
         return redirect(url_for('get_login_page_ui', _external=True, _scheme='http'))
 
     # Assuming that certain roles such as 'admin' or higher employee tier have the permission to deny updates
-    if session.get('usertype') not in ['admin', 'employee'] or session.get('emp_tier', 1) < 2:
+    if session.get('usertype') not in ['admin', 'employee', 'tier1', 'tier2'] or session.get(
+            'emp_tier', 1) < 2:
         logging.warning(f"Insufficient permissions to deny update info: {session.get('userid')}")
         return jsonify({'message': 'Insufficient permissions'}), 403
 
@@ -1168,7 +1177,7 @@ def deactivate_employee():
 
         # Deactivate employee and handle success/failure
         emp = Employee()
-        response = emp.deactivate_employee(data['emp_id'])
+        response = emp.deactivate_employee(session['userid'], data['emp_id'])
         return jsonify({'message': response}), 200
 
     except Exception as e:
