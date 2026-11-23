@@ -833,8 +833,8 @@ def approve_update_info():
     try:
         emp = Employee()
         # Check if the employee has the right to approve updates
-        if session.get('usertype') in ['admin', 'employee'] and session.get('emp_tier',
-                                                                            1) >= 2:  # Assuming tier 2 and above can approve
+        if session.get('usertype') in ['admin', 'employee', 'tier1', 'tier2'] and session.get(
+                'emp_tier', 1) >= 2:
             result = emp.approve_update_info(values['userid'], values['update_req_no'])
             return jsonify({'message': result}), 200
         else:
@@ -864,7 +864,8 @@ def deny_update_info():
         return redirect(url_for('get_login_page_ui', _external=True, _scheme='http'))
 
     # Assuming that certain roles such as 'admin' or higher employee tier have the permission to deny updates
-    if session.get('usertype') not in ['admin', 'employee'] or session.get('emp_tier', 1) < 2:
+    if session.get('usertype') not in ['admin', 'employee', 'tier1', 'tier2'] or session.get(
+            'emp_tier', 1) < 2:
         logging.warning(f"Insufficient permissions to deny update info: {session.get('userid')}")
         return jsonify({'message': 'Insufficient permissions'}), 403
 

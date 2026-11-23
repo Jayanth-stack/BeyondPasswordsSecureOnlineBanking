@@ -209,6 +209,36 @@ class SessionAuthRegressionTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         employee_cls.return_value.deactivate_employee.assert_called_once_with("admin1", "emp42")
 
+    @patch("app.Employee")
+    def test_approve_update_info_allows_tier2_usertype(self, employee_cls):
+        employee_cls.return_value.approve_update_info.return_value = "Customer Updated"
+        self._login_tier2_session("tier2emp")
+
+        response = self.client.post(
+            "/approveUpdateInfo",
+            json={"userid": "tier2emp", "update_req_no": 7},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json()["message"], "Customer Updated")
+        employee_cls.return_value.approve_update_info.assert_called_once_with(
+            "tier2emp", 7
+        )
+
+    def test_approve_update_info_rejects_tier1_employee(self):
+        with self.client.session_transaction() as sess:
+            sess["userid"] = "tier1emp"
+            sess["usertype"] = "tier1"
+            sess["emp_tier"] = 1
+
+        response = self.client.post(
+            "/approveUpdateInfo",
+            json={"userid": "tier1emp", "update_req_no": 7},
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.get_json()["message"], "Insufficient permissions")
+
 
 class TransactionOwnershipQueryTests(unittest.TestCase):
     def setUp(self):
