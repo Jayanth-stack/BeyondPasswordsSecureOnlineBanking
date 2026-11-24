@@ -111,6 +111,15 @@
         </button>
 
         <button type="button" class="btn btn-primary btn-block"
+        id="canpay_menu">
+        <span class="glyphicon glyphicon-globe gi-3x"
+        style="color: white" aria-hidden="true">
+        </span>
+        <br />
+        Interac
+        </button>
+
+        <button type="button" class="btn btn-primary btn-block"
         id="service_requests_menu">
         <span class="glyphicon glyphicon-edit gi-3x"
         style="color: white" aria-hidden="true">
@@ -351,6 +360,90 @@
           </table>
           <select id="wire_open_select" style="height:30px;margin-right:5px;">
             <option value="select">Select open wire</option>
+          </select>
+        </div>
+        <div id="canpay_pane" style="display:none;">
+          <p id="canpay_summary" style="color:white;">Active: 0 &middot; open: 0 &middot; YTD sent: C$0.00 &middot; fees: C$0.00</p>
+          <p id="canpay_clock" style="color:white;">Interac 24/7 &middot; EFT cutoff 16:00 ET &middot; Lynx cutoff 18:00 ET</p>
+          <table class="table table-hover table-bordered table-color fixed-header" id="canpay_bene_tbl">
+            <thead>
+              <tr>
+                <th>Nickname</th>
+                <th>Name</th>
+                <th>CPA</th>
+                <th>Last4</th>
+                <th>Payee</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+          <hr>
+          <h5 style="color:white;">Add an Interac / EFT / Lynx beneficiary</h5>
+          <input type="text" id="canpay_nickname" placeholder="Nickname" style="height:30px;width:140px;margin-right:5px;">
+          <input type="text" id="canpay_legal_name" placeholder="Legal name" style="height:30px;width:160px;margin-right:5px;">
+          <input type="text" id="canpay_payee_name" placeholder="Payee name" style="height:30px;width:160px;margin-right:5px;">
+          <input type="text" id="canpay_bank_code" placeholder="CPA routing" maxlength="9" style="height:30px;width:120px;margin-right:5px;">
+          <input type="text" id="canpay_account_number" placeholder="Account no." style="height:30px;width:140px;margin-right:5px;">
+          <select id="canpay_default_account" style="height:30px;margin-right:5px;">
+            <option value="select">Internal account</option>
+          </select>
+          <br><br>
+          <select id="canpay_proxy_type" style="height:30px;margin-right:5px;">
+            <option value="">No proxy</option>
+            <option value="phone">Mobile</option>
+            <option value="nid">SIN</option>
+            <option value="email">Email</option>
+            <option value="cpa">CPA+account</option>
+          </select>
+          <input type="text" id="canpay_proxy" placeholder="Proxy" style="height:30px;width:180px;margin-right:5px;">
+          <button type="button" id="canpay_lookup_btn" class="btn btn-primary">Lookup name</button>
+          <button type="button" id="canpay_add_btn" class="btn btn-primary">Add beneficiary</button>
+          <br><br>
+          <h5 style="color:white;">Send Interac / EFT / Lynx</h5>
+          <select id="canpay_bene_select" style="height:30px;margin-right:5px;">
+            <option value="select">Select beneficiary</option>
+          </select>
+          <input type="text" id="canpay_amount" placeholder="CAD amount" style="height:30px;width:110px;margin-right:5px;">
+          <select id="canpay_rail" style="height:30px;margin-right:5px;">
+            <option value="inst">Interac 24/7</option>
+            <option value="eft">EFT</option>
+            <option value="lynx">Lynx</option>
+          </select>
+          <select id="canpay_purpose" style="height:30px;margin-right:5px;">
+            <option value="other">Other</option>
+            <option value="family">Family</option>
+            <option value="goods">Goods</option>
+            <option value="payroll">Payroll</option>
+            <option value="tax">Tax</option>
+            <option value="loan">Loan</option>
+            <option value="rent">Rent</option>
+          </select>
+          <input type="text" id="canpay_memo" placeholder="Memo" style="height:30px;width:140px;margin-right:5px;">
+          <button type="button" id="canpay_quote_btn" class="btn btn-primary">Quote FX</button>
+          <button type="button" id="canpay_preview_btn" class="btn btn-primary">Preview</button>
+          <button type="button" id="canpay_send_btn" class="btn btn-primary">Send</button>
+          <button type="button" id="canpay_cancel_btn" class="btn btn-primary">Cancel open</button>
+          <button type="button" id="canpay_pause_btn" class="btn btn-primary">Pause</button>
+          <button type="button" id="canpay_resume_btn" class="btn btn-primary">Resume</button>
+          <button type="button" id="canpay_archive_btn" class="btn btn-primary">Archive</button>
+          <p id="canpay_result" style="color:yellow;margin-top:10px;"></p>
+          <hr>
+          <h5 style="color:white;">Canada rail history</h5>
+          <table class="table table-hover table-bordered table-color fixed-header" id="canpay_history_tbl">
+            <thead>
+              <tr>
+                <th>Nickname</th>
+                <th>Amount</th>
+                <th>USD</th>
+                <th>Status</th>
+                <th>E2E</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+          <select id="canpay_open_select" style="height:30px;margin-right:5px;">
+            <option value="select">Select open payment</option>
           </select>
         </div>
         <div id="account_details_pane" style="display:none;">
