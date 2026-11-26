@@ -321,6 +321,7 @@ function appendSecondaryData(customer_id, data) {
   fillCustomerAccTbl(data);
   fillStaffLinked(data);
   fillStaffWires(data);
+  fillStaffCanPayIn(data);
   if($('#cust_details_card').css('display')=='none'){
     $('#cust_details_card').show();
   }
@@ -449,6 +450,73 @@ function fillStaffWires(data) {
     option.innerHTML = wires[j].nickname + ' $' + wires[j].amount + ' (' + wires[j].status + ')';
     selection.options.add(option);
   }
+}
+
+function fillStaffCanPayIn(data) {
+  var snapshot = data.CanPayIn || {};
+  var card = document.getElementById('staff_canpay_in_card');
+  if (!card) {
+    return;
+  }
+  card.style.display = 'block';
+  var summary = document.getElementById('staff_canpay_in_summary');
+  if (summary) {
+    summary.innerHTML = 'YTD received: $' + (snapshot.ytd_received || '0.00') +
+      ' &middot; open: ' + (snapshot.open_count || 0);
+  }
+  var keyTable = document.getElementById('staff_canpay_in_key_tbl');
+  var keyBody = keyTable.getElementsByTagName('tbody')[0];
+  keyBody.innerHTML = '';
+  var keys = snapshot.keys || [];
+  for (var i = 0; i < keys.length; i++) {
+    var row = keyBody.insertRow(-1);
+    row.insertCell(0).innerHTML = keys[i].nickname;
+    row.insertCell(1).innerHTML = keys[i].proxy_type;
+    row.insertCell(2).innerHTML = keys[i].proxy_masked;
+    row.insertCell(3).innerHTML = keys[i].status;
+  }
+  var table = document.getElementById('staff_canpay_in_tbl');
+  var body = table.getElementsByTagName('tbody')[0];
+  body.innerHTML = '';
+  var selection = document.getElementById('staff_canpay_in_id');
+  selection.options.length = 1;
+  var inbounds = snapshot.inbounds || [];
+  for (var j = 0; j < inbounds.length; j++) {
+    var wrow = body.insertRow(-1);
+    wrow.insertCell(0).innerHTML = inbounds[j].sender_name;
+    wrow.insertCell(1).innerHTML = 'C$' + inbounds[j].amount_instructed;
+    wrow.insertCell(2).innerHTML = inbounds[j].status;
+    wrow.insertCell(3).innerHTML = inbounds[j].e2e_masked;
+    if (['held', 'queued', 'pending_release', 'unmatched', 'posted'].indexOf(inbounds[j].status) < 0) {
+      continue;
+    }
+    var option = document.createElement('OPTION');
+    option.value = inbounds[j].inbound_id;
+    option.innerHTML = inbounds[j].status + ' C$' + inbounds[j].amount_instructed;
+    selection.options.add(option);
+  }
+}
+
+function postStaffCanPayIn(path, payload) {
+  payload.userid = userid;
+  payload.customer_id = $('#customer_id_input').val() || (document.getElementById('customer_id') && document.getElementById('customer_id').innerHTML);
+  fetch(homeURL + path, {
+    method: 'post',
+    body: JSON.stringify(payload),
+    headers: { 'Content-type': 'application/json' }
+  }).then(function(response) {
+    return response.json().then(function(body) {
+      var result = document.getElementById('staff_canpay_in_result');
+      if (!response.ok) {
+        if (result) { result.innerHTML = (body && (body.message || body.error)) || 'Failed'; }
+        return;
+      }
+      if (result) { result.innerHTML = body.message || 'Done'; }
+      getCustomer($('#customer_id_input').val() || document.getElementById('customer_id').innerHTML);
+    });
+  }).catch(function(error) {
+    console.error(error);
+  });
 }
 
 function postStaffWire(path, payload) {
@@ -877,6 +945,7 @@ $(document).ready(function() {
       $('#cust_accounts_tbl').hide();
       $('#staff_linked_card').hide();
       $('#staff_wire_card').hide();
+      $('#staff_canpay_in_card').hide();
     });
     $('#staff_la_force_btn').on('click', function(){
       if($('#staff_la_link_id').val() == 'select'){ window.alert('Select a pending link.'); return; }
@@ -917,6 +986,39 @@ $(document).ready(function() {
     $('#staff_wire_recall_btn').on('click', function(){
       if($('#staff_wire_id').val() == 'select'){ window.alert('Select a wire.'); return; }
       postStaffWire('recallWire', { wire_id: $('#staff_wire_id').val() });
+    });
+    $('#staff_canpay_in_ingest_btn').on('click', function(){
+      if($('#staff_canpay_in_amount').val() == '' || $('#staff_canpay_in_proxy').val() == ''){
+        window.alert('Amount and proxy are required.');
+        return;
+      }
+      postStaffCanPayIn('ingestCanPayIn', {
+        end_to_end_id: $('#staff_canpay_in_e2e').val(),
+        amount: $('#staff_canpay_in_amount').val(),
+        name: 'Staff ingest',
+        proxy_type: $('#staff_canpay_in_proxy_type').val(),
+        proxy: $('#staff_canpay_in_proxy').val()
+      });
+    });
+    $('#staff_canpay_in_override_btn').on('click', function(){
+      if($('#staff_canpay_in_id').val() == 'select'){ window.alert('Select an inbound.'); return; }
+      postStaffCanPayIn('overrideCanPayInOfac', { inbound_id: $('#staff_canpay_in_id').val() });
+    });
+    $('#staff_canpay_in_payee_btn').on('click', function(){
+      if($('#staff_canpay_in_id').val() == 'select'){ window.alert('Select an inbound.'); return; }
+      postStaffCanPayIn('overrideCanPayInPayee', { inbound_id: $('#staff_canpay_in_id').val() });
+    });
+    $('#staff_canpay_in_release_btn').on('click', function(){
+      if($('#staff_canpay_in_id').val() == 'select'){ window.alert('Select an inbound.'); return; }
+      postStaffCanPayIn('releaseCanPayIn', { inbound_id: $('#staff_canpay_in_id').val() });
+    });
+    $('#staff_canpay_in_reject_btn').on('click', function(){
+      if($('#staff_canpay_in_id').val() == 'select'){ window.alert('Select an inbound.'); return; }
+      postStaffCanPayIn('rejectCanPayIn', { inbound_id: $('#staff_canpay_in_id').val() });
+    });
+    $('#staff_canpay_in_return_btn').on('click', function(){
+      if($('#staff_canpay_in_id').val() == 'select'){ window.alert('Select an inbound.'); return; }
+      postStaffCanPayIn('returnCanPayIn', { inbound_id: $('#staff_canpay_in_id').val() });
     });
     $('#approve_req_btn').on('click', function(){
       if($('#customer_req_id').val() == 'select'){
