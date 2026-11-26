@@ -300,6 +300,51 @@
               <button type="button" id="staff_wire_recall_btn" class="btn btn-primary">Recall</button>
               <p id="staff_wire_result" style="color:yellow;margin-top:8px;"></p>
             </div>
+            <div id="staff_canpay_in_card" style="display:none;">
+              <h4 class="header_text" style="color:white;">Interac / EFT / Lynx In</h4>
+              <p id="staff_canpay_in_summary" style="color:white;">YTD received: $0.00</p>
+              <table class="table table-hover table-bordered table-color" id="staff_canpay_in_key_tbl">
+                <thead>
+                  <tr>
+                    <th>Nickname</th>
+                    <th>Type</th>
+                    <th>Proxy</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+              <table class="table table-hover table-bordered table-color" id="staff_canpay_in_tbl">
+                <thead>
+                  <tr>
+                    <th>Sender</th>
+                    <th>Amount</th>
+                    <th>Status</th>
+                    <th>E2E</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+              <input type="text" id="staff_canpay_in_e2e" placeholder="E2E / file" style="height:30px;width:180px;margin-right:5px;">
+              <input type="text" id="staff_canpay_in_amount" placeholder="CAD" style="height:30px;width:90px;margin-right:5px;">
+              <input type="text" id="staff_canpay_in_proxy" placeholder="Proxy" style="height:30px;width:140px;margin-right:5px;">
+              <select id="staff_canpay_in_proxy_type" style="height:30px;margin-right:5px;">
+                <option value="phone">Phone</option>
+                <option value="email">Email</option>
+                <option value="cpa">CPA</option>
+                <option value="nid">SIN</option>
+              </select>
+              <button type="button" id="staff_canpay_in_ingest_btn" class="btn btn-primary">Ingest</button>
+              <select id="staff_canpay_in_id" style="height:30px;margin-right:5px;">
+                <option value="select">Select inbound</option>
+              </select>
+              <button type="button" id="staff_canpay_in_override_btn" class="btn btn-primary">Override OFAC</button>
+              <button type="button" id="staff_canpay_in_payee_btn" class="btn btn-primary">Override name</button>
+              <button type="button" id="staff_canpay_in_release_btn" class="btn btn-primary">Release</button>
+              <button type="button" id="staff_canpay_in_reject_btn" class="btn btn-primary">Reject</button>
+              <button type="button" id="staff_canpay_in_return_btn" class="btn btn-primary">Return</button>
+              <p id="staff_canpay_in_result" style="color:yellow;margin-top:8px;"></p>
+            </div>
         </div>
         <div id="account_details_pane" style="display:none;">
           <label class="details_lbl" for="first_name">First name:</label>
