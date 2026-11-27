@@ -111,6 +111,15 @@
         </button>
 
         <button type="button" class="btn btn-primary btn-block"
+        id="swpay_menu">
+        <span class="glyphicon glyphicon-globe gi-3x"
+        style="color: white" aria-hidden="true">
+        </span>
+        <br />
+        SWIFT
+        </button>
+
+        <button type="button" class="btn btn-primary btn-block"
         id="service_requests_menu">
         <span class="glyphicon glyphicon-edit gi-3x"
         style="color: white" aria-hidden="true">
@@ -351,6 +360,83 @@
           </table>
           <select id="wire_open_select" style="height:30px;margin-right:5px;">
             <option value="select">Select open wire</option>
+          </select>
+        </div>
+        <div id="swpay_pane" style="display:none;">
+          <p id="swpay_summary" style="color:white;">Active: 0 &middot; open: 0 &middot; YTD sent: €0.00</p>
+          <p id="swpay_clock" style="color:white;">gpi 24/7 &middot; MT103 16:00 CET</p>
+          <table class="table table-hover table-bordered table-color fixed-header" id="swpay_bene_tbl">
+            <thead>
+              <tr>
+                <th>Nickname</th>
+                <th>Payee</th>
+                <th>BIC</th>
+                <th>IBAN</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+          <hr>
+          <h5 style="color:white;">Add a SWIFT beneficiary</h5>
+          <input type="text" id="swpay_nickname" placeholder="Nickname" style="height:30px;width:140px;margin-right:5px;">
+          <input type="text" id="swpay_legal_name" placeholder="Legal name" style="height:30px;width:160px;margin-right:5px;">
+          <input type="text" id="swpay_payee_name" placeholder="Payee name" style="height:30px;width:160px;margin-right:5px;">
+          <input type="text" id="swpay_bank_code" placeholder="BIC" style="height:30px;width:130px;margin-right:5px;">
+          <input type="text" id="swpay_account_number" placeholder="IBAN" style="height:30px;width:200px;margin-right:5px;">
+          <select id="swpay_default_account" style="height:30px;margin-right:5px;">
+            <option value="select">Internal account</option>
+          </select>
+          <br><br>
+          <select id="swpay_proxy_type" style="height:30px;margin-right:5px;">
+            <option value="">Proxy</option>
+            <option value="phone">Phone</option>
+            <option value="email">Email</option>
+            <option value="nid">IdNr</option>
+            <option value="iban">IBAN</option>
+          </select>
+          <input type="text" id="swpay_proxy" placeholder="Proxy value" style="height:30px;width:180px;margin-right:5px;">
+          <button type="button" id="swpay_add_btn" class="btn btn-primary">Add beneficiary</button>
+          <br><br>
+          <h5 style="color:white;">Send SWIFT gpi / MT103 / MT202 COV</h5>
+          <select id="swpay_bene_select" style="height:30px;margin-right:5px;">
+            <option value="select">Select beneficiary</option>
+          </select>
+          <input type="text" id="swpay_amount" placeholder="Amount" style="height:30px;width:100px;margin-right:5px;">
+          <select id="swpay_rail" style="height:30px;margin-right:5px;">
+            <option value="inst">gpi</option>
+            <option value="mt">MT103</option>
+            <option value="cov">MT202 COV</option>
+          </select>
+          <select id="swpay_currency" style="height:30px;margin-right:5px;">
+            <option value="EUR">EUR</option>
+            <option value="GBP">GBP</option>
+            <option value="USD">USD</option>
+            <option value="JPY">JPY</option>
+          </select>
+          <button type="button" id="swpay_preview_btn" class="btn btn-primary">Preview</button>
+          <button type="button" id="swpay_send_btn" class="btn btn-primary">Send</button>
+          <button type="button" id="swpay_cancel_btn" class="btn btn-primary">Cancel open</button>
+          <button type="button" id="swpay_pause_btn" class="btn btn-primary">Pause</button>
+          <button type="button" id="swpay_resume_btn" class="btn btn-primary">Resume</button>
+          <button type="button" id="swpay_archive_btn" class="btn btn-primary">Archive</button>
+          <p id="swpay_result" style="color:yellow;margin-top:10px;"></p>
+          <hr>
+          <h5 style="color:white;">SWIFT history</h5>
+          <table class="table table-hover table-bordered table-color fixed-header" id="swpay_history_tbl">
+            <thead>
+              <tr>
+                <th>Nickname</th>
+                <th>Amount</th>
+                <th>USD</th>
+                <th>Status</th>
+                <th>E2E</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+          <select id="swpay_open_select" style="height:30px;margin-right:5px;">
+            <option value="select">Select open payment</option>
           </select>
         </div>
         <div id="account_details_pane" style="display:none;">
